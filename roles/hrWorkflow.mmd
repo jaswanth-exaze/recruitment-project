@@ -1,0 +1,155 @@
+sequenceDiagram
+    autonumber
+
+    participant HR as HR User
+    participant API as Backend API
+    participant DB as Database
+    participant EMAIL as Email Service
+    participant AUDIT as Audit Log System
+
+    %% =====================================================
+    %% HR LOGIN
+    %% =====================================================
+
+    HR->>API: POST /auth/login
+    API->>DB: Validate credentials (role=HR)
+    API-->>HR: Access Token Issued
+
+
+    %% =====================================================
+    %% CREATE JOB DRAFT
+    %% =====================================================
+
+    HR->>API: POST /jobs (status=draft)
+    API->>DB: INSERT INTO job_requisitions
+    API->>AUDIT: Log job created (draft)
+    API-->>HR: Job Draft Created
+
+
+    %% =====================================================
+    %% SUBMIT FOR APPROVAL
+    %% =====================================================
+
+    HR->>API: PUT /jobs/{id}/submit
+    API->>DB: UPDATE job_requisitions SET status='pending'
+    API->>DB: INSERT INTO job_approvals (status='pending')
+    API->>EMAIL: Notify Hiring Manager
+    API->>AUDIT: Log approval requested
+    API-->>HR: Approval Requested
+
+
+    %% =====================================================
+    %% CHECK APPROVAL STATUS
+    %% =====================================================
+
+    HR->>API: GET /jobs/{id}
+    API->>DB: Fetch job status
+    API-->>HR: Job Status Returned
+
+
+    %% =====================================================
+    %% VIEW APPLICATIONS
+    %% =====================================================
+
+    HR->>API: GET /applications?job_id={id}
+    API->>DB: SELECT * FROM applications WHERE job_id=?
+    API-->>HR: List of Applications
+
+
+    %% =====================================================
+    %% MOVE CANDIDATE TO SCREENING
+    %% =====================================================
+
+    HR->>API: PUT /applications/{id}/move-stage
+    API->>DB: UPDATE applications SET current_stage_id=?
+    API->>AUDIT: Log stage change
+    API-->>HR: Stage Updated
+
+
+    %% =====================================================
+    %% SCREENING DECISION
+    %% =====================================================
+
+    HR->>API: PUT /applications/{id}/screen
+    API->>DB: UPDATE applications SET status='rejected' OR 'interview'
+    API->>EMAIL: Send rejection OR interview invite
+    API->>AUDIT: Log screening decision
+    API-->>HR: Screening Decision Saved
+
+
+    %% =====================================================
+    %% SCHEDULE INTERVIEW
+    %% =====================================================
+
+    HR->>API: POST /interviews
+    API->>DB: INSERT INTO interviews
+    API->>EMAIL: Send interview invitation
+    API->>AUDIT: Log interview scheduled
+    API-->>HR: Interview Scheduled
+
+
+    %% =====================================================
+    %% REVIEW INTERVIEW FEEDBACK
+    %% =====================================================
+
+    HR->>API: GET /scorecards/{application_id}
+    API->>DB: SELECT interview feedback
+    API-->>HR: Feedback Returned
+
+
+    %% =====================================================
+    %% FINAL DECISION
+    %% =====================================================
+
+    HR->>API: PUT /applications/{id}/final-decision
+    API->>DB: UPDATE applications SET status='selected' OR 'rejected'
+    API->>EMAIL: Send rejection email (if rejected)
+    API->>AUDIT: Log final decision
+    API-->>HR: Decision Saved
+
+
+    %% =====================================================
+    %% CREATE OFFER
+    %% =====================================================
+
+    HR->>API: POST /offers
+    API->>DB: INSERT INTO offers (status='draft')
+    API->>AUDIT: Log offer created
+    API-->>HR: Offer Draft Created
+
+
+    %% =====================================================
+    %% SEND OFFER
+    %% =====================================================
+
+    HR->>API: PUT /offers/{id}/send
+    API->>DB: UPDATE offers SET status='sent'
+    API->>EMAIL: Send offer email
+    API->>AUDIT: Log offer sent
+    API-->>HR: Offer Sent
+
+
+    %% =====================================================
+    %% OFFER RESPONSE HANDLING
+    %% =====================================================
+
+    HR->>API: GET /offers/{id}
+    API->>DB: Fetch offer status
+    API-->>HR: Offer Status
+
+    %% If Accepted:
+    HR->>API: PUT /applications/{id}/hire
+    API->>DB: UPDATE applications SET status='hired'
+    API->>AUDIT: Log candidate hired
+    API->>EMAIL: Send onboarding email
+    API-->>HR: Candidate Hired
+
+
+    %% =====================================================
+    %% CLOSE JOB
+    %% =====================================================
+
+    HR->>API: PUT /jobs/{id}/close
+    API->>DB: UPDATE job_requisitions SET status='closed'
+    API->>AUDIT: Log job closed
+    API-->>HR: Job Closed

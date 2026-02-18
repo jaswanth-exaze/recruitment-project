@@ -1,0 +1,66 @@
+sequenceDiagram
+    autonumber
+
+    participant PA as Platform Admin
+    participant API as Backend API
+    participant DB as Database
+    participant EMAIL as Email Service
+    participant AUDIT as Audit Log System
+
+    %% =====================================================
+    %% PLATFORM ADMIN LOGIN
+    %% =====================================================
+
+    PA->>API: POST /auth/login
+    API->>DB: Validate Platform Admin credentials
+    API-->>PA: Access Token Issued
+
+
+    %% =====================================================
+    %% CREATE COMPANY
+    %% =====================================================
+
+    PA->>API: POST /companies (company details)
+    API->>DB: INSERT INTO companies
+    API->>AUDIT: Log company created
+    API-->>PA: Company Created (company_id)
+
+
+    %% =====================================================
+    %% CREATE COMPANY ADMIN USER
+    %% =====================================================
+
+    PA->>API: POST /users (role=CompanyAdmin)
+    API->>DB: INSERT INTO users (company_id, role=CompanyAdmin)
+    API->>EMAIL: Send invite email
+    API->>AUDIT: Log company admin created
+    API-->>PA: Company Admin Created
+
+
+    %% =====================================================
+    %% VIEW ALL COMPANIES
+    %% =====================================================
+
+    PA->>API: GET /companies
+    API->>DB: SELECT * FROM companies
+    API-->>PA: List of Companies
+
+
+    %% =====================================================
+    %% DEACTIVATE COMPANY
+    %% =====================================================
+
+    PA->>API: PUT /companies/{id}/deactivate
+    API->>DB: UPDATE companies SET is_active=false
+    API->>AUDIT: Log company deactivated
+    API-->>PA: Company Deactivated
+
+
+    %% =====================================================
+    %% REACTIVATE COMPANY
+    %% =====================================================
+
+    PA->>API: PUT /companies/{id}/activate
+    API->>DB: UPDATE companies SET is_active=true
+    API->>AUDIT: Log company reactivated
+    API-->>PA: Company Activated

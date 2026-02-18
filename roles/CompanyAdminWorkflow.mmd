@@ -1,0 +1,113 @@
+sequenceDiagram
+    autonumber
+
+    participant CA as Company Admin
+    participant API as Backend API
+    participant DB as Database
+    participant EMAIL as Email Service
+    participant AUDIT as Audit Log System
+
+    %% =====================================================
+    %% COMPANY ADMIN LOGIN
+    %% =====================================================
+
+    CA->>API: POST /auth/login
+    API->>DB: Validate credentials (company_id + role=CompanyAdmin)
+    API-->>CA: Access Token Issued
+
+
+    %% =====================================================
+    %% LOAD DASHBOARD
+    %% =====================================================
+
+    CA->>API: GET /dashboard
+    API->>DB: Fetch company jobs
+    API->>DB: Fetch active users
+    API->>DB: Fetch pipeline stages
+    API-->>CA: Dashboard Data
+
+
+    %% =====================================================
+    %% ADD NEW USER (HR / MANAGER / INTERVIEWER)
+    %% =====================================================
+
+    CA->>API: POST /users (role=HR)
+    API->>DB: INSERT INTO users (company_id, role)
+    API->>EMAIL: Send invite email
+    API->>AUDIT: Log user created
+    API-->>CA: User Created Successfully
+
+
+    %% =====================================================
+    %% UPDATE USER ROLE
+    %% =====================================================
+
+    CA->>API: PUT /users/{id}/role
+    API->>DB: UPDATE users SET role=NewRole
+    API->>AUDIT: Log role updated
+    API-->>CA: Role Updated
+
+
+    %% =====================================================
+    %% DEACTIVATE USER
+    %% =====================================================
+
+    CA->>API: PUT /users/{id}/deactivate
+    API->>DB: UPDATE users SET is_active=false
+    API->>AUDIT: Log user deactivated
+    API-->>CA: User Deactivated
+
+
+    %% =====================================================
+    %% CONFIGURE HIRING PIPELINE
+    %% =====================================================
+
+    CA->>API: POST /pipeline-stages
+    API->>DB: INSERT INTO pipeline_stages (company_id, stage_name, order)
+    API->>AUDIT: Log pipeline stage created
+    API-->>CA: Stage Added
+
+    CA->>API: PUT /pipeline-stages/{id}
+    API->>DB: UPDATE pipeline_stages
+    API->>AUDIT: Log pipeline stage updated
+    API-->>CA: Stage Updated
+
+
+    %% =====================================================
+    %% CONFIGURE COMPANY SETTINGS
+    %% =====================================================
+
+    CA->>API: PUT /company-settings
+    API->>DB: UPDATE company_settings
+    API->>AUDIT: Log settings updated
+    API-->>CA: Settings Saved
+
+
+    %% =====================================================
+    %% VIEW AUDIT LOGS
+    %% =====================================================
+
+    CA->>API: GET /audit-logs
+    API->>DB: SELECT * FROM audit_logs WHERE company_id=?
+    API-->>CA: Audit Log List
+
+
+    %% =====================================================
+    %% OVERRIDE JOB APPROVAL
+    %% =====================================================
+
+    CA->>API: PUT /jobs/{id}/override-approve
+    API->>DB: UPDATE job_approvals SET status='override_approved'
+    API->>DB: UPDATE job_requisitions SET status='published'
+    API->>AUDIT: Log override approval
+    API-->>CA: Job Published
+
+
+    %% =====================================================
+    %% CLOSE JOB REQUISITION
+    %% =====================================================
+
+    CA->>API: PUT /jobs/{id}/close
+    API->>DB: UPDATE job_requisitions SET status='closed'
+    API->>AUDIT: Log job closed
+    API-->>CA: Job Closed Successfully

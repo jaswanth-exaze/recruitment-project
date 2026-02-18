@@ -1,0 +1,194 @@
+sequenceDiagram
+    autonumber
+
+    participant PA as Platform Admin
+    participant CA as Company Admin (TSEworks)
+    participant HR as HR
+    participant HM as Hiring Manager
+    participant IV as Interviewer
+    participant C as Candidate Portal
+    participant API as Backend API
+    participant WF as Workflow Engine
+    participant DB as MySQL Database
+    participant W as Background Worker
+    participant EXT as External Services (Email/Calendar/E-Sign)
+
+    %% =====================================================
+    %% PLATFORM SETUP — TSEworks
+    %% =====================================================
+
+    rect rgb(240,248,255)
+        PA->>API: POST /companies (TSEworks)
+        API->>DB: INSERT companies
+        API->>DB: INSERT audit_logs
+        API-->>PA: Company Created
+
+        PA->>API: POST /users (CompanyAdmin)
+        API->>DB: INSERT users (role=CompanyAdmin)
+        API->>EXT: Send invite email
+        API->>DB: INSERT audit_logs
+    end
+
+
+    %% =====================================================
+    %% COMPANY ADMIN SETUP USERS
+    %% =====================================================
+
+    rect rgb(245,250,255)
+        CA->>API: Login
+        API-->>CA: Access Token
+
+        CA->>API: Add HR / Manager / Interviewer
+        API->>DB: INSERT users
+        API->>EXT: Send invite emails
+        API->>DB: INSERT audit_logs
+    end
+
+
+    %% =====================================================
+    %% PHASE 1 — JOB CREATION
+    %% =====================================================
+
+    note over HR,DB: Job: Java Software Engineer
+
+    rect rgb(240,248,255)
+        HR->>API: POST /jobs (status="pending")
+        API->>DB: INSERT job_requisitions
+        API->>WF: Trigger approval workflow
+        WF->>DB: INSERT job_approvals (pending)
+        WF->>W: Queue manager notification
+        W->>EXT: Send approval email
+        API->>DB: INSERT audit_logs
+        API-->>HR: Job Submitted
+    end
+
+    rect rgb(240,248,255)
+        HM->>API: Approve Job
+        API->>DB: UPDATE job_approvals=approved
+        API->>DB: UPDATE job_requisitions=published
+        API->>DB: INSERT audit_logs
+        API->>EXT: Notify HR (Job Published)
+    end
+
+
+    %% =====================================================
+    %% PHASE 2 — 4 CANDIDATES APPLY
+    %% =====================================================
+
+    note over C,DB: 4 Candidates Apply
+
+    rect rgb(255,250,240)
+        loop For Each of 4 Candidates
+            C->>API: POST /applications (resume + form)
+            API->>DB: INSERT candidates
+            API->>DB: INSERT applications (status="applied")
+            API->>W: Queue resume parsing
+            API->>W: Queue acknowledgment email
+            API-->>C: Application Submitted
+        end
+
+        W->>EXT: Send 4 acknowledgment emails
+        API->>DB: INSERT audit_logs
+    end
+
+
+    %% =====================================================
+    %% PHASE 3 — SCREENING
+    %% =====================================================
+
+    note over HR,DB: Resume Screening
+
+    rect rgb(240,255,255)
+        HR->>API: Screen Applications
+
+        alt Candidate 1 Rejected at Screening
+            API->>DB: UPDATE applications SET status="rejected"
+            API->>DB: INSERT audit_logs
+            API->>W: Queue rejection email
+            W->>EXT: Send rejection email
+        else Remaining 3 Move to Interview
+            API->>DB: UPDATE applications SET status="interview"
+            API->>DB: INSERT audit_logs
+            API->>W: Queue interview invite
+            W->>EXT: Send interview emails (3)
+        end
+    end
+
+
+    %% =====================================================
+    %% PHASE 4 — INTERVIEW
+    %% =====================================================
+
+    note over HR,DB: Interview Process
+
+    rect rgb(245,255,245)
+        HR->>API: Schedule Interviews (3 Candidates)
+        API->>DB: INSERT interviews
+        API->>EXT: Sync Calendar
+        API->>DB: INSERT audit_logs
+
+        IV->>API: Submit Scorecards
+        API->>DB: INSERT scorecards
+        API->>DB: Calculate aggregate scores
+
+        alt Candidate 2 Rejected at Interview
+            API->>DB: UPDATE applications SET status="rejected"
+            API->>DB: INSERT audit_logs
+            API->>W: Queue rejection email
+            W->>EXT: Send rejection email
+        else 2 Candidates Selected
+            API->>DB: UPDATE applications SET status="final_selected"
+            API->>DB: INSERT audit_logs
+        end
+    end
+
+
+    %% =====================================================
+    %% PHASE 5 — OFFER PROCESS
+    %% =====================================================
+
+    note over HR,DB: Offer Stage (2 Candidates)
+
+    rect rgb(255,245,255)
+        HR->>API: Create Offers
+        API->>DB: INSERT offers (status="draft")
+        API->>W: Queue offer generation
+
+        W->>EXT: Generate PDF
+        W->>EXT: Send E-Sign links
+        W->>DB: UPDATE offers SET status="sent"
+        API->>DB: INSERT audit_logs
+    end
+
+
+    %% =====================================================
+    %% OFFER RESPONSES
+    %% =====================================================
+
+    rect rgb(255,245,255)
+        alt Candidate A Accepts
+            C->>API: Accept Offer
+            API->>DB: UPDATE offers="accepted"
+            API->>DB: UPDATE applications="hired"
+            API->>DB: INSERT audit_logs
+            API->>W: Queue onboarding email
+            W->>EXT: Send onboarding email
+        else Candidate B Declines
+            C->>API: Decline Offer
+            API->>DB: UPDATE offers="declined"
+            API->>DB: UPDATE applications="rejected"
+            API->>DB: INSERT audit_logs
+        end
+    end
+
+
+    %% =====================================================
+    %% POSITION CLOSED
+    %% =====================================================
+
+    rect rgb(235,245,255)
+        HR->>API: Close Job
+        API->>DB: UPDATE job_requisitions SET status="closed"
+        API->>DB: INSERT audit_logs
+        API-->>HR: Position Closed
+    end

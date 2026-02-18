@@ -1,0 +1,83 @@
+sequenceDiagram
+    autonumber
+
+    participant IV as Interviewer
+    participant API as Backend API
+    participant DB as Database
+    participant EMAIL as Email Service
+    participant AUDIT as Audit Log System
+
+    %% =====================================================
+    %% INTERVIEWER LOGIN
+    %% =====================================================
+
+    IV->>API: POST /auth/login
+    API->>DB: Validate credentials (role=Interviewer)
+    API-->>IV: Access Token Issued
+
+
+    %% =====================================================
+    %% VIEW ASSIGNED INTERVIEWS
+    %% =====================================================
+
+    IV->>API: GET /interviews?assigned_to=me
+    API->>DB: SELECT * FROM interviews WHERE interviewer_id=IV
+    API-->>IV: List of Assigned Interviews
+
+
+    %% =====================================================
+    %% VIEW INTERVIEW DETAILS
+    %% =====================================================
+
+    IV->>API: GET /interviews/{id}
+    API->>DB: Fetch interview schedule details
+    API-->>IV: Interview Details Returned
+
+
+    %% =====================================================
+    %% VIEW CANDIDATE PROFILE
+    %% =====================================================
+
+    IV->>API: GET /applications/{id}
+    API->>DB: Fetch candidate profile + resume
+    API-->>IV: Candidate Information Returned
+
+
+    %% =====================================================
+    %% SUBMIT SCORECARD
+    %% =====================================================
+
+    IV->>API: POST /scorecards
+    API->>DB: INSERT INTO scorecards
+    API->>AUDIT: Log scorecard submitted
+    API-->>IV: Scorecard Saved
+
+
+    %% =====================================================
+    %% UPDATE SCORECARD (Before Final Lock)
+    %% =====================================================
+
+    IV->>API: PUT /scorecards/{id}
+    API->>DB: UPDATE scorecards
+    API->>AUDIT: Log scorecard updated
+    API-->>IV: Scorecard Updated
+
+
+    %% =====================================================
+    %% FINAL SUBMISSION (LOCK FEEDBACK)
+    %% =====================================================
+
+    IV->>API: PUT /scorecards/{id}/finalize
+    API->>DB: UPDATE scorecards SET is_final=true
+    API->>EMAIL: Notify HR & Hiring Manager (Feedback Submitted)
+    API->>AUDIT: Log scorecard finalized
+    API-->>IV: Feedback Finalized
+
+
+    %% =====================================================
+    %% VIEW SUBMITTED FEEDBACK HISTORY
+    %% =====================================================
+
+    IV->>API: GET /scorecards/{id}/history
+    API->>DB: SELECT feedback history
+    API-->>IV: Feedback History Returned

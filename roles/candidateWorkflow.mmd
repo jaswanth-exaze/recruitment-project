@@ -1,0 +1,147 @@
+sequenceDiagram
+    autonumber
+
+    participant C as Candidate
+    participant API as Backend API
+    participant DB as MySQL Database
+    participant W as Background Worker
+    participant EXT as External Services (Email/S3/E-Sign)
+    participant AUDIT as Audit Log
+
+    %% =====================================================
+    %% PHASE 1 — SIGNUP
+    %% =====================================================
+
+    rect rgb(240,248,255)
+        C->>API: POST /auth/signup (name, email, password)
+        API->>DB: INSERT INTO candidates (is_verified=false)
+        API->>W: Queue verification email
+        W->>EXT: Send verification email
+        API->>AUDIT: Log candidate signup
+        API-->>C: Signup Successful (Verify Email)
+    end
+
+    rect rgb(240,248,255)
+        C->>API: GET /auth/verify-email (token)
+        API->>DB: UPDATE candidates SET is_verified=true
+        API->>AUDIT: Log email verified
+        API-->>C: Email Verified
+    end
+
+
+    %% =====================================================
+    %% PHASE 2 — LOGIN
+    %% =====================================================
+
+    rect rgb(245,250,255)
+        C->>API: POST /auth/login
+        API->>DB: Validate credentials
+        API-->>C: Access Token Issued
+    end
+
+
+    %% =====================================================
+    %% PHASE 3 — COMPLETE PROFILE
+    %% =====================================================
+
+    rect rgb(255,250,240)
+        C->>API: PUT /profile (education, skills, experience)
+        API->>DB: UPDATE candidates profile
+        API->>AUDIT: Log profile update
+        API-->>C: Profile Updated
+
+        C->>API: POST /resume-upload
+        API->>EXT: Upload Resume to S3
+        API->>DB: UPDATE candidates resume_url
+        API->>AUDIT: Log resume upload
+        API-->>C: Resume Uploaded
+    end
+
+
+    %% =====================================================
+    %% PHASE 4 — BROWSE & SAVE JOBS
+    %% =====================================================
+
+    rect rgb(240,255,255)
+        C->>API: GET /jobs (published jobs)
+        API->>DB: SELECT * FROM job_requisitions WHERE status="published"
+        API-->>C: Job List
+
+        C->>API: POST /saved-jobs
+        API->>DB: INSERT saved_jobs
+        API->>AUDIT: Log job saved
+        API-->>C: Job Saved
+    end
+
+
+    %% =====================================================
+    %% PHASE 5 — APPLY FOR JOB
+    %% =====================================================
+
+    rect rgb(245,255,245)
+        C->>API: POST /applications (job_id)
+        API->>DB: INSERT applications (status="applied")
+        API->>W: Queue acknowledgment email
+        API->>AUDIT: Log application submitted
+        API-->>C: Application Submitted
+
+        W->>EXT: Send acknowledgment email
+    end
+
+
+    %% =====================================================
+    %% PHASE 6 — TRACK APPLICATION
+    %% =====================================================
+
+    rect rgb(255,245,255)
+        C->>API: GET /my-applications
+        API->>DB: SELECT applications WHERE candidate_id=?
+        API-->>C: Application Status List
+    end
+
+
+    %% =====================================================
+    %% PHASE 7 — INTERVIEW NOTIFICATION
+    %% =====================================================
+
+    rect rgb(240,255,255)
+        API->>W: Queue interview notification
+        W->>EXT: Send interview email
+        C->>API: GET /interview-details
+        API->>DB: Fetch interview schedule
+        API-->>C: Interview Details
+    end
+
+
+    %% =====================================================
+    %% PHASE 8 — OFFER RESPONSE
+    %% =====================================================
+
+    rect rgb(255,245,255)
+        API->>W: Queue offer email
+        W->>EXT: Send offer email (E-Sign link)
+
+        alt Candidate Accepts Offer
+            C->>API: POST /offers/{id}/accept
+            API->>DB: UPDATE offers SET status="accepted"
+            API->>DB: UPDATE applications SET status="hired"
+            API->>AUDIT: Log offer accepted
+            API-->>C: Offer Accepted
+        else Candidate Declines Offer
+            C->>API: POST /offers/{id}/decline
+            API->>DB: UPDATE offers SET status="declined"
+            API->>DB: UPDATE applications SET status="rejected"
+            API->>AUDIT: Log offer declined
+            API-->>C: Offer Declined
+        end
+    end
+
+
+    %% =====================================================
+    %% PHASE 9 — LOGOUT
+    %% =====================================================
+
+    rect rgb(235,245,255)
+        C->>API: POST /auth/logout
+        API-->>C: Session Cleared
+    end

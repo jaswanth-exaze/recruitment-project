@@ -1,0 +1,107 @@
+sequenceDiagram
+    autonumber
+
+    participant HM as Hiring Manager
+    participant API as Backend API
+    participant DB as Database
+    participant EMAIL as Email Service
+    participant AUDIT as Audit Log System
+
+    %% =====================================================
+    %% HIRING MANAGER LOGIN
+    %% =====================================================
+
+    HM->>API: POST /auth/login
+    API->>DB: Validate credentials (role=HiringManager)
+    API-->>HM: Access Token Issued
+
+
+    %% =====================================================
+    %% VIEW PENDING JOB APPROVALS
+    %% =====================================================
+
+    HM->>API: GET /job-approvals?status=pending
+    API->>DB: SELECT * FROM job_approvals WHERE approver_id=HM
+    API-->>HM: Pending Job Requests
+
+
+    %% =====================================================
+    %% REVIEW JOB DETAILS
+    %% =====================================================
+
+    HM->>API: GET /jobs/{id}
+    API->>DB: Fetch job_requisition details
+    API-->>HM: Job Details Returned
+
+
+    %% =====================================================
+    %% APPROVE JOB
+    %% =====================================================
+
+    HM->>API: PUT /jobs/{id}/approve
+    API->>DB: UPDATE job_approvals SET status='approved'
+    API->>DB: UPDATE job_requisitions SET status='published'
+    API->>EMAIL: Notify HR (Job Approved)
+    API->>AUDIT: Log job approved
+    API-->>HM: Job Approved Successfully
+
+
+    %% =====================================================
+    %% REJECT JOB (Alternative Path)
+    %% =====================================================
+
+    HM->>API: PUT /jobs/{id}/reject
+    API->>DB: UPDATE job_approvals SET status='rejected'
+    API->>DB: UPDATE job_requisitions SET status='rejected'
+    API->>EMAIL: Notify HR (Job Rejected)
+    API->>AUDIT: Log job rejected
+    API-->>HM: Job Rejected
+
+
+    %% =====================================================
+    %% VIEW SHORTLISTED CANDIDATES
+    %% =====================================================
+
+    HM->>API: GET /applications?stage=interview
+    API->>DB: SELECT applications WHERE current_stage='interview'
+    API-->>HM: Shortlisted Candidates
+
+
+    %% =====================================================
+    %% REVIEW CANDIDATE PROFILE
+    %% =====================================================
+
+    HM->>API: GET /applications/{id}
+    API->>DB: Fetch candidate profile + resume
+    API-->>HM: Candidate Details
+
+
+    %% =====================================================
+    %% SUBMIT INTERVIEW FEEDBACK
+    %% =====================================================
+
+    HM->>API: POST /scorecards
+    API->>DB: INSERT INTO scorecards
+    API->>AUDIT: Log feedback submitted
+    API-->>HM: Feedback Submitted
+
+
+    %% =====================================================
+    %% FINAL EVALUATION DECISION
+    %% =====================================================
+
+    HM->>API: PUT /applications/{id}/final-review
+    API->>DB: UPDATE applications SET status='selected' OR 'rejected'
+    API->>EMAIL: Notify HR (Decision Made)
+    API->>AUDIT: Log final evaluation decision
+    API-->>HM: Final Decision Recorded
+
+
+    %% =====================================================
+    %% RECOMMEND OFFER CREATION
+    %% =====================================================
+
+    HM->>API: POST /applications/{id}/recommend-offer
+    API->>DB: UPDATE applications SET offer_recommended=true
+    API->>AUDIT: Log offer recommendation
+    API-->>HM: Offer Recommendation Submitted

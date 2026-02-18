@@ -1,0 +1,139 @@
+// Use this code at dbdiagram.io to visualize your schema
+// Recruitment Platform Database Schema
+
+Project Recruitment_Platform {
+  database_type: 'MySQL'
+  Note: 'Comprehensive platform for managing jobs, candidates, and interviews.'
+}
+
+// --- Tables ---
+
+Table companies {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  domain varchar(255)
+  is_active tinyint [default: 1]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  Note: 'Organizations posting job requisitions'
+}
+
+Table users {
+  id int [pk, increment]
+  company_id int [ref: > companies.id]
+  email varchar(255) [unique, not null]
+  password_hash varchar(255)
+  first_name varchar(100)
+  last_name varchar(100)
+  role enum('PlatformAdmin','CompanyAdmin','HR','HiringManager','Interviewer','Candidate')
+  is_active tinyint
+  created_at timestamp [default: `now()`]
+}
+
+Table job_requisitions {
+  id int [pk, increment]
+  company_id int [ref: > companies.id]
+  created_by int [ref: > users.id]
+  title varchar(255)
+  description text
+  requirements text
+  location varchar(255)
+  employment_type enum('Full-time','Part-time','Contract')
+  status enum('draft','pending','published','rejected','closed')
+  positions_count int [default: 1]
+  published_at timestamp
+  closed_at timestamp
+}
+
+Table applications {
+  id int [pk, increment]
+  job_id int [ref: > job_requisitions.id]
+  candidate_id int [ref: > users.id]
+  status enum('applied','screening','interview','selected','rejected','hired')
+  referrer_id int [ref: > users.id]
+  source enum('Company Careers Site','Our Portal','Social Media','Referral','Job Board','Other')
+  applied_at timestamp [default: `now()`]
+}
+
+Table candidate_profiles {
+  user_id int [pk, ref: - users.id]
+  phone varchar(20)
+  address text
+  resume_url varchar(500)
+  profile_data json
+  is_verified tinyint
+}
+
+Table interviews {
+  id int [pk, increment]
+  application_id int [ref: > applications.id]
+  interviewer_id int [ref: > users.id]
+  scheduled_at timestamp
+  duration_minutes int
+  status enum('scheduled','completed','cancelled')
+  meeting_link varchar(500)
+}
+
+Table scorecards {
+  id int [pk, increment]
+  interview_id int [ref: > interviews.id]
+  interviewer_id int [ref: > users.id]
+  ratings json
+  recommendation enum('Strong Yes','Yes','Maybe','No')
+  is_final tinyint
+}
+
+Table offers {
+  id int [pk, increment]
+  application_id int [ref: > applications.id]
+  created_by int [ref: > users.id]
+  status enum('draft','sent','accepted','declined')
+  offer_details json
+  sent_at timestamp
+}
+
+Table job_approvals {
+  id int [pk, increment]
+  job_id int [ref: > job_requisitions.id]
+  approver_id int [ref: > users.id]
+  status enum('pending','approved','rejected')
+}
+
+Table audit_logs {
+  id bigint [pk, increment]
+  user_id int [ref: > users.id]
+  action varchar(255)
+  entity_type varchar(50)
+  entity_id int
+  old_data json
+  new_data json
+  created_at timestamp [default: `now()`]
+}
+
+Table background_jobs {
+  id bigint [pk, increment]
+  job_type varchar(100)
+  payload json
+  status enum('pending','processing','completed','failed')
+}
+
+// --- Table Groupings (For Visual Clarity) ---
+
+TableGroup Candidate_Info {
+  users
+  candidate_profiles
+  applications
+}
+
+TableGroup Hiring_Process {
+  interviews
+  scorecards
+  offers
+}
+
+TableGroup Operations {
+  job_requisitions
+  job_approvals
+  audit_logs
+}

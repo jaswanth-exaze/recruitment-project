@@ -1,0 +1,372 @@
+{
+  "version": "1.0.0",
+  "darkMode": true,
+  "gridEnabling": false,
+  "detailLevel": "All",
+  "tablePositions": [
+    {
+      "name": "companies",
+      "schemaName": "public",
+      "x": 115.82460514058278,
+      "y": -110.57734824906845
+    },
+    {
+      "name": "users",
+      "schemaName": "public",
+      "x": 474.2392578125,
+      "y": 299
+    },
+    {
+      "name": "job_requisitions",
+      "schemaName": "public",
+      "x": 1297.33935546875,
+      "y": 299
+    },
+    {
+      "name": "applications",
+      "schemaName": "public",
+      "x": 1259.3822368838921,
+      "y": 830.9354529238653
+    },
+    {
+      "name": "candidate_profiles",
+      "schemaName": "public",
+      "x": 108.54762660907858,
+      "y": 152.03044479907697
+    },
+    {
+      "name": "interviews",
+      "schemaName": "public",
+      "x": 2124.3742966897453,
+      "y": 314.5736907710875
+    },
+    {
+      "name": "scorecards",
+      "schemaName": "public",
+      "x": 2121.871234676702,
+      "y": 717.4238777470782
+    },
+    {
+      "name": "offers",
+      "schemaName": "public",
+      "x": 676.021054978616,
+      "y": 800.8623648956217
+    },
+    {
+      "name": "job_approvals",
+      "schemaName": "public",
+      "x": 799.9583591368141,
+      "y": -34.92570648606885
+    },
+    {
+      "name": "audit_logs",
+      "schemaName": "public",
+      "x": 134.50377789422424,
+      "y": 446.3909809557081
+    },
+    {
+      "name": "background_jobs",
+      "schemaName": "public",
+      "x": 250.79659182334018,
+      "y": 881.5310680523797
+    }
+  ],
+  "tableGroupCollapseStates": [],
+  "stickyNoteLayouts": [],
+  "referencePaths": [
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "companies",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "company_id"
+      ],
+      "secondTableName": "users",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 366.81294858358757,
+          "y": -62.57734824906845
+        },
+        {
+          "x": 366.81294858358757,
+          "y": 379
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "companies",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "company_id"
+      ],
+      "secondTableName": "job_requisitions",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "secondEndpointSide": "right",
+      "checkPoints": [
+        {
+          "x": 1804.2492265572068,
+          "y": -62.57734824906845
+        },
+        {
+          "x": 1804.2492265572068,
+          "y": 379
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "created_by"
+      ],
+      "secondTableName": "job_requisitions",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "job_requisitions",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "job_id"
+      ],
+      "secondTableName": "applications",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "candidate_id"
+      ],
+      "secondTableName": "applications",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "referrer_id"
+      ],
+      "secondTableName": "applications",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 1119.4046448911756,
+          "y": 347
+        },
+        {
+          "x": 1119.4046448911756,
+          "y": 1009.5310680523797
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "candidate_profiles",
+      "secondSchemaName": "public",
+      "secondRelation": "1",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "applications",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "application_id"
+      ],
+      "secondTableName": "interviews",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "interviewer_id"
+      ],
+      "secondTableName": "interviews",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 1051.33935546875,
+          "y": 191.26309228912595
+        },
+        {
+          "x": 2044.87134897289,
+          "y": 191.26309228912595
+        },
+        {
+          "x": 2044.87134897289,
+          "y": 426.5736907710875
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "interviews",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "interview_id"
+      ],
+      "secondTableName": "scorecards",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "interviewer_id"
+      ],
+      "secondTableName": "scorecards",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": [
+        {
+          "x": 1051.33935546875,
+          "y": 258.74908563050474
+        },
+        {
+          "x": 1945.1826433217943,
+          "y": 258.74908563050474
+        },
+        {
+          "x": 1945.1826433217943,
+          "y": 754.1510390201557
+        }
+      ]
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "applications",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "application_id"
+      ],
+      "secondTableName": "offers",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "created_by"
+      ],
+      "secondTableName": "offers",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "job_requisitions",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "job_id"
+      ],
+      "secondTableName": "job_approvals",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "approver_id"
+      ],
+      "secondTableName": "job_approvals",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "users",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "user_id"
+      ],
+      "secondTableName": "audit_logs",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    }
+  ]
+}

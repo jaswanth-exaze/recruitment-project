@@ -1,0 +1,124 @@
+erDiagram
+    COMPANIES ||--o{ USERS : "belongs to"
+    COMPANIES ||--o{ JOB_REQUISITIONS : "hosts"
+    
+    USERS ||--o{ JOB_REQUISITIONS : "created by"
+    USERS ||--o{ JOB_APPROVALS : "approves"
+    USERS ||--o{ APPLICATIONS : "is candidate"
+    USERS ||--o{ APPLICATIONS : "referred by"
+    USERS ||--o{ INTERVIEWS : "interviews"
+    USERS ||--o{ OFFERS : "created by"
+    USERS ||--o{ SCORECARDS : "scores"
+    USERS ||--o{ SAVED_JOBS : "saves"
+    USERS ||--|| CANDIDATE_PROFILES : "has profile"
+    USERS ||--o{ AUDIT_LOGS : "performed action"
+
+    JOB_REQUISITIONS ||--o{ JOB_APPROVALS : "requires"
+    JOB_REQUISITIONS ||--o{ APPLICATIONS : "has"
+    JOB_REQUISITIONS ||--o{ SAVED_JOBS : "is saved"
+
+    APPLICATIONS ||--o{ INTERVIEWS : "schedules"
+    APPLICATIONS ||--o{ OFFERS : "receives"
+
+    INTERVIEWS ||--o{ SCORECARDS : "has results"
+
+    COMPANIES {
+        int id PK
+        varchar name
+        varchar domain
+        tinyint is_active
+    }
+
+    USERS {
+        int id PK
+        int company_id FK
+        varchar email UK
+        varchar password_hash
+        varchar first_name
+        varchar last_name
+        enum role
+        tinyint is_active
+    }
+
+    JOB_REQUISITIONS {
+        int id PK
+        int company_id FK
+        int created_by FK
+        varchar title
+        text description
+        text requirements
+        enum employment_type
+        enum status
+        int positions_count
+    }
+
+    APPLICATIONS {
+        int id PK
+        int job_id FK
+        int candidate_id FK
+        enum status
+        int referrer_id FK
+        enum source
+        timestamp applied_at
+    }
+
+    CANDIDATE_PROFILES {
+        int user_id PK, FK
+        varchar phone
+        text address
+        varchar resume_url
+        json profile_data
+        tinyint is_verified
+    }
+
+    INTERVIEWS {
+        int id PK
+        int application_id FK
+        int interviewer_id FK
+        timestamp scheduled_at
+        enum status
+        varchar meeting_link
+    }
+
+    OFFERS {
+        int id PK
+        int application_id FK
+        int created_by FK
+        enum status
+        json offer_details
+        varchar document_url
+    }
+
+    SCORECARDS {
+        int id PK
+        int interview_id FK
+        int interviewer_id FK
+        json ratings
+        enum recommendation
+        tinyint is_final
+    }
+
+    JOB_APPROVALS {
+        int id PK
+        int job_id FK
+        int approver_id FK
+        enum status
+    }
+
+    AUDIT_LOGS {
+        bigint id PK
+        int user_id FK
+        varchar action
+        varchar entity_type
+        int entity_id
+        json old_data
+        json new_data
+    }
+
+    BACKGROUND_JOBS {
+        bigint id PK
+        varchar job_type
+        json payload
+        enum status
+        int retries
+    }

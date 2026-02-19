@@ -1,11 +1,284 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:'Poppins',sans-serif;
+}
+
+body{
+display:flex;
+background:#f4f7fc;
+color:#0a1f44;
+}
+
+/* SIDEBAR */
+
+.sidebar{
+width:260px;
+background:#0a1f44;
+color:white;
+height:100vh;
+padding:25px 20px;
+position:fixed;
+}
+
+.sidebar h2{
+margin-bottom:30px;
+font-size:20px;
+}
+
+.sidebar ul{
+list-style:none;
+}
+
+.sidebar ul li{
+margin:18px 0;
+}
+
+.sidebar ul li a{
+text-decoration:none;
+color:white;
+font-size:14px;
+display:block;
+padding:8px;
+border-radius:6px;
+}
+
+.sidebar ul li a:hover{
+background:#123a7a;
+}
+
+/* MAIN */
+
+.main{
+margin-left:260px;
+padding:30px 40px;
+width:100%;
+}
+
+/* TOP BAR */
+
+.topbar{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:30px;
+}
+
+.topbar h1{
+font-size:24px;
+}
+
+.topbar input{
+padding:8px 15px;
+border-radius:6px;
+border:1px solid #ddd;
+}
+
+/* CARDS */
+
+.cards{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+gap:20px;
+margin-bottom:40px;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:12px;
+box-shadow:0 8px 20px rgba(0,0,0,0.05);
+}
+
+.card h3{
+font-size:14px;
+color:gray;
+}
+
+.card h2{
+margin-top:10px;
+font-size:28px;
+color:#123a7a;
+}
+
+/* CHARTS */
+
+.charts{
+display:grid;
+grid-template-columns:2fr 1fr;
+gap:20px;
+}
+
+.chart-box{
+background:white;
+padding:20px;
+border-radius:12px;
+box-shadow:0 8px 20px rgba(0,0,0,0.05);
+}
+
+/* TABLE */
+
+.table-section{
+margin-top:40px;
+background:white;
+padding:20px;
+border-radius:12px;
+box-shadow:0 8px 20px rgba(0,0,0,0.05);
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:15px;
+}
+
+table th, table td{
+padding:12px;
+text-align:left;
+border-bottom:1px solid #eee;
+font-size:14px;
+}
+
+.status{
+padding:4px 10px;
+border-radius:12px;
+font-size:12px;
+color:white;
+}
+
+.active{ background:green; }
+.pending{ background:orange; }
+.suspended{ background:red; }
+
+</style>
 </head>
 <body>
-    <h1>Welcome to Platform Admin Dashboard</h1>
+
+<div class="sidebar">
+<h2>HireSphere Admin</h2>
+<ul>
+<li><a href="#">Dashboard</a></li>
+<li><a href="#">Manage Companies</a></li>
+<li><a href="#">User Roles</a></li>
+<li><a href="#">Approval Monitoring</a></li>
+<li><a href="#">Audit Logs</a></li>
+<li><a href="#">System Settings</a></li>
+<li><a href="#">Reports & Analytics</a></li>
+</ul>
+</div>
+
+<div class="main">
+
+<div class="topbar">
+<h1>Platform Overview</h1>
+<input type="text" placeholder="Search Companies...">
+</div>
+
+<div class="cards">
+<div class="card">
+<h3>Total Companies</h3>
+<h2>124</h2>
+</div>
+
+<div class="card">
+<h3>Active Job Listings</h3>
+<h2>1,278</h2>
+</div>
+
+<div class="card">
+<h3>Total Candidates</h3>
+<h2>32,540</h2>
+</div>
+
+<div class="card">
+<h3>Pending Approvals</h3>
+<h2>48</h2>
+</div>
+</div>
+
+<div class="charts">
+<div class="chart-box">
+<h3>Monthly Job Growth</h3>
+<canvas id="jobChart"></canvas>
+</div>
+
+<div class="chart-box">
+<h3>Company Status</h3>
+<canvas id="companyChart"></canvas>
+</div>
+</div>
+
+<div class="table-section">
+<h3>Recent Company Activity</h3>
+<table>
+<tr>
+<th>Company</th>
+<th>Status</th>
+<th>Jobs</th>
+<th>Last Activity</th>
+</tr>
+<tr>
+<td>TechNova Ltd</td>
+<td><span class="status active">Active</span></td>
+<td>24</td>
+<td>2 hours ago</td>
+</tr>
+<tr>
+<td>GrowthX Corp</td>
+<td><span class="status pending">Pending</span></td>
+<td>12</td>
+<td>1 day ago</td>
+</tr>
+<tr>
+<td>FutureHire Inc</td>
+<td><span class="status suspended">Suspended</span></td>
+<td>0</td>
+<td>3 days ago</td>
+</tr>
+</table>
+</div>
+
+</div>
+
+<script>
+const ctx = document.getElementById('jobChart');
+new Chart(ctx, {
+type: 'line',
+data: {
+labels: ['Jan','Feb','Mar','Apr','May','Jun'],
+datasets: [{
+label: 'Jobs Created',
+data: [120,190,300,250,400,450],
+borderColor:'#123a7a',
+fill:false,
+tension:0.4
+}]
+}
+});
+
+const ctx2 = document.getElementById('companyChart');
+new Chart(ctx2, {
+type: 'doughnut',
+data: {
+labels: ['Active','Pending','Suspended'],
+datasets: [{
+data: [90,25,9],
+backgroundColor:['#123a7a','orange','red']
+}]
+}
+});
+</script>
+
 </body>
 </html>

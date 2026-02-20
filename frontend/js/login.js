@@ -3,10 +3,9 @@
  * Handles credential submission, response messaging, and role-based redirect.
  */
 
-const API_BASE =
-  window.location.origin.includes("localhost:3000")
-    ? window.location.origin
-    : "http://localhost:3000";
+const API_BASE = window.location.origin.includes("localhost:3000")
+  ? window.location.origin
+  : "http://localhost:3000";
 
 // Authenticates the user and routes them to the correct dashboard.
 async function login(event) {
@@ -51,13 +50,11 @@ async function login(event) {
   else if (data.role === "PlatformAdmin")
     window.location.href = "./dashboards/platformAdmin.html";
   else if (data.role === "CompanyAdmin")
-    window.location.href = "./dashboards/companyAdmin.html";   
-    else if (data.role === "HR")
-      window.location.href = "./dashboards/hr.html";
-    else if (data.role === "HiringManager")
-      window.location.href = "./dashboards/hrManager.html";
-    else
-    window.location.href = "./dashboards/interviewer.html";
+    window.location.href = "./dashboards/companyAdmin.html";
+  else if (data.role === "HR") window.location.href = "./dashboards/hr.html";
+  else if (data.role === "HiringManager")
+    window.location.href = "./dashboards/hrManager.html";
+  else window.location.href = "./dashboards/interviewer.html";
 }
 
 // Shows a one-time message when a previous session expired.
@@ -83,7 +80,3 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   showSessionExpiredMessage();
 });
-
-
-
-

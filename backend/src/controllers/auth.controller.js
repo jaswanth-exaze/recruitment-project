@@ -26,6 +26,16 @@ exports.login = async (req, res) => {
   }
 };
 
+
+exports.profile = async (req, res) => {
+  try {
+    const profile = await authService.getProfile(req.userId);
+    res.json({ profile });    
+  } catch (err) {
+    res.status(401).json({ message: err.message });
+  }
+}
+
 // Exchanges a valid refresh token cookie for a new access token and rotated refresh token.
 exports.refreshToken = async (req, res) => {
   try {

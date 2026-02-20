@@ -1,8 +1,4 @@
-/**
- * Auth service.
- * Basic auth service with straightforward refresh-token flow.
- */
-
+const crypto = require("crypto");
 const db = require("../config/db");
 const { comparePassword } = require("../utils/password.util");
 const {
@@ -10,7 +6,6 @@ const {
   generateRefreshToken,
   verifyRefreshToken,
 } = require("../utils/jwt.util");
-const crypto = require("crypto");
 
 function hashRefreshToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -22,33 +17,27 @@ function refreshExpiryDate() {
   return expiresAt;
 }
 
-// Authenticates user credentials and builds login response data.
 exports.login = async ({ email, password }) => {
   if (!email || !password) {
-    throw new Error("Email and password required");
+    throw new Error("Email and password are required");
   }
 
+  const [rows] = await db.promise().query(
+    `
+      SELECT id, company_id, email, first_name, last_name, role, password_hash, is_active, last_login_at
+      FROM users
+      WHERE email = ?
+      LIMIT 1
+    `,
+    [email],
+  );
 
-  let userRows;
-  try {
-    [userRows] = await db.promise().query(
-      `
-      SELECT id, company_id, email, first_name, last_name, role, password_hash, is_active, last_login_at FROM users WHERE email = ? AND is_active = 1 LIMIT 1;
-      `,
-      [email],
-    );
-  } catch (err) {
-    console.log("DB ERROR:", err);
+  if (!rows.length || !rows[0].is_active) {
     throw new Error("Invalid credentials");
   }
 
-  if (!userRows.length) {
-    throw new Error("Invalid credentials");
-  }
-
-  const user = userRows[0];
+  const user = rows[0];
   const isValid = await comparePassword(password, user.password_hash);
-
   if (!isValid) {
     throw new Error("Invalid credentials");
   }
@@ -59,24 +48,18 @@ exports.login = async ({ email, password }) => {
     company_id: user.company_id,
   });
   const refreshToken = generateRefreshToken({ user_id: user.id });
-  const hashedRefreshToken = hashRefreshToken(refreshToken);
 
   await db.promise().query(
     `
-    INSERT INTO refresh_tokens (user_id, token, expires_at, is_revoked, created_at)
-    VALUES (?, ?, ?, false, NOW())
+      INSERT INTO refresh_tokens (user_id, token, expires_at, is_revoked, created_at)
+      VALUES (?, ?, ?, false, NOW())
     `,
-    [user.id, hashedRefreshToken, refreshExpiryDate()],
+    [user.id, hashRefreshToken(refreshToken), refreshExpiryDate()],
   );
-  //updade last login time
-  await db.promise().query(
-    `
-    UPDATE users SET last_login_at = NOW() WHERE id = ?
-    `,
-    [user.id],
-  );
-    
 
+  await db.promise().query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [
+    user.id,
+  ]);
 
   return {
     message: "Login successful",
@@ -86,7 +69,24 @@ exports.login = async ({ email, password }) => {
   };
 };
 
-// Rotates refresh token, revokes old token, and returns a new access token pair.
+exports.getProfile = async (userId) => {
+  const [rows] = await db.promise().query(
+    `
+      SELECT id, company_id, email, first_name, last_name, role, is_active, last_login_at, created_at, updated_at
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [userId],
+  );
+
+  if (!rows.length) {
+    throw new Error("User not found");
+  }
+
+  return rows[0];
+};
+
 exports.refreshAccessToken = async (refreshToken) => {
   if (!refreshToken) {
     throw new Error("Refresh token missing");
@@ -107,11 +107,11 @@ exports.refreshAccessToken = async (refreshToken) => {
 
     const [tokenRows] = await connection.query(
       `
-      SELECT id, expires_at
-      FROM refresh_tokens
-      WHERE token = ? AND user_id = ? AND is_revoked = false
-      LIMIT 1
-      FOR UPDATE
+        SELECT id, expires_at
+        FROM refresh_tokens
+        WHERE token = ? AND user_id = ? AND is_revoked = false
+        LIMIT 1
+        FOR UPDATE
       `,
       [hashedIncomingToken, decoded.user_id],
     );
@@ -120,51 +120,48 @@ exports.refreshAccessToken = async (refreshToken) => {
       throw new Error("Refresh token not recognized");
     }
 
-    const tokenRecord = tokenRows[0];
-
-    if (new Date(tokenRecord.expires_at) <= new Date()) {
+    if (new Date(tokenRows[0].expires_at) <= new Date()) {
       throw new Error("Refresh token expired");
     }
 
     const [userRows] = await connection.query(
       `
-      SELECT u.user_id, u.branch_id, r.role_name
-      FROM users u
-      JOIN roles r ON u.role_id = r.role_id
-      WHERE u.user_id = ? AND u.is_active = 1
-      LIMIT 1
+        SELECT id, company_id, role, is_active
+        FROM users
+        WHERE id = ?
+        LIMIT 1
       `,
       [decoded.user_id],
     );
 
-    if (!userRows.length) {
-      throw new Error("User not found");
+    if (!userRows.length || !userRows[0].is_active) {
+      throw new Error("User not found or inactive");
     }
 
     const user = userRows[0];
+
     const nextAccessToken = generateAccessToken({
-      user_id: user.user_id,
-      role: user.role_name,
-      branch_id: user.branch_id,
+      user_id: user.id,
+      role: user.role,
+      company_id: user.company_id,
     });
-    const nextRefreshToken = generateRefreshToken({ user_id: user.user_id });
-    const hashedNextRefreshToken = hashRefreshToken(nextRefreshToken);
+    const nextRefreshToken = generateRefreshToken({ user_id: user.id });
 
     await connection.query(
       `
-      UPDATE refresh_tokens
-      SET is_revoked = true
-      WHERE id = ?
+        UPDATE refresh_tokens
+        SET is_revoked = true
+        WHERE id = ?
       `,
-      [tokenRecord.id],
+      [tokenRows[0].id],
     );
 
     await connection.query(
       `
-      INSERT INTO refresh_tokens (user_id, token, expires_at, is_revoked, created_at)
-      VALUES (?, ?, ?, false, NOW())
+        INSERT INTO refresh_tokens (user_id, token, expires_at, is_revoked, created_at)
+        VALUES (?, ?, ?, false, NOW())
       `,
-      [user.user_id, hashedNextRefreshToken, refreshExpiryDate()],
+      [user.id, hashRefreshToken(nextRefreshToken), refreshExpiryDate()],
     );
 
     await connection.commit();
@@ -173,7 +170,7 @@ exports.refreshAccessToken = async (refreshToken) => {
       message: "Token refreshed",
       token: nextAccessToken,
       refreshToken: nextRefreshToken,
-      role: user.role_name,
+      role: user.role,
     };
   } catch (err) {
     await connection.rollback();
@@ -183,18 +180,14 @@ exports.refreshAccessToken = async (refreshToken) => {
   }
 };
 
-// Revokes a refresh token represented by the plain token value from cookie.
 exports.revokeRefreshToken = async (refreshToken) => {
   if (!refreshToken) return;
-
-  const hashedRefreshToken = hashRefreshToken(refreshToken);
-
   await db.promise().query(
     `
-    UPDATE refresh_tokens
-    SET is_revoked = true
-    WHERE token = ?
+      UPDATE refresh_tokens
+      SET is_revoked = true
+      WHERE token = ?
     `,
-    [hashedRefreshToken],
+    [hashRefreshToken(refreshToken)],
   );
 };

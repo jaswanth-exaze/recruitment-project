@@ -4,17 +4,11 @@ const {
   getRefreshCookieOptions,
 } = require("../utils/jwt.util");
 
-
-// Validates credentials via service and returns JWT payload on success.
 exports.login = async (req, res) => {
   try {
     const result = await authService.login(req.body);
 
-    res.cookie(
-      REFRESH_COOKIE_NAME,
-      result.refreshToken,
-      getRefreshCookieOptions(),
-    );
+    res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, getRefreshCookieOptions());
 
     res.json({
       message: result.message,
@@ -26,32 +20,21 @@ exports.login = async (req, res) => {
   }
 };
 
-
 exports.profile = async (req, res) => {
   try {
-    const profile = await authService.getProfile(req.userId);
-    res.json({ profile });    
+    const profile = await authService.getProfile(req.user.user_id);
+    res.json({ profile });
   } catch (err) {
-    res.status(401).json({ message: err.message });
+    res.status(404).json({ message: err.message });
   }
-}
+};
 
-// Exchanges a valid refresh token cookie for a new access token and rotated refresh token.
 exports.refreshToken = async (req, res) => {
   try {
     const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
-
-    if (!refreshToken) {
-      return res.status(401).json({ message: "Refresh token missing" });
-    }
-
     const result = await authService.refreshAccessToken(refreshToken);
 
-    res.cookie(
-      REFRESH_COOKIE_NAME,
-      result.refreshToken,
-      getRefreshCookieOptions(),
-    );
+    res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, getRefreshCookieOptions());
 
     return res.json({
       message: result.message,
@@ -63,7 +46,6 @@ exports.refreshToken = async (req, res) => {
   }
 };
 
-// Revokes current refresh token and clears cookie to terminate the session.
 exports.logout = async (req, res) => {
   try {
     const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME];

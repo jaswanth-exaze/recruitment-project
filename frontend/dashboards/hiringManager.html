@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hiring Manager Dashboard | HireFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="icon" type="image/svg+xml" href="../public/assets/images/favicon.svg" />
+  </head>
+  <body class="dashboard-body">
+    <div class="dashboard-layout">
+      <aside class="dash-sidebar d-flex flex-column">
+        <a class="d-inline-flex align-items-center fw-semibold text-white" href="../public/index.html">
+          <span class="brand-mark">H</span>
+          <span class="dash-brand-text">HireFlow</span>
+        </a>
+
+        <nav class="mt-4">
+          <a class="dash-nav-link active" href="hiringManager.html" data-hm-nav="dashboard">
+            <i class="bi bi-speedometer2"></i>
+            <span class="sidebar-label">Dashboard</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-hm-nav="approvals">
+            <i class="bi bi-kanban"></i>
+            <span class="sidebar-label">Approvals</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-hm-nav="jobs">
+            <i class="bi bi-briefcase"></i>
+            <span class="sidebar-label">Jobs</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-hm-nav="decisions">
+            <i class="bi bi-clipboard-check"></i>
+            <span class="sidebar-label">Final Decisions</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-hm-nav="profile">
+            <i class="bi bi-person-circle"></i>
+            <span class="sidebar-label">Profile</span>
+          </a>
+          <a class="dash-nav-link" href="../public/login.html" data-hm-nav="logout">
+            <i class="bi bi-box-arrow-right"></i>
+            <span class="sidebar-label">Logout</span>
+          </a>
+        </nav>
+
+        <div class="mt-auto sidebar-footnote small text-white-50">
+          Review approvals, publish roles, and finalize hiring outcomes.
+        </div>
+      </aside>
+
+      <div class="dash-main">
+        <header class="dash-topbar">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="btn btn-outline-brand" data-sidebar-toggle>
+                <i class="bi bi-list"></i>
+              </button>
+              <div>
+                <h1 class="h5 mb-0" data-hm-header-title>Hiring Manager Dashboard</h1>
+                <p class="mb-0 text-secondary small" data-hm-header-subtitle>
+                  Approve jobs and take final candidate decisions.
+                </p>
+              </div>
+            </div>
+            <div class="search-box">
+              <i class="bi bi-search"></i>
+              <input type="search" class="form-control" placeholder="Search approvals or jobs" data-hm-search />
+            </div>
+          </div>
+        </header>
+
+        <main class="container-fluid py-4">
+          <section data-hm-view="dashboard">
+            <div class="row g-3">
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Pending Approvals</p>
+                  <p class="kpi-value mb-0" data-hm-kpi-pending-approvals>--</p>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Jobs Published</p>
+                  <p class="kpi-value mb-0" data-hm-kpi-published>--</p>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Jobs Closed</p>
+                  <p class="kpi-value mb-0" data-hm-kpi-closed>--</p>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Final Decisions</p>
+                  <p class="kpi-value mb-0">Use Decisions section</p>
+                </article>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-lg-8">
+                <section class="chart-card p-3">
+                  <h2 class="h6 mb-3">Requisition Pipeline Health</h2>
+                  <div class="chart-wrap">
+                    <canvas id="pipelineChart"></canvas>
+                  </div>
+                </section>
+              </div>
+              <div class="col-lg-4">
+                <section class="chart-card p-3 h-100">
+                  <h2 class="h6 mb-3">Candidate Source Mix</h2>
+                  <div class="chart-wrap">
+                    <canvas id="sourceChart"></canvas>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-hm-view="approvals" class="d-none">
+            <div class="row g-3">
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">Pending Job Approvals</h2>
+                    <div class="d-flex align-items-end gap-2">
+                      <div>
+                        <label class="form-label small mb-1" for="hmApproverId">Approver ID (optional)</label>
+                        <input id="hmApproverId" type="number" min="1" class="form-control form-control-sm" data-hm-approver-id />
+                      </div>
+                      <button type="button" class="btn btn-outline-brand btn-sm" data-hm-approval-load>Load</button>
+                    </div>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Job ID</th>
+                          <th>Title</th>
+                          <th>Requester</th>
+                          <th>Status</th>
+                          <th>Created</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody data-hm-approval-list></tbody>
+                    </table>
+                  </div>
+                  <p class="small mt-3 mb-0 text-secondary" data-hm-approval-msg></p>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-hm-view="jobs" class="d-none">
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Load Job Details</h2>
+                  <div class="d-flex align-items-end gap-2 mb-3">
+                    <div class="flex-grow-1">
+                      <label class="form-label" for="hmJobIdInput">Job ID</label>
+                      <input id="hmJobIdInput" type="number" min="1" class="form-control" data-hm-job-id-input />
+                    </div>
+                    <button type="button" class="btn btn-outline-brand" data-hm-job-load>Load</button>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <tbody>
+                        <tr>
+                          <th style="width: 35%">Title</th>
+                          <td data-hm-job-title>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Status</th>
+                          <td data-hm-job-status>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Company</th>
+                          <td data-hm-job-company>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Location</th>
+                          <td data-hm-job-location>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Positions</th>
+                          <td data-hm-job-positions>N/A</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="small mt-3 mb-0 text-secondary" data-hm-job-msg></p>
+                </section>
+              </div>
+
+              <div class="col-lg-6">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Job Actions</h2>
+                  <p class="small text-secondary mb-3">
+                    Selected Job ID:
+                    <span class="fw-semibold" data-hm-selected-job-id>N/A</span>
+                  </p>
+                  <div class="d-grid gap-2 mb-3">
+                    <button type="button" class="btn btn-outline-success" data-hm-job-publish>Publish Job</button>
+                    <button type="button" class="btn btn-outline-danger" data-hm-job-close>Close Job</button>
+                  </div>
+
+                  <hr class="my-3" />
+
+                  <h3 class="h6 mb-3">Approval Actions</h3>
+                  <form class="row g-3" data-hm-approval-action-form>
+                    <div class="col-12">
+                      <label class="form-label" for="hmApprovalComments">Comments</label>
+                      <textarea id="hmApprovalComments" rows="4" class="form-control" data-hm-approval-comments></textarea>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                      <button type="button" class="btn btn-brand" data-hm-job-approve>Approve</button>
+                      <button type="button" class="btn btn-outline-danger" data-hm-job-reject>Reject</button>
+                    </div>
+                  </form>
+                  <p class="small mt-3 mb-0 text-secondary" data-hm-job-action-msg></p>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-hm-view="decisions" class="d-none">
+            <div class="row g-3">
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <h2 class="h6 mb-3">Final Candidate Decision</h2>
+                  <form class="row g-3" data-hm-final-decision-form>
+                    <div class="col-md-3">
+                      <label class="form-label" for="hmApplicationId">Application ID</label>
+                      <input id="hmApplicationId" type="number" min="1" class="form-control" data-hm-application-id required />
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label" for="hmDecisionStatus">Decision</label>
+                      <select id="hmDecisionStatus" class="form-select" data-hm-decision-status>
+                        <option value="selected">selected</option>
+                        <option value="rejected">rejected</option>
+                      </select>
+                    </div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-brand" data-hm-final-decision-btn>Submit Final Decision</button>
+                    </div>
+                  </form>
+                  <p class="small mt-3 mb-0 text-secondary" data-hm-final-decision-msg></p>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-hm-view="profile" class="d-none">
+            <div class="row g-3">
+              <div class="col-lg-7">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">My Profile</h2>
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <tbody>
+                        <tr>
+                          <th style="width: 30%">Name</th>
+                          <td data-hm-profile-name>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Email</th>
+                          <td data-hm-profile-email>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Role</th>
+                          <td data-hm-profile-role>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Company ID</th>
+                          <td data-hm-profile-company>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Last Login</th>
+                          <td data-hm-profile-last-login>N/A</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <hr class="my-3" />
+                  <h3 class="h6 mb-3">Edit Profile</h3>
+                  <form class="row g-3" data-hm-profile-form>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hmProfileFirstName">First Name</label>
+                      <input id="hmProfileFirstName" type="text" class="form-control" data-hm-edit-first-name required />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hmProfileLastName">Last Name</label>
+                      <input id="hmProfileLastName" type="text" class="form-control" data-hm-edit-last-name required />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="hmProfileEmail">Email</label>
+                      <input id="hmProfileEmail" type="email" class="form-control" data-hm-edit-email required />
+                    </div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-brand" data-hm-profile-save>Save Profile</button>
+                    </div>
+                  </form>
+                </section>
+              </div>
+              <div class="col-lg-5">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Session Actions</h2>
+                  <p class="small text-secondary">Reload profile from backend or logout securely.</p>
+                  <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-brand" data-hm-reload-profile>Reload Profile</button>
+                    <button type="button" class="btn btn-danger" data-hm-logout>Logout</button>
+                  </div>
+                  <p class="small mt-3 mb-0 text-secondary" data-hm-profile-status></p>
+                </section>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <button class="back-to-top" type="button" aria-label="Back to top" data-back-to-top>
+      <i class="bi bi-arrow-up"></i>
+    </button>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="../js/script.js"></script>
+    <script src="../js/hiringManager.js"></script>
+  </body>
+</html>

@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const db = require("../config/db");
-const { comparePassword } = require("../utils/password.util");
+const { comparePassword, hashPassword } = require("../utils/password.util");
 const {
   generateAccessToken,
   generateRefreshToken,
@@ -67,6 +67,84 @@ exports.login = async ({ email, password }) => {
     refreshToken,
     role: user.role,
   };
+};
+
+exports.signupCandidate = async (payload) => {
+  const { email, password, first_name, last_name, phone, address, profile_data } = payload || {};
+  if (!email || !password || !first_name || !last_name) {
+    throw new Error("email, password, first_name, and last_name are required");
+  }
+
+  let profileData = null;
+  if (profile_data !== undefined && profile_data !== null && profile_data !== "") {
+    if (typeof profile_data === "string") {
+      try {
+        profileData = JSON.parse(profile_data);
+      } catch (error) {
+        throw new Error("profile_data must be valid JSON");
+      }
+    } else if (typeof profile_data === "object") {
+      profileData = profile_data;
+    } else {
+      throw new Error("profile_data must be valid JSON");
+    }
+  }
+
+  const passwordHash = await hashPassword(password);
+  const connection = await db.promise().getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [userResult] = await connection.query(
+      `
+        INSERT INTO users (company_id, email, password_hash, first_name, last_name, role, is_active, created_at, updated_at)
+        VALUES (NULL, ?, ?, ?, ?, 'Candidate', 1, NOW(), NOW())
+      `,
+      [email, passwordHash, first_name, last_name],
+    );
+
+    const userId = userResult.insertId;
+
+    await connection.query(
+      `
+        INSERT INTO candidate_profiles (user_id, phone, address, resume_url, profile_data, is_verified, created_at, updated_at)
+        VALUES (?, ?, ?, NULL, ?, 0, NOW(), NOW())
+      `,
+      [userId, phone || null, address || null, profileData ? JSON.stringify(profileData) : null],
+    );
+
+    const token = generateAccessToken({
+      user_id: userId,
+      role: "Candidate",
+      company_id: null,
+    });
+    const refreshToken = generateRefreshToken({ user_id: userId });
+
+    await connection.query(
+      `
+        INSERT INTO refresh_tokens (user_id, token, expires_at, is_revoked, created_at)
+        VALUES (?, ?, ?, false, NOW())
+      `,
+      [userId, hashRefreshToken(refreshToken), refreshExpiryDate()],
+    );
+
+    await connection.query(`UPDATE users SET last_login_at = NOW() WHERE id = ?`, [userId]);
+
+    await connection.commit();
+
+    return {
+      message: "Signup successful",
+      token,
+      refreshToken,
+      role: "Candidate",
+    };
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 };
 
 exports.getProfile = async (userId) => {

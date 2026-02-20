@@ -1,11 +1,842 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Company Admin Dashboard | HireFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="icon" type="image/svg+xml" href="../public/assets/images/favicon.svg" />
   </head>
-  <body>
-    <h1>Welcome to Company Admin Dashboard</h1>
+  <body class="dashboard-body">
+    <div class="dashboard-layout">
+      <aside class="dash-sidebar d-flex flex-column">
+        <a class="d-inline-flex align-items-center fw-semibold text-white" href="../public/index.html">
+          <span class="brand-mark">H</span>
+          <span class="dash-brand-text">HireFlow</span>
+        </a>
+
+        <nav class="mt-4">
+          <a class="dash-nav-link active" href="companyAdmin.html" data-company-nav="dashboard">
+            <i class="bi bi-speedometer2"></i>
+            <span class="sidebar-label">Dashboard</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-company-nav="users">
+            <i class="bi bi-people"></i>
+            <span class="sidebar-label">Users</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-company-nav="jobs">
+            <i class="bi bi-briefcase"></i>
+            <span class="sidebar-label">Jobs</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-company-nav="applications">
+            <i class="bi bi-file-earmark-text"></i>
+            <span class="sidebar-label">Applications</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-company-nav="offers">
+            <i class="bi bi-file-earmark-check"></i>
+            <span class="sidebar-label">Offers</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-company-nav="profile">
+            <i class="bi bi-person-circle"></i>
+            <span class="sidebar-label">Profile</span>
+          </a>
+          <a class="dash-nav-link" href="../public/login.html" data-company-nav="logout">
+            <i class="bi bi-box-arrow-right"></i>
+            <span class="sidebar-label">Logout</span>
+          </a>
+        </nav>
+
+        <div class="mt-auto sidebar-footnote small text-white-50">
+          Company-level control over users, jobs, applications, and offers.
+        </div>
+      </aside>
+
+      <div class="dash-main">
+        <header class="dash-topbar">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="btn btn-outline-brand" data-sidebar-toggle>
+                <i class="bi bi-list"></i>
+              </button>
+              <div>
+                <h1 class="h5 mb-0" data-company-header-title>Company Admin Dashboard</h1>
+                <p class="mb-0 text-secondary small" data-company-header-subtitle>
+                  Manage team access, jobs, and recruitment progress.
+                </p>
+              </div>
+            </div>
+            <div class="search-box">
+              <i class="bi bi-search"></i>
+              <input
+                type="search"
+                class="form-control"
+                placeholder="Search jobs, users, or applications"
+                data-company-search
+              />
+            </div>
+          </div>
+        </header>
+
+        <main class="container-fluid py-4">
+          <section data-company-view="dashboard">
+            <div class="row g-3">
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Active HR</p>
+                  <p class="kpi-value mb-0" data-company-kpi-hr>--</p>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Active Managers</p>
+                  <p class="kpi-value mb-0" data-company-kpi-managers>--</p>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Active Interviewers</p>
+                  <p class="kpi-value mb-0" data-company-kpi-interviewers>--</p>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Open Jobs</p>
+                  <p class="kpi-value mb-0" data-company-kpi-open-jobs>--</p>
+                </article>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-lg-8">
+                <section class="chart-card p-3">
+                  <h2 class="h6 mb-3">Hiring Throughput by Week</h2>
+                  <div class="chart-wrap">
+                    <canvas id="pipelineChart"></canvas>
+                  </div>
+                </section>
+              </div>
+              <div class="col-lg-4">
+                <section class="chart-card p-3 h-100">
+                  <h2 class="h6 mb-3">Source Distribution</h2>
+                  <div class="chart-wrap">
+                    <canvas id="sourceChart"></canvas>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-lg-8">
+                <section class="table-card p-3">
+                  <h2 class="h6 mb-3">Company Admin Priority Actions</h2>
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>Area</th>
+                          <th>Action</th>
+                          <th>Target</th>
+                          <th>SLA</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>Users</td>
+                          <td>Create and assign HR, HiringManager, Interviewer</td>
+                          <td>Role-based access</td>
+                          <td>Same day</td>
+                        </tr>
+                        <tr>
+                          <td>Jobs</td>
+                          <td>Create, submit, publish, close jobs</td>
+                          <td>Requisition flow</td>
+                          <td>24 hours</td>
+                        </tr>
+                        <tr>
+                          <td>Applications</td>
+                          <td>Move stage and finalize decisions</td>
+                          <td>Candidate pipeline</td>
+                          <td>48 hours</td>
+                        </tr>
+                        <tr>
+                          <td>Offers</td>
+                          <td>Draft and send offers</td>
+                          <td>Selected candidates</td>
+                          <td>24 hours</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+              <div class="col-lg-4">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Admin Notes</h2>
+                  <ul class="role-list mb-3">
+                    <li>Profile can be edited from the Profile section.</li>
+                    <li>Use Users section to activate or deactivate members.</li>
+                    <li>Applications and offers are action-driven by IDs.</li>
+                  </ul>
+                  <p class="small text-secondary mb-1">Team Coverage</p>
+                  <div class="progress mb-3"><div class="progress-bar progress-value-88"></div></div>
+                  <p class="small text-secondary mb-1">Hiring Velocity</p>
+                  <div class="progress"><div class="progress-bar progress-value-74"></div></div>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-company-view="users" class="d-none">
+            <div class="row g-3">
+              <div class="col-lg-5">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Add Team User</h2>
+                  <form class="row g-3" data-company-user-create-form>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyUserFirstName">First Name</label>
+                      <input
+                        id="companyUserFirstName"
+                        name="first_name"
+                        type="text"
+                        class="form-control"
+                        required
+                      />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyUserLastName">Last Name</label>
+                      <input
+                        id="companyUserLastName"
+                        name="last_name"
+                        type="text"
+                        class="form-control"
+                        required
+                      />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="companyUserEmail">Email</label>
+                      <input
+                        id="companyUserEmail"
+                        name="email"
+                        type="email"
+                        class="form-control"
+                        required
+                      />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="companyUserPassword">Temporary Password</label>
+                      <input
+                        id="companyUserPassword"
+                        name="password"
+                        type="password"
+                        class="form-control"
+                        minlength="8"
+                        required
+                      />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="companyUserRole">Role</label>
+                      <select id="companyUserRole" name="role" class="form-select" required>
+                        <option value="HR" selected>HR</option>
+                        <option value="HiringManager">HiringManager</option>
+                        <option value="Interviewer">Interviewer</option>
+                      </select>
+                    </div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-brand w-100">Create User</button>
+                    </div>
+                  </form>
+                  <p class="small mb-0 mt-3 text-secondary" data-company-user-create-msg></p>
+                </section>
+              </div>
+
+              <div class="col-lg-7">
+                <section class="table-card p-3 h-100">
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">Company Users</h2>
+                    <div class="d-flex flex-wrap align-items-end gap-2">
+                      <div>
+                        <label class="form-label small mb-1" for="companyUserRoleFilter">Role</label>
+                        <select id="companyUserRoleFilter" class="form-select form-select-sm" data-company-user-role-filter>
+                          <option value="all" selected>All Managed Roles</option>
+                          <option value="HR">HR</option>
+                          <option value="HiringManager">HiringManager</option>
+                          <option value="Interviewer">Interviewer</option>
+                        </select>
+                      </div>
+                      <button type="button" class="btn btn-outline-brand btn-sm" data-company-user-load>Load</button>
+                    </div>
+                  </div>
+
+                  <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+                    <div>
+                      <label class="form-label small mb-1" for="companyUserLoadId">Load User By ID</label>
+                      <input
+                        id="companyUserLoadId"
+                        type="number"
+                        min="1"
+                        class="form-control form-control-sm"
+                        placeholder="User ID"
+                        data-company-user-id-input
+                      />
+                    </div>
+                    <button type="button" class="btn btn-outline-brand btn-sm" data-company-user-load-id>Load User</button>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Role</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody data-company-user-list></tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <h2 class="h6 mb-3">Edit Selected User</h2>
+                  <p class="small text-secondary mb-3">
+                    Selected User ID:
+                    <span class="fw-semibold" data-company-user-edit-id>N/A</span>
+                  </p>
+                  <form class="row g-3" data-company-user-edit-form>
+                    <div class="col-md-3">
+                      <label class="form-label" for="companyEditUserFirstName">First Name</label>
+                      <input
+                        id="companyEditUserFirstName"
+                        type="text"
+                        class="form-control"
+                        data-company-user-edit-first-name
+                        required
+                      />
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label" for="companyEditUserLastName">Last Name</label>
+                      <input
+                        id="companyEditUserLastName"
+                        type="text"
+                        class="form-control"
+                        data-company-user-edit-last-name
+                        required
+                      />
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label" for="companyEditUserEmail">Email</label>
+                      <input
+                        id="companyEditUserEmail"
+                        type="email"
+                        class="form-control"
+                        data-company-user-edit-email
+                        required
+                      />
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label" for="companyEditUserRole">Role</label>
+                      <select id="companyEditUserRole" class="form-select" data-company-user-edit-role>
+                        <option value="HR">HR</option>
+                        <option value="HiringManager">HiringManager</option>
+                        <option value="Interviewer">Interviewer</option>
+                      </select>
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-2">
+                      <button type="submit" class="btn btn-brand" data-company-user-save>Save Changes</button>
+                      <button type="button" class="btn btn-outline-brand" data-company-user-toggle disabled>
+                        Activate / Deactivate
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary" data-company-user-clear>Clear Selection</button>
+                    </div>
+                  </form>
+                  <p class="small mb-0 mt-3 text-secondary" data-company-user-edit-msg></p>
+                </section>
+              </div>
+            </div>
+          </section>
+          <section data-company-view="jobs" class="d-none">
+            <div class="row g-3">
+              <div class="col-lg-5">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Create Job Draft</h2>
+                  <form class="row g-3" data-company-job-create-form>
+                    <div class="col-12">
+                      <label class="form-label" for="companyJobTitle">Title</label>
+                      <input id="companyJobTitle" name="title" type="text" class="form-control" required />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="companyJobDescription">Description</label>
+                      <textarea id="companyJobDescription" name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="companyJobRequirements">Requirements</label>
+                      <textarea id="companyJobRequirements" name="requirements" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyJobLocation">Location</label>
+                      <input id="companyJobLocation" name="location" type="text" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyJobType">Employment Type</label>
+                      <select id="companyJobType" name="employment_type" class="form-select">
+                        <option value="Full-time" selected>Full-time</option>
+                        <option value="Part-time">Part-time</option>
+                        <option value="Contract">Contract</option>
+                      </select>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="companyJobPositions">Positions</label>
+                      <input
+                        id="companyJobPositions"
+                        name="positions_count"
+                        type="number"
+                        min="1"
+                        class="form-control"
+                        value="1"
+                      />
+                    </div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-brand w-100">Create Draft</button>
+                    </div>
+                  </form>
+                  <p class="small mb-0 mt-3 text-secondary" data-company-job-create-msg></p>
+                </section>
+              </div>
+
+              <div class="col-lg-7">
+                <section class="table-card p-3 h-100">
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">Job List</h2>
+                    <div class="d-flex flex-wrap align-items-end gap-2">
+                      <div>
+                        <label class="form-label small mb-1" for="companyJobStatusFilter">Status</label>
+                        <select id="companyJobStatusFilter" class="form-select form-select-sm" data-company-job-status-filter>
+                          <option value="all" selected>All</option>
+                          <option value="draft">Draft</option>
+                          <option value="pending">Pending</option>
+                          <option value="published">Published</option>
+                          <option value="closed">Closed</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="form-label small mb-1" for="companyJobApprover">Approver ID</label>
+                        <input
+                          id="companyJobApprover"
+                          type="number"
+                          min="1"
+                          class="form-control form-control-sm"
+                          placeholder="For submit"
+                          data-company-job-approver-id
+                        />
+                      </div>
+                      <button type="button" class="btn btn-outline-brand btn-sm" data-company-job-load>Load</button>
+                    </div>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Title</th>
+                          <th>Status</th>
+                          <th>Location</th>
+                          <th>Positions</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody data-company-job-list></tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <h2 class="h6 mb-3">Edit Selected Job</h2>
+                  <p class="small text-secondary mb-3">
+                    Selected Job ID:
+                    <span class="fw-semibold" data-company-job-edit-id>N/A</span>
+                  </p>
+                  <form class="row g-3" data-company-job-edit-form>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyJobEditTitle">Title</label>
+                      <input
+                        id="companyJobEditTitle"
+                        type="text"
+                        class="form-control"
+                        data-company-job-edit-title
+                        required
+                      />
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label" for="companyJobEditLocation">Location</label>
+                      <input
+                        id="companyJobEditLocation"
+                        type="text"
+                        class="form-control"
+                        data-company-job-edit-location
+                      />
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label" for="companyJobEditPositions">Positions</label>
+                      <input
+                        id="companyJobEditPositions"
+                        type="number"
+                        min="1"
+                        class="form-control"
+                        data-company-job-edit-positions
+                      />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyJobEditDescription">Description</label>
+                      <textarea
+                        id="companyJobEditDescription"
+                        class="form-control"
+                        rows="3"
+                        data-company-job-edit-description
+                      ></textarea>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyJobEditRequirements">Requirements</label>
+                      <textarea
+                        id="companyJobEditRequirements"
+                        class="form-control"
+                        rows="3"
+                        data-company-job-edit-requirements
+                      ></textarea>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label" for="companyJobEditType">Employment Type</label>
+                      <select id="companyJobEditType" class="form-select" data-company-job-edit-type>
+                        <option value="Full-time">Full-time</option>
+                        <option value="Part-time">Part-time</option>
+                        <option value="Contract">Contract</option>
+                      </select>
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-2">
+                      <button type="submit" class="btn btn-brand" data-company-job-save>Save Job</button>
+                      <button type="button" class="btn btn-outline-brand" data-company-job-publish>Publish</button>
+                      <button type="button" class="btn btn-outline-brand" data-company-job-submit>Submit</button>
+                      <button type="button" class="btn btn-outline-danger" data-company-job-close>Close</button>
+                      <button type="button" class="btn btn-outline-secondary" data-company-job-clear>Clear Selection</button>
+                    </div>
+                  </form>
+                  <p class="small mb-0 mt-3 text-secondary" data-company-job-edit-msg></p>
+                </section>
+              </div>
+            </div>
+          </section>
+          <section data-company-view="applications" class="d-none">
+            <div class="row g-3">
+              <div class="col-lg-8">
+                <section class="table-card p-3 h-100">
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">Applications by Job</h2>
+                    <div class="d-flex flex-wrap align-items-end gap-2">
+                      <div>
+                        <label class="form-label small mb-1" for="companyAppJobId">Job ID</label>
+                        <input
+                          id="companyAppJobId"
+                          type="number"
+                          min="1"
+                          class="form-control form-control-sm"
+                          placeholder="Required"
+                          data-company-app-job-id
+                        />
+                      </div>
+                      <button type="button" class="btn btn-outline-brand btn-sm" data-company-app-load>
+                        Load
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Candidate</th>
+                          <th>Status</th>
+                          <th>Stage</th>
+                          <th>Resume</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody data-company-app-list></tbody>
+                    </table>
+                  </div>
+                  <p class="small mb-0 mt-3 text-secondary" data-company-app-msg></p>
+                </section>
+              </div>
+              <div class="col-lg-4">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Application Stats</h2>
+                  <div class="small text-secondary mb-2">Status counts for selected job.</div>
+                  <ul class="list-group list-group-flush" data-company-app-stats>
+                    <li class="list-group-item px-0 text-secondary">Load a job to see stats.</li>
+                  </ul>
+                  <hr class="my-3" />
+                  <p class="small text-secondary mb-2">Action shortcuts</p>
+                  <ul class="role-list mb-0">
+                    <li><strong>Move Stage:</strong> update status and stage id.</li>
+                    <li><strong>Screen:</strong> set interview or rejected.</li>
+                    <li><strong>Final:</strong> set selected or rejected.</li>
+                    <li><strong>Recommend:</strong> mark offer recommended.</li>
+                  </ul>
+                </section>
+              </div>
+            </div>
+          </section>
+          <section data-company-view="offers" class="d-none">
+            <div class="row g-3">
+              <div class="col-lg-5">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Create Offer Draft</h2>
+                  <form class="row g-3" data-company-offer-create-form>
+                    <div class="col-12">
+                      <label class="form-label" for="companyOfferApplicationId">Application ID</label>
+                      <input
+                        id="companyOfferApplicationId"
+                        name="application_id"
+                        type="number"
+                        min="1"
+                        class="form-control"
+                        required
+                      />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="companyOfferDetails">Offer Details (JSON)</label>
+                      <textarea
+                        id="companyOfferDetails"
+                        name="offer_details"
+                        class="form-control"
+                        rows="5"
+                        placeholder='{"ctc":"20LPA"}'
+                      ></textarea>
+                    </div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-brand w-100">Create Draft</button>
+                    </div>
+                  </form>
+                  <p class="small mb-0 mt-3 text-secondary" data-company-offer-create-msg></p>
+                </section>
+              </div>
+
+              <div class="col-lg-7">
+                <section class="table-card p-3 h-100">
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">Offers by Application</h2>
+                    <div class="d-flex flex-wrap align-items-end gap-2">
+                      <div>
+                        <label class="form-label small mb-1" for="companyOfferFilterApplicationId">Application ID</label>
+                        <input
+                          id="companyOfferFilterApplicationId"
+                          type="number"
+                          min="1"
+                          class="form-control form-control-sm"
+                          placeholder="Required"
+                          data-company-offer-application-id
+                        />
+                      </div>
+                      <button type="button" class="btn btn-outline-brand btn-sm" data-company-offer-load>
+                        Load
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Status</th>
+                          <th>Details</th>
+                          <th>Sent At</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody data-company-offer-list></tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <h2 class="h6 mb-3">Send Offer</h2>
+                  <form class="row g-3" data-company-offer-send-form>
+                    <div class="col-md-2">
+                      <label class="form-label" for="companySendOfferId">Offer ID</label>
+                      <input
+                        id="companySendOfferId"
+                        type="number"
+                        min="1"
+                        class="form-control"
+                        data-company-offer-send-id
+                        required
+                      />
+                    </div>
+                    <div class="col-md-5">
+                      <label class="form-label" for="companySendOfferDocument">Document URL</label>
+                      <input
+                        id="companySendOfferDocument"
+                        type="url"
+                        class="form-control"
+                        data-company-offer-send-document
+                      />
+                    </div>
+                    <div class="col-md-5">
+                      <label class="form-label" for="companySendOfferEsign">E-sign URL</label>
+                      <input
+                        id="companySendOfferEsign"
+                        type="url"
+                        class="form-control"
+                        data-company-offer-send-esign
+                      />
+                    </div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-brand" data-company-offer-send-btn>Send Offer</button>
+                    </div>
+                  </form>
+                  <p class="small mb-0 mt-3 text-secondary" data-company-offer-send-msg></p>
+                </section>
+              </div>
+            </div>
+          </section>
+          <section data-company-view="profile" class="d-none">
+            <div class="row g-3">
+              <div class="col-lg-7">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">My Profile</h2>
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <tbody>
+                        <tr>
+                          <th style="width: 30%">Name</th>
+                          <td data-company-profile-name>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Email</th>
+                          <td data-company-profile-email>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Role</th>
+                          <td data-company-profile-role>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Company ID</th>
+                          <td data-company-profile-company>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Last Login</th>
+                          <td data-company-profile-last-login>N/A</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <hr class="my-3" />
+                  <h3 class="h6 mb-3">Edit Profile</h3>
+                  <form class="row g-3" data-company-profile-form>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyProfileFirstName">First Name</label>
+                      <input
+                        id="companyProfileFirstName"
+                        type="text"
+                        class="form-control"
+                        data-company-edit-first-name
+                        required
+                      />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyProfileLastName">Last Name</label>
+                      <input
+                        id="companyProfileLastName"
+                        type="text"
+                        class="form-control"
+                        data-company-edit-last-name
+                        required
+                      />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="companyProfileEmail">Email</label>
+                      <input
+                        id="companyProfileEmail"
+                        type="email"
+                        class="form-control"
+                        data-company-edit-email
+                        required
+                      />
+                    </div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-brand" data-company-profile-save>
+                        Save Profile
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              </div>
+              <div class="col-lg-5">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Session Actions</h2>
+                  <p class="small text-secondary">
+                    Reload profile from backend or logout securely.
+                  </p>
+                  <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-brand" data-company-reload-profile>
+                      Reload Profile
+                    </button>
+                    <button type="button" class="btn btn-danger" data-company-logout>
+                      Logout
+                    </button>
+                  </div>
+                  <p class="small mt-3 mb-0 text-secondary" data-company-profile-status></p>
+                </section>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <button class="back-to-top" type="button" aria-label="Back to top" data-back-to-top>
+      <i class="bi bi-arrow-up"></i>
+    </button>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="../js/script.js"></script>
+    <script src="../js/companyAdmin.js"></script>
   </body>
 </html>

@@ -1,0 +1,56 @@
+<svg width="960" height="640" viewBox="0 0 960 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="heroTitle heroDesc">
+  <title id="heroTitle">HireFlow dashboard illustration</title>
+  <desc id="heroDesc">Stylized hiring dashboard with pipeline cards and analytics charts.</desc>
+  <defs>
+    <linearGradient id="heroBg" x1="120" y1="40" x2="820" y2="580" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F3F8FF"/>
+      <stop offset="1" stop-color="#E2ECFF"/>
+    </linearGradient>
+    <linearGradient id="heroCard" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F4F8FF"/>
+    </linearGradient>
+    <linearGradient id="heroAccent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#4167DF"/>
+      <stop offset="1" stop-color="#3DA9FC"/>
+    </linearGradient>
+    <filter id="heroShadow" x="130" y="50" width="700" height="520" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="16"/>
+      <feGaussianBlur stdDeviation="18"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.067 0 0 0 0 0.14 0 0 0 0 0.38 0 0 0 0.18 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_hero"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_hero" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect width="960" height="640" rx="42" fill="url(#heroBg)"/>
+  <circle cx="150" cy="94" r="74" fill="#D5E6FF" fill-opacity="0.65"/>
+  <circle cx="868" cy="534" r="108" fill="#C8DCFF" fill-opacity="0.58"/>
+
+  <g filter="url(#heroShadow)">
+    <rect x="184" y="102" width="592" height="430" rx="26" fill="url(#heroCard)"/>
+    <rect x="212" y="132" width="538" height="64" rx="14" fill="#EDF4FF"/>
+    <rect x="234" y="152" width="146" height="24" rx="12" fill="url(#heroAccent)"/>
+    <rect x="622" y="152" width="104" height="24" rx="12" fill="#D5E4FF"/>
+
+    <rect x="212" y="218" width="258" height="132" rx="18" fill="#FFFFFF"/>
+    <rect x="234" y="244" width="108" height="18" rx="9" fill="#D7E4FF"/>
+    <rect x="234" y="275" width="210" height="12" rx="6" fill="#E5EEFF"/>
+    <rect x="234" y="296" width="178" height="12" rx="6" fill="#EDF3FF"/>
+    <rect x="234" y="316" width="88" height="12" rx="6" fill="#8FB3FF"/>
+
+    <rect x="492" y="218" width="258" height="132" rx="18" fill="#FFFFFF"/>
+    <rect x="514" y="244" width="108" height="18" rx="9" fill="#D7E4FF"/>
+    <path d="M522 320C548 294 566 308 592 282C617 257 635 272 660 246C679 226 699 230 721 220" stroke="url(#heroAccent)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="721" cy="220" r="9" fill="#4167DF"/>
+
+    <rect x="212" y="370" width="538" height="138" rx="18" fill="#FFFFFF"/>
+    <rect x="234" y="394" width="146" height="18" rx="9" fill="#D7E4FF"/>
+    <rect x="234" y="426" width="494" height="14" rx="7" fill="#E6EEFF"/>
+    <rect x="234" y="450" width="458" height="14" rx="7" fill="#EFF4FF"/>
+    <rect x="234" y="474" width="388" height="14" rx="7" fill="#F4F8FF"/>
+  </g>
+</svg>

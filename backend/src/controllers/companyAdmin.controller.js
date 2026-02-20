@@ -30,7 +30,8 @@ exports.updateMyProfile = async (req, res) => {
 exports.listUsersByRole = async (req, res) => {
   try {
     if (!req.query.role) return res.status(400).json({ message: "role query param is required" });
-    return res.json(await service.listUsersByRole(req.query.role));
+    const includeInactive = String(req.query.include_inactive || "").trim().toLowerCase() === "true";
+    return res.json(await service.listUsersByRole(req.query.role, req.user.company_id, includeInactive));
   } catch (err) {
     return handleError(res, err);
   }
@@ -38,7 +39,7 @@ exports.listUsersByRole = async (req, res) => {
 
 exports.getUserById = async (req, res) => {
   try {
-    const user = await service.getUserById(req.params.id);
+    const user = await service.getUserById(req.params.id, req.user.company_id);
     if (!user) return res.status(404).json({ message: "User not found" });
     return res.json(user);
   } catch (err) {
@@ -48,7 +49,8 @@ exports.getUserById = async (req, res) => {
 
 exports.createUser = async (req, res) => {
   try {
-    return res.status(201).json(await service.createUser(req.body));
+    const payload = { ...req.body, company_id: req.user.company_id };
+    return res.status(201).json(await service.createUser(payload, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -56,7 +58,8 @@ exports.createUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const affected = await service.updateUser(req.params.id, req.body);
+    const payload = { ...req.body, company_id: req.user.company_id };
+    const affected = await service.updateUser(req.params.id, payload, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "User not found" });
     return res.json({ message: "User updated" });
   } catch (err) {
@@ -66,7 +69,7 @@ exports.updateUser = async (req, res) => {
 
 exports.deactivateUser = async (req, res) => {
   try {
-    const affected = await service.deactivateUser(req.params.id);
+    const affected = await service.deactivateUser(req.params.id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "User not found" });
     return res.json({ message: "User deactivated" });
   } catch (err) {
@@ -76,7 +79,7 @@ exports.deactivateUser = async (req, res) => {
 
 exports.activateUser = async (req, res) => {
   try {
-    const affected = await service.activateUser(req.params.id);
+    const affected = await service.activateUser(req.params.id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "User not found" });
     return res.json({ message: "User activated" });
   } catch (err) {
@@ -87,7 +90,7 @@ exports.activateUser = async (req, res) => {
 exports.countUsersByRole = async (req, res) => {
   try {
     if (!req.query.role) return res.status(400).json({ message: "role query param is required" });
-    return res.json(await service.countUsersByRole(req.query.role));
+    return res.json(await service.countUsersByRole(req.query.role, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -95,7 +98,8 @@ exports.countUsersByRole = async (req, res) => {
 
 exports.listJobs = async (req, res) => {
   try {
-    return res.json(await service.listJobs(req.query));
+    const query = { ...req.query, company_id: req.user.company_id };
+    return res.json(await service.listJobs(query, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -103,7 +107,7 @@ exports.listJobs = async (req, res) => {
 
 exports.getJobById = async (req, res) => {
   try {
-    const job = await service.getJobById(req.params.id);
+    const job = await service.getJobById(req.params.id, req.user.company_id);
     if (!job) return res.status(404).json({ message: "Job not found" });
     return res.json(job);
   } catch (err) {
@@ -114,8 +118,8 @@ exports.getJobById = async (req, res) => {
 exports.createJobDraft = async (req, res) => {
   try {
     const payload = { ...req.body };
-    if (!payload.created_by) payload.created_by = req.user.user_id;
-    if (!payload.company_id) payload.company_id = req.user.company_id;
+    payload.created_by = req.user.user_id;
+    payload.company_id = req.user.company_id;
     return res.status(201).json(await service.createJobDraft(payload));
   } catch (err) {
     return handleError(res, err);
@@ -124,7 +128,7 @@ exports.createJobDraft = async (req, res) => {
 
 exports.updateJob = async (req, res) => {
   try {
-    const affected = await service.updateJob(req.params.id, req.body);
+    const affected = await service.updateJob(req.params.id, req.body, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Job not found or not editable" });
     return res.json({ message: "Job updated" });
   } catch (err) {
@@ -134,7 +138,7 @@ exports.updateJob = async (req, res) => {
 
 exports.submitJob = async (req, res) => {
   try {
-    const affected = await service.submitJob(req.params.id, req.body.approver_id);
+    const affected = await service.submitJob(req.params.id, req.body.approver_id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Job not found" });
     return res.json({ message: "Job submitted for approval" });
   } catch (err) {
@@ -144,7 +148,7 @@ exports.submitJob = async (req, res) => {
 
 exports.publishJob = async (req, res) => {
   try {
-    const affected = await service.publishJob(req.params.id);
+    const affected = await service.publishJob(req.params.id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Job not found" });
     return res.json({ message: "Job published" });
   } catch (err) {
@@ -154,7 +158,7 @@ exports.publishJob = async (req, res) => {
 
 exports.closeJob = async (req, res) => {
   try {
-    const affected = await service.closeJob(req.params.id);
+    const affected = await service.closeJob(req.params.id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Job not found" });
     return res.json({ message: "Job closed" });
   } catch (err) {
@@ -167,7 +171,7 @@ exports.listApplications = async (req, res) => {
     if (!req.query.job_id) {
       return res.status(400).json({ message: "job_id query param is required" });
     }
-    return res.json(await service.listApplicationsForJob(req.query.job_id));
+    return res.json(await service.listApplicationsForJob(req.query.job_id, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -175,7 +179,12 @@ exports.listApplications = async (req, res) => {
 
 exports.moveApplicationStage = async (req, res) => {
   try {
-    const affected = await service.moveApplicationStage(req.params.id, req.body.status, req.body.current_stage_id);
+    const affected = await service.moveApplicationStage(
+      req.params.id,
+      req.body.status,
+      req.body.current_stage_id,
+      req.user.company_id,
+    );
     if (!affected) return res.status(404).json({ message: "Application not found" });
     return res.json({ message: "Application updated" });
   } catch (err) {
@@ -185,7 +194,7 @@ exports.moveApplicationStage = async (req, res) => {
 
 exports.screenDecision = async (req, res) => {
   try {
-    const affected = await service.screenDecision(req.params.id, req.body.status);
+    const affected = await service.screenDecision(req.params.id, req.body.status, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Application not found" });
     return res.json({ message: "Screening decision updated" });
   } catch (err) {
@@ -195,7 +204,7 @@ exports.screenDecision = async (req, res) => {
 
 exports.finalDecision = async (req, res) => {
   try {
-    const affected = await service.finalDecision(req.params.id, req.body.status);
+    const affected = await service.finalDecision(req.params.id, req.body.status, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Application not found" });
     return res.json({ message: "Final decision updated" });
   } catch (err) {
@@ -205,7 +214,7 @@ exports.finalDecision = async (req, res) => {
 
 exports.recommendOffer = async (req, res) => {
   try {
-    const affected = await service.recommendOffer(req.params.id);
+    const affected = await service.recommendOffer(req.params.id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Application not found" });
     return res.json({ message: "Offer recommended" });
   } catch (err) {
@@ -216,7 +225,7 @@ exports.recommendOffer = async (req, res) => {
 exports.applicationStats = async (req, res) => {
   try {
     if (!req.query.job_id) return res.status(400).json({ message: "job_id query param is required" });
-    return res.json(await service.applicationStats(req.query.job_id));
+    return res.json(await service.applicationStats(req.query.job_id, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -224,7 +233,9 @@ exports.applicationStats = async (req, res) => {
 
 exports.createOfferDraft = async (req, res) => {
   try {
-    return res.status(201).json(await service.createOfferDraft(req.body));
+    const payload = { ...req.body };
+    payload.created_by = req.user.user_id;
+    return res.status(201).json(await service.createOfferDraft(payload, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -232,7 +243,7 @@ exports.createOfferDraft = async (req, res) => {
 
 exports.sendOffer = async (req, res) => {
   try {
-    const affected = await service.sendOffer(req.params.id, req.body);
+    const affected = await service.sendOffer(req.params.id, req.body, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Offer not found" });
     return res.json({ message: "Offer sent" });
   } catch (err) {
@@ -245,7 +256,7 @@ exports.getOffers = async (req, res) => {
     if (!req.query.application_id) {
       return res.status(400).json({ message: "application_id query param is required" });
     }
-    return res.json(await service.getOffersByApplication(req.query.application_id));
+    return res.json(await service.getOffersByApplication(req.query.application_id, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }

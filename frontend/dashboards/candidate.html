@@ -1,11 +1,450 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Candidate Dashboard | HireFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="icon" type="image/svg+xml" href="../public/assets/images/favicon.svg" />
   </head>
-  <body>
-    <h1>Welcome to Candidate Dashboard</h1>
+  <body class="dashboard-body">
+    <div class="dashboard-layout">
+      <aside class="dash-sidebar d-flex flex-column">
+        <a class="d-inline-flex align-items-center fw-semibold text-white" href="../public/index.html">
+          <span class="brand-mark">H</span>
+          <span class="dash-brand-text">HireFlow</span>
+        </a>
+
+        <nav class="mt-4">
+          <a class="dash-nav-link active" href="candidate.html" data-cand-nav="dashboard">
+            <i class="bi bi-speedometer2"></i>
+            <span class="sidebar-label">Dashboard</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-cand-nav="jobs">
+            <i class="bi bi-briefcase"></i>
+            <span class="sidebar-label">Jobs</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-cand-nav="applications">
+            <i class="bi bi-folder2-open"></i>
+            <span class="sidebar-label">My Applications</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-cand-nav="saved">
+            <i class="bi bi-bookmark-star"></i>
+            <span class="sidebar-label">Saved Jobs</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-cand-nav="offers">
+            <i class="bi bi-file-earmark-check"></i>
+            <span class="sidebar-label">Offers</span>
+          </a>
+          <a class="dash-nav-link" href="#" data-cand-nav="profile">
+            <i class="bi bi-person-circle"></i>
+            <span class="sidebar-label">Profile</span>
+          </a>
+          <a class="dash-nav-link" href="../public/login.html" data-cand-nav="logout">
+            <i class="bi bi-box-arrow-right"></i>
+            <span class="sidebar-label">Logout</span>
+          </a>
+        </nav>
+
+        <div class="mt-auto sidebar-footnote small text-white-50">
+          Discover jobs, track your applications, and manage offers.
+        </div>
+      </aside>
+
+      <div class="dash-main">
+        <header class="dash-topbar">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="btn btn-outline-brand" data-sidebar-toggle>
+                <i class="bi bi-list"></i>
+              </button>
+              <div>
+                <h1 class="h5 mb-0" data-cand-header-title>Candidate Dashboard</h1>
+                <p class="mb-0 text-secondary small" data-cand-header-subtitle>
+                  Monitor applications, saved jobs, and offer responses.
+                </p>
+              </div>
+            </div>
+            <div class="search-box">
+              <i class="bi bi-search"></i>
+              <input type="search" class="form-control" placeholder="Search jobs or companies" data-cand-search />
+            </div>
+          </div>
+        </header>
+
+        <main class="container-fluid py-4">
+          <section data-cand-view="dashboard">
+            <div class="row g-3">
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Active Applications</p>
+                  <p class="kpi-value mb-0" data-cand-kpi-active-apps>--</p>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Saved Jobs</p>
+                  <p class="kpi-value mb-0" data-cand-kpi-saved-jobs>--</p>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Offers (Loaded)</p>
+                  <p class="kpi-value mb-0" data-cand-kpi-offers>--</p>
+                </article>
+              </div>
+              <div class="col-6 col-xl-3">
+                <article class="metric-card">
+                  <p class="kpi-title mb-1">Profile Completion</p>
+                  <p class="kpi-value mb-0" data-cand-kpi-profile>--</p>
+                </article>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-lg-8">
+                <section class="chart-card p-3">
+                  <h2 class="h6 mb-3">Application Activity</h2>
+                  <div class="chart-wrap">
+                    <canvas id="pipelineChart"></canvas>
+                  </div>
+                </section>
+              </div>
+              <div class="col-lg-4">
+                <section class="chart-card p-3 h-100">
+                  <h2 class="h6 mb-3">Applied Source Breakdown</h2>
+                  <div class="chart-wrap">
+                    <canvas id="sourceChart"></canvas>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-cand-view="jobs" class="d-none">
+            <div class="row g-3">
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">Available Jobs</h2>
+                    <div class="d-flex align-items-end gap-2">
+                      <div>
+                        <label class="form-label small mb-1" for="candJobStatus">Status</label>
+                        <select id="candJobStatus" class="form-select form-select-sm" data-cand-job-status>
+                          <option value="all" selected>All</option>
+                          <option value="published">Published</option>
+                          <option value="draft">Draft</option>
+                          <option value="pending">Pending</option>
+                          <option value="closed">Closed</option>
+                        </select>
+                      </div>
+                      <button type="button" class="btn btn-outline-brand btn-sm" data-cand-jobs-load>Load</button>
+                    </div>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Title</th>
+                          <th>Company</th>
+                          <th>Status</th>
+                          <th>Location</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody data-cand-job-list></tbody>
+                    </table>
+                  </div>
+                  <p class="small mt-3 mb-0 text-secondary" data-cand-job-msg></p>
+                </section>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <h2 class="h6 mb-3">Selected Job Details</h2>
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <tbody>
+                        <tr>
+                          <th style="width: 25%">Title</th>
+                          <td data-cand-selected-job-title>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Description</th>
+                          <td data-cand-selected-job-description>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Requirements</th>
+                          <td data-cand-selected-job-requirements>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Employment</th>
+                          <td data-cand-selected-job-employment>N/A</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-cand-view="applications" class="d-none">
+            <div class="row g-3">
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">My Applications</h2>
+                    <button type="button" class="btn btn-outline-brand btn-sm" data-cand-apps-load>Load</button>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Role</th>
+                          <th>Company</th>
+                          <th>Status</th>
+                          <th>Applied At</th>
+                        </tr>
+                      </thead>
+                      <tbody data-cand-app-list></tbody>
+                    </table>
+                  </div>
+                  <p class="small mt-3 mb-0 text-secondary" data-cand-app-msg></p>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-cand-view="saved" class="d-none">
+            <div class="row g-3">
+              <div class="col-lg-4">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Save Job By ID</h2>
+                  <form class="row g-3" data-cand-save-job-form>
+                    <div class="col-12">
+                      <label class="form-label" for="candSaveJobId">Job ID</label>
+                      <input id="candSaveJobId" type="number" min="1" class="form-control" data-cand-save-job-id required />
+                    </div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-brand w-100">Save Job</button>
+                    </div>
+                  </form>
+                  <p class="small mt-3 mb-0 text-secondary" data-cand-save-msg></p>
+                </section>
+              </div>
+              <div class="col-lg-8">
+                <section class="table-card p-3 h-100">
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">Saved Jobs</h2>
+                    <button type="button" class="btn btn-outline-brand btn-sm" data-cand-saved-load>Load</button>
+                  </div>
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Title</th>
+                          <th>Company</th>
+                          <th>Status</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody data-cand-saved-list></tbody>
+                    </table>
+                  </div>
+                  <p class="small mt-3 mb-0 text-secondary" data-cand-saved-msg></p>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-cand-view="offers" class="d-none">
+            <div class="row g-3">
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">Offers By Application</h2>
+                    <div class="d-flex align-items-end gap-2">
+                      <div>
+                        <label class="form-label small mb-1" for="candOfferApplicationId">Application ID</label>
+                        <input id="candOfferApplicationId" type="number" min="1" class="form-control form-control-sm" data-cand-offer-application-id />
+                      </div>
+                      <button type="button" class="btn btn-outline-brand btn-sm" data-cand-offers-load>Load</button>
+                    </div>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Status</th>
+                          <th>Details</th>
+                          <th>Document</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody data-cand-offer-list></tbody>
+                    </table>
+                  </div>
+                  <p class="small mt-3 mb-0 text-secondary" data-cand-offer-msg></p>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-cand-view="profile" class="d-none">
+            <div class="row g-3">
+              <div class="col-lg-6">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Account Profile</h2>
+                  <div class="table-responsive mb-3">
+                    <table class="table align-middle mb-0">
+                      <tbody>
+                        <tr>
+                          <th style="width: 35%">Name</th>
+                          <td data-cand-profile-name>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Email</th>
+                          <td data-cand-profile-email>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Role</th>
+                          <td data-cand-profile-role>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Last Login</th>
+                          <td data-cand-profile-last-login>N/A</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <h3 class="h6 mb-3">Edit Account Profile</h3>
+                  <form class="row g-3" data-cand-profile-form>
+                    <div class="col-md-6">
+                      <label class="form-label" for="candFirstName">First Name</label>
+                      <input id="candFirstName" type="text" class="form-control" data-cand-edit-first-name required />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="candLastName">Last Name</label>
+                      <input id="candLastName" type="text" class="form-control" data-cand-edit-last-name required />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="candEmail">Email</label>
+                      <input id="candEmail" type="email" class="form-control" data-cand-edit-email required />
+                    </div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-brand" data-cand-profile-save>Save Account Profile</button>
+                    </div>
+                  </form>
+                </section>
+              </div>
+
+              <div class="col-lg-6">
+                <section class="table-card p-3 h-100">
+                  <h2 class="h6 mb-3">Candidate Profile</h2>
+                  <div class="table-responsive mb-3">
+                    <table class="table align-middle mb-0">
+                      <tbody>
+                        <tr>
+                          <th style="width: 35%">Phone</th>
+                          <td data-cand-cp-phone>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Address</th>
+                          <td data-cand-cp-address>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Resume</th>
+                          <td data-cand-cp-resume>N/A</td>
+                        </tr>
+                        <tr>
+                          <th>Verified</th>
+                          <td data-cand-cp-verified>N/A</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <form class="row g-3" data-cand-cp-form>
+                    <div class="col-md-6">
+                      <label class="form-label" for="candCpPhone">Phone</label>
+                      <input id="candCpPhone" type="text" class="form-control" data-cand-cp-edit-phone />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="candCpAddress">Address</label>
+                      <input id="candCpAddress" type="text" class="form-control" data-cand-cp-edit-address />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="candCpData">Profile Data (JSON)</label>
+                      <textarea id="candCpData" rows="4" class="form-control" data-cand-cp-edit-data></textarea>
+                    </div>
+                    <div class="col-md-9">
+                      <label class="form-label" for="candCpResume">Resume URL</label>
+                      <input id="candCpResume" type="url" class="form-control" data-cand-cp-resume-url />
+                    </div>
+                    <div class="col-md-3 d-flex align-items-end">
+                      <button type="button" class="btn btn-outline-brand w-100" data-cand-cp-upload-resume>Update Resume</button>
+                    </div>
+                    <div class="col-12">
+                      <button type="submit" class="btn btn-brand">Save Candidate Profile</button>
+                    </div>
+                  </form>
+                </section>
+              </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <h2 class="h6 mb-3">Session Actions</h2>
+                  <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-outline-brand" data-cand-reload-profile>Reload Profile</button>
+                    <button type="button" class="btn btn-danger" data-cand-logout>Logout</button>
+                  </div>
+                  <p class="small mt-3 mb-0 text-secondary" data-cand-profile-status></p>
+                </section>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <button class="back-to-top" type="button" aria-label="Back to top" data-back-to-top>
+      <i class="bi bi-arrow-up"></i>
+    </button>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="../js/script.js"></script>
+    <script src="../js/candidate.js"></script>
   </body>
 </html>

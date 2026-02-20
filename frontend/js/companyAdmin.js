@@ -1,0 +1,2169 @@
+/**
+ * Company Admin dashboard script.
+ * Handles section switching, profile updates, and company admin APIs.
+ */
+
+const COMPANY_ADMIN_CONFIG = {
+  useApi: true,
+  apiBase: String(window.COMPANY_ADMIN_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(
+    /\/+$/,
+    "",
+  ),
+  tryApiPrefixFallback: false,
+  tokenKeys: ["token", "accessToken", "authToken", "jwtToken"],
+  managedRoles: ["HR", "HiringManager", "Interviewer"],
+  endpoints: {
+    authLogout: "/auth/logout",
+    authProfile: "/auth/profile",
+    getMyProfile: "/company-admin/profile",
+    updateMyProfile: "/company-admin/profile",
+    listUsersByRole: "/company-admin/users",
+    createUser: "/company-admin/users",
+    deactivateUser: "/company-admin/users/:id",
+    getUserById: "/company-admin/users/:id",
+    updateUser: "/company-admin/users/:id",
+    activateUser: "/company-admin/users/:id/activate",
+    countUsersByRole: "/company-admin/users/count",
+    listJobs: "/company-admin/jobs",
+    createJobDraft: "/company-admin/jobs",
+    getJobById: "/company-admin/jobs/:id",
+    updateJob: "/company-admin/jobs/:id",
+    submitJob: "/company-admin/jobs/:id/submit",
+    publishJob: "/company-admin/jobs/:id/publish",
+    closeJob: "/company-admin/jobs/:id/close",
+    listApplications: "/company-admin/applications",
+    moveApplicationStage: "/company-admin/applications/:id/move-stage",
+    screenDecision: "/company-admin/applications/:id/screen",
+    finalDecision: "/company-admin/applications/:id/final-decision",
+    recommendOffer: "/company-admin/applications/:id/recommend-offer",
+    applicationStats: "/company-admin/applications/stats",
+    getOffers: "/company-admin/offers",
+    createOfferDraft: "/company-admin/offers",
+    sendOffer: "/company-admin/offers/:id/send"
+  }
+};
+
+const companyState = {
+  currentView: "dashboard",
+  currentProfile: null,
+  usersLoaded: false,
+  jobsLoaded: false,
+  applicationsLoaded: false,
+  offersLoaded: false,
+  usersRows: [],
+  selectedUser: null,
+  jobsRows: [],
+  selectedJob: null,
+  applicationRows: [],
+  currentApplicationJobId: "",
+  offerRows: [],
+  currentOfferApplicationId: "",
+  redirecting: false
+};
+
+const viewMeta = {
+  dashboard: {
+    title: "Company Admin Dashboard",
+    subtitle: "Manage team access, jobs, and recruitment progress.",
+    searchPlaceholder: "Search jobs, users, or applications"
+  },
+  users: {
+    title: "Users",
+    subtitle: "Add HR, HiringManager, Interviewer and manage activation.",
+    searchPlaceholder: "Search users by name or email"
+  },
+  jobs: {
+    title: "Jobs",
+    subtitle: "Create draft jobs, update, submit, publish, and close.",
+    searchPlaceholder: "Search jobs by title or location"
+  },
+  applications: {
+    title: "Applications",
+    subtitle: "Move stages and make screening/final decisions.",
+    searchPlaceholder: "Search applications by candidate"
+  },
+  offers: {
+    title: "Offers",
+    subtitle: "Create offer drafts and send selected offers.",
+    searchPlaceholder: "Search offers by application"
+  },
+  profile: {
+    title: "Profile",
+    subtitle: "View and edit your company admin profile.",
+    searchPlaceholder: "Search jobs, users, or applications"
+  }
+};
+
+const ui = {
+  navLinks: document.querySelectorAll("[data-company-nav]"),
+  sections: document.querySelectorAll("[data-company-view]"),
+  headerTitle: document.querySelector("[data-company-header-title]"),
+  headerSubtitle: document.querySelector("[data-company-header-subtitle]"),
+  searchInput: document.querySelector("[data-company-search]"),
+
+  kpiHr: document.querySelector("[data-company-kpi-hr]"),
+  kpiManagers: document.querySelector("[data-company-kpi-managers]"),
+  kpiInterviewers: document.querySelector("[data-company-kpi-interviewers]"),
+  kpiOpenJobs: document.querySelector("[data-company-kpi-open-jobs]"),
+
+  userCreateForm: document.querySelector("[data-company-user-create-form]"),
+  userCreateMsg: document.querySelector("[data-company-user-create-msg]"),
+  userRoleFilter: document.querySelector("[data-company-user-role-filter]"),
+  userLoadBtn: document.querySelector("[data-company-user-load]"),
+  userLoadIdInput: document.querySelector("[data-company-user-id-input]"),
+  userLoadIdBtn: document.querySelector("[data-company-user-load-id]"),
+  userList: document.querySelector("[data-company-user-list]"),
+  userEditId: document.querySelector("[data-company-user-edit-id]"),
+  userEditForm: document.querySelector("[data-company-user-edit-form]"),
+  userEditFirstName: document.querySelector("[data-company-user-edit-first-name]"),
+  userEditLastName: document.querySelector("[data-company-user-edit-last-name]"),
+  userEditEmail: document.querySelector("[data-company-user-edit-email]"),
+  userEditRole: document.querySelector("[data-company-user-edit-role]"),
+  userSaveBtn: document.querySelector("[data-company-user-save]"),
+  userToggleBtn: document.querySelector("[data-company-user-toggle]"),
+  userClearBtn: document.querySelector("[data-company-user-clear]"),
+  userEditMsg: document.querySelector("[data-company-user-edit-msg]"),
+
+  jobCreateForm: document.querySelector("[data-company-job-create-form]"),
+  jobCreateMsg: document.querySelector("[data-company-job-create-msg]"),
+  jobStatusFilter: document.querySelector("[data-company-job-status-filter]"),
+  jobApproverId: document.querySelector("[data-company-job-approver-id]"),
+  jobLoadBtn: document.querySelector("[data-company-job-load]"),
+  jobList: document.querySelector("[data-company-job-list]"),
+  jobEditId: document.querySelector("[data-company-job-edit-id]"),
+  jobEditForm: document.querySelector("[data-company-job-edit-form]"),
+  jobEditTitle: document.querySelector("[data-company-job-edit-title]"),
+  jobEditLocation: document.querySelector("[data-company-job-edit-location]"),
+  jobEditPositions: document.querySelector("[data-company-job-edit-positions]"),
+  jobEditDescription: document.querySelector("[data-company-job-edit-description]"),
+  jobEditRequirements: document.querySelector("[data-company-job-edit-requirements]"),
+  jobEditType: document.querySelector("[data-company-job-edit-type]"),
+  jobSaveBtn: document.querySelector("[data-company-job-save]"),
+  jobPublishBtn: document.querySelector("[data-company-job-publish]"),
+  jobSubmitBtn: document.querySelector("[data-company-job-submit]"),
+  jobCloseBtn: document.querySelector("[data-company-job-close]"),
+  jobClearBtn: document.querySelector("[data-company-job-clear]"),
+  jobEditMsg: document.querySelector("[data-company-job-edit-msg]"),
+
+  appJobIdInput: document.querySelector("[data-company-app-job-id]"),
+  appLoadBtn: document.querySelector("[data-company-app-load]"),
+  appList: document.querySelector("[data-company-app-list]"),
+  appStats: document.querySelector("[data-company-app-stats]"),
+  appMsg: document.querySelector("[data-company-app-msg]"),
+
+  offerCreateForm: document.querySelector("[data-company-offer-create-form]"),
+  offerCreateMsg: document.querySelector("[data-company-offer-create-msg]"),
+  offerApplicationIdInput: document.querySelector("[data-company-offer-application-id]"),
+  offerLoadBtn: document.querySelector("[data-company-offer-load]"),
+  offerList: document.querySelector("[data-company-offer-list]"),
+  offerSendForm: document.querySelector("[data-company-offer-send-form]"),
+  offerSendId: document.querySelector("[data-company-offer-send-id]"),
+  offerSendDocument: document.querySelector("[data-company-offer-send-document]"),
+  offerSendEsign: document.querySelector("[data-company-offer-send-esign]"),
+  offerSendMsg: document.querySelector("[data-company-offer-send-msg]"),
+
+  profileName: document.querySelector("[data-company-profile-name]"),
+  profileEmail: document.querySelector("[data-company-profile-email]"),
+  profileRole: document.querySelector("[data-company-profile-role]"),
+  profileCompany: document.querySelector("[data-company-profile-company]"),
+  profileLastLogin: document.querySelector("[data-company-profile-last-login]"),
+  profileForm: document.querySelector("[data-company-profile-form]"),
+  profileFirstName: document.querySelector("[data-company-edit-first-name]"),
+  profileLastName: document.querySelector("[data-company-edit-last-name]"),
+  profileEditEmail: document.querySelector("[data-company-edit-email]"),
+  profileSaveBtn: document.querySelector("[data-company-profile-save]"),
+  profileStatus: document.querySelector("[data-company-profile-status]"),
+  reloadProfileBtn: document.querySelector("[data-company-reload-profile]"),
+  profileLogoutBtn: document.querySelector("[data-company-logout]")
+};
+
+function firstValue(record, keys, fallback = "") {
+  for (let i = 0; i < keys.length; i += 1) {
+    const value = record?.[keys[i]];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return String(value);
+    }
+  }
+  return fallback;
+}
+
+function normalizeArrayResponse(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.data)) return payload.data;
+  if (payload && Array.isArray(payload.items)) return payload.items;
+  if (payload && Array.isArray(payload.rows)) return payload.rows;
+  return [];
+}
+
+function buildPathWithId(path, id) {
+  return path.replace(":id", encodeURIComponent(String(id)));
+}
+
+function toNumber(value) {
+  const n = Number(value);
+  return Number.isNaN(n) ? null : n;
+}
+
+function isActive(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "active" || normalized === "enabled";
+}
+
+function formatDate(value) {
+  if (!value) return "N/A";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString();
+}
+
+function formatDateTime(value) {
+  if (!value) return "N/A";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString();
+}
+
+function fullName(record) {
+  const first = firstValue(record, ["first_name"], "");
+  const last = firstValue(record, ["last_name"], "");
+  const name = `${first} ${last}`.trim();
+  return name || firstValue(record, ["name"], "N/A");
+}
+
+function setText(element, value) {
+  if (!element) return;
+  element.textContent = value === undefined || value === null || value === "" ? "N/A" : String(value);
+}
+
+function setMessage(element, text, type = "info") {
+  if (!element) return;
+  element.textContent = text || "";
+  element.classList.remove("text-secondary", "text-success", "text-danger");
+  if (type === "success") {
+    element.classList.add("text-success");
+    return;
+  }
+  if (type === "error") {
+    element.classList.add("text-danger");
+    return;
+  }
+  element.classList.add("text-secondary");
+}
+
+function setActiveNav(viewKey) {
+  ui.navLinks.forEach((link) => link.classList.remove("active"));
+  const target = document.querySelector(`[data-company-nav="${viewKey}"]`);
+  if (target) target.classList.add("active");
+}
+
+function profileSuffixText() {
+  const profile = companyState.currentProfile;
+  if (!profile) return "";
+  const name = fullName(profile);
+  const role = firstValue(profile, ["role"], "");
+  if (name === "N/A" && !role) return "";
+  if (name !== "N/A" && role) return ` Signed in as ${name} (${role}).`;
+  return ` Signed in as ${name !== "N/A" ? name : role}.`;
+}
+
+function showSection(viewKey) {
+  ui.sections.forEach((sec) => {
+    sec.classList.toggle("d-none", sec.dataset.companyView !== viewKey);
+  });
+
+  setActiveNav(viewKey);
+  companyState.currentView = viewKey;
+
+  const meta = viewMeta[viewKey];
+  if (!meta) return;
+  if (ui.headerTitle) ui.headerTitle.textContent = meta.title;
+  if (ui.headerSubtitle) ui.headerSubtitle.textContent = `${meta.subtitle}${profileSuffixText()}`;
+  if (ui.searchInput) ui.searchInput.placeholder = meta.searchPlaceholder;
+}
+
+function getStoredToken() {
+  if (window.COMPANY_ADMIN_TOKEN) return String(window.COMPANY_ADMIN_TOKEN);
+  for (let i = 0; i < COMPANY_ADMIN_CONFIG.tokenKeys.length; i += 1) {
+    const key = COMPANY_ADMIN_CONFIG.tokenKeys[i];
+    const localToken = localStorage.getItem(key);
+    if (localToken) return localToken;
+    const sessionToken = sessionStorage.getItem(key);
+    if (sessionToken) return sessionToken;
+  }
+  return "";
+}
+
+function clearAuthStorage() {
+  COMPANY_ADMIN_CONFIG.tokenKeys.forEach((key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
+  localStorage.removeItem("role");
+  localStorage.removeItem("userRole");
+  sessionStorage.removeItem("role");
+  sessionStorage.removeItem("userRole");
+}
+
+function redirectToLogin(message) {
+  if (companyState.redirecting) return;
+  companyState.redirecting = true;
+  localStorage.setItem("sessionExpiredMessage", message || "Login session expired. Please log in again.");
+  clearAuthStorage();
+  window.location.href = "../public/login.html";
+}
+
+function getAuthHeader() {
+  const token = getStoredToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function buildUrlCandidates(path, queryObj) {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const base = COMPANY_ADMIN_CONFIG.apiBase;
+  const params = new URLSearchParams();
+
+  if (queryObj && typeof queryObj === "object") {
+    Object.keys(queryObj).forEach((key) => {
+      const value = queryObj[key];
+      if (value !== undefined && value !== null && value !== "") {
+        params.append(key, String(value));
+      }
+    });
+  }
+
+  const query = params.toString();
+  const candidates = [];
+  const add = (url) => {
+    const finalUrl = query ? `${url}?${query}` : url;
+    if (!candidates.includes(finalUrl)) candidates.push(finalUrl);
+  };
+
+  add(`${base}${cleanPath}`);
+
+  if (COMPANY_ADMIN_CONFIG.tryApiPrefixFallback) {
+    if (base.endsWith("/api")) {
+      add(`${base.replace(/\/api$/, "")}${cleanPath}`);
+    } else {
+      add(`${base}/api${cleanPath}`);
+    }
+  }
+
+  return candidates;
+}
+
+async function parseJsonSafely(response) {
+  try {
+    return await response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+function preferNon404Error(currentError, incomingError) {
+  if (!currentError) return incomingError;
+  const currentStatus = Number(currentError.status || 0);
+  const incomingStatus = Number(incomingError?.status || 0);
+  if (currentStatus === 404 && incomingStatus && incomingStatus !== 404) {
+    return incomingError;
+  }
+  return currentError;
+}
+
+async function apiRequest(path, options = {}) {
+  const method = options.method || "GET";
+  const payload = options.body;
+  const query = options.query || null;
+  const useAuthHeader = options.useAuthHeader !== false;
+  const baseHeaders = {
+    ...(useAuthHeader ? getAuthHeader() : {}),
+    ...(options.headers || {})
+  };
+
+  if (payload !== undefined && payload !== null && !baseHeaders["Content-Type"]) {
+    baseHeaders["Content-Type"] = "application/json";
+  }
+
+  const buildRequestOptions = () => {
+    const req = {
+      method,
+      headers: {
+        ...(useAuthHeader ? getAuthHeader() : {}),
+        ...baseHeaders
+      },
+      credentials: "include"
+    };
+
+    if (payload !== undefined && payload !== null) {
+      req.body = JSON.stringify(payload);
+    }
+
+    return req;
+  };
+
+  const candidates = buildUrlCandidates(path, query);
+  let lastError = null;
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const url = candidates[i];
+    while (true) {
+      try {
+        const response = await fetch(url, buildRequestOptions());
+        const data = response.status === 204 ? null : await parseJsonSafely(response);
+
+        if (response.ok) {
+          return data;
+        }
+
+        const error = new Error(data?.message || `${method} ${url} failed with status ${response.status}`);
+        error.status = response.status;
+        error.url = url;
+
+        if (response.status === 401) {
+          redirectToLogin(data?.message || "Login session expired. Please log in again.");
+        }
+
+        lastError = preferNon404Error(lastError, error);
+        if (response.status === 404) {
+          break;
+        }
+
+        throw error;
+      } catch (error) {
+        lastError = preferNon404Error(lastError, error);
+        break;
+      }
+    }
+  }
+
+  throw lastError || new Error("API request failed");
+}
+
+const authApi = {
+  logout() {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.authLogout, {
+      method: "POST",
+      body: {},
+      useAuthHeader: false
+    });
+  },
+
+  profile() {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.authProfile);
+  }
+};
+
+const companyAdminApi = {
+  getMyProfile() {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.getMyProfile);
+  },
+
+  updateMyProfile(payload) {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.updateMyProfile, {
+      method: "PUT",
+      body: payload
+    });
+  },
+
+  listUsersByRole(role, includeInactive = true) {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.listUsersByRole, {
+      query: { role, include_inactive: includeInactive ? "true" : "false" }
+    });
+  },
+
+  createUser(payload) {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.createUser, {
+      method: "POST",
+      body: payload
+    });
+  },
+
+  deactivateUser(id) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.deactivateUser, id), {
+      method: "DELETE",
+      body: {}
+    });
+  },
+
+  getUserById(id) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.getUserById, id));
+  },
+
+  updateUser(id, payload) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.updateUser, id), {
+      method: "PUT",
+      body: payload
+    });
+  },
+
+  activateUser(id) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.activateUser, id), {
+      method: "POST",
+      body: {}
+    });
+  },
+
+  countUsersByRole(role) {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.countUsersByRole, {
+      query: { role }
+    });
+  },
+
+  listJobs(query) {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.listJobs, {
+      query: query || {}
+    });
+  },
+
+  createJobDraft(payload) {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.createJobDraft, {
+      method: "POST",
+      body: payload
+    });
+  },
+
+  getJobById(id) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.getJobById, id));
+  },
+
+  updateJob(id, payload) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.updateJob, id), {
+      method: "PUT",
+      body: payload
+    });
+  },
+
+  submitJob(id, approverId) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.submitJob, id), {
+      method: "POST",
+      body: { approver_id: approverId }
+    });
+  },
+
+  publishJob(id) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.publishJob, id), {
+      method: "POST",
+      body: {}
+    });
+  },
+
+  closeJob(id) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.closeJob, id), {
+      method: "POST",
+      body: {}
+    });
+  },
+
+  listApplications(jobId) {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.listApplications, {
+      query: { job_id: jobId }
+    });
+  },
+
+  moveApplicationStage(id, payload) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.moveApplicationStage, id), {
+      method: "PUT",
+      body: payload
+    });
+  },
+
+  screenDecision(id, status) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.screenDecision, id), {
+      method: "POST",
+      body: { status }
+    });
+  },
+
+  finalDecision(id, status) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.finalDecision, id), {
+      method: "POST",
+      body: { status }
+    });
+  },
+
+  recommendOffer(id) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.recommendOffer, id), {
+      method: "POST",
+      body: {}
+    });
+  },
+
+  applicationStats(jobId) {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.applicationStats, {
+      query: { job_id: jobId }
+    });
+  },
+
+  getOffers(applicationId) {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.getOffers, {
+      query: { application_id: applicationId }
+    });
+  },
+
+  createOfferDraft(payload) {
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.createOfferDraft, {
+      method: "POST",
+      body: payload
+    });
+  },
+
+  sendOffer(id, payload) {
+    return apiRequest(buildPathWithId(COMPANY_ADMIN_CONFIG.endpoints.sendOffer, id), {
+      method: "PUT",
+      body: payload
+    });
+  }
+};
+
+function getCurrentCompanyId() {
+  return toNumber(firstValue(companyState.currentProfile || {}, ["company_id"], ""));
+}
+
+function belongsToCurrentCompany(user) {
+  const currentCompanyId = getCurrentCompanyId();
+  const userCompanyId = toNumber(firstValue(user || {}, ["company_id"], ""));
+  if (!currentCompanyId || !userCompanyId) return true;
+  return currentCompanyId === userCompanyId;
+}
+
+function showTableMessage(tbody, colSpan, text) {
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center text-secondary py-3">${text}</td></tr>`;
+}
+
+function createStatusBadge(value) {
+  const badge = document.createElement("span");
+  badge.className = `badge ${isActive(value) ? "text-bg-success" : "text-bg-secondary"}`;
+  badge.textContent = isActive(value) ? "Active" : "Inactive";
+  return badge;
+}
+
+function renderProfilePanel() {
+  const profile = companyState.currentProfile;
+  if (!profile) {
+    setText(ui.profileName, "N/A");
+    setText(ui.profileEmail, "N/A");
+    setText(ui.profileRole, "N/A");
+    setText(ui.profileCompany, "N/A");
+    setText(ui.profileLastLogin, "N/A");
+    if (ui.profileFirstName) ui.profileFirstName.value = "";
+    if (ui.profileLastName) ui.profileLastName.value = "";
+    if (ui.profileEditEmail) ui.profileEditEmail.value = "";
+    return;
+  }
+
+  setText(ui.profileName, fullName(profile));
+  setText(ui.profileEmail, firstValue(profile, ["email"], "N/A"));
+  setText(ui.profileRole, firstValue(profile, ["role"], "N/A"));
+  setText(ui.profileCompany, firstValue(profile, ["company_id"], "N/A"));
+  setText(ui.profileLastLogin, formatDateTime(firstValue(profile, ["last_login_at"], "")));
+
+  if (ui.profileFirstName) ui.profileFirstName.value = firstValue(profile, ["first_name"], "");
+  if (ui.profileLastName) ui.profileLastName.value = firstValue(profile, ["last_name"], "");
+  if (ui.profileEditEmail) ui.profileEditEmail.value = firstValue(profile, ["email"], "");
+}
+
+function setProfileStatus(text, type = "info") {
+  setMessage(ui.profileStatus, text, type);
+}
+
+function ensureCompanyAdminRole(profile) {
+  const role = String(firstValue(profile || {}, ["role"], "")).trim();
+  if (!role) return true;
+  const isCompanyAdmin = role.toLowerCase() === "companyadmin";
+  if (isCompanyAdmin) return true;
+  redirectToLogin("You are not authorized to access Company Admin dashboard.");
+  return false;
+}
+
+async function loadAuthProfile() {
+  if (!COMPANY_ADMIN_CONFIG.useApi) return false;
+
+  try {
+    const payload = await companyAdminApi.getMyProfile();
+    companyState.currentProfile = payload?.profile || payload || null;
+
+    if (!ensureCompanyAdminRole(companyState.currentProfile)) {
+      return false;
+    }
+
+    const role = firstValue(companyState.currentProfile, ["role"], "");
+    if (role) {
+      localStorage.setItem("role", role);
+      localStorage.setItem("userRole", role);
+      sessionStorage.setItem("role", role);
+      sessionStorage.setItem("userRole", role);
+    }
+
+    renderProfilePanel();
+    return true;
+  } catch (error) {
+    console.error("Profile load error:", error);
+
+    try {
+      const fallback = await authApi.profile();
+      companyState.currentProfile = fallback?.profile || fallback || null;
+      if (!ensureCompanyAdminRole(companyState.currentProfile)) {
+        return false;
+      }
+      renderProfilePanel();
+      return true;
+    } catch (fallbackError) {
+      console.error("Auth profile fallback failed:", fallbackError);
+      redirectToLogin("Login session expired. Please log in again.");
+      return false;
+    }
+  }
+}
+
+async function performLogout() {
+  try {
+    if (COMPANY_ADMIN_CONFIG.useApi) {
+      await authApi.logout();
+    }
+  } catch (error) {
+    console.error("Logout API error:", error);
+  } finally {
+    clearAuthStorage();
+    window.location.href = "../public/login.html";
+  }
+}
+
+function setKpiText(element, value) {
+  if (!element) return;
+  element.textContent = value === undefined || value === null ? "--" : String(value);
+}
+
+async function loadDashboardKpis() {
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+
+  const [hrResult, managerResult, interviewerResult, jobsResult] = await Promise.allSettled([
+    companyAdminApi.countUsersByRole("HR"),
+    companyAdminApi.countUsersByRole("HiringManager"),
+    companyAdminApi.countUsersByRole("Interviewer"),
+    companyAdminApi.listJobs()
+  ]);
+
+  if (hrResult.status === "fulfilled") {
+    setKpiText(ui.kpiHr, firstValue(hrResult.value, ["total"], "--"));
+  }
+
+  if (managerResult.status === "fulfilled") {
+    setKpiText(ui.kpiManagers, firstValue(managerResult.value, ["total"], "--"));
+  }
+
+  if (interviewerResult.status === "fulfilled") {
+    setKpiText(ui.kpiInterviewers, firstValue(interviewerResult.value, ["total"], "--"));
+  }
+
+  if (jobsResult.status === "fulfilled") {
+    const jobs = normalizeArrayResponse(jobsResult.value);
+    const openJobsCount = jobs.filter((job) => {
+      const status = String(firstValue(job, ["status"], "")).toLowerCase();
+      return status !== "closed";
+    }).length;
+    setKpiText(ui.kpiOpenJobs, openJobsCount);
+  }
+}
+
+function dedupeById(records) {
+  const seen = new Set();
+  const output = [];
+  records.forEach((item) => {
+    const id = firstValue(item, ["id"], "");
+    if (!id || !seen.has(id)) {
+      if (id) seen.add(id);
+      output.push(item);
+    }
+  });
+  return output;
+}
+
+async function filterUsersToCurrentCompany(rows) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const currentCompanyId = getCurrentCompanyId();
+  if (!currentCompanyId || !safeRows.length) return safeRows;
+
+  const rowsWithCompany = safeRows.filter((row) => firstValue(row, ["company_id"], ""));
+  if (rowsWithCompany.length === safeRows.length) {
+    return safeRows.filter((row) => belongsToCurrentCompany(row));
+  }
+
+  const detailCalls = safeRows.map(async (row) => {
+    const id = firstValue(row, ["id"], "");
+    if (!id) return null;
+    try {
+      const detail = await companyAdminApi.getUserById(id);
+      return detail && belongsToCurrentCompany(detail) ? detail : null;
+    } catch (error) {
+      return null;
+    }
+  });
+
+  const settled = await Promise.allSettled(detailCalls);
+  const filtered = [];
+  settled.forEach((result) => {
+    if (result.status !== "fulfilled") return;
+    if (result.value) filtered.push(result.value);
+  });
+  return filtered;
+}
+
+function setUserCreateMessage(text, type) {
+  setMessage(ui.userCreateMsg, text, type);
+}
+
+function setUserEditMessage(text, type) {
+  setMessage(ui.userEditMsg, text, type);
+}
+
+function clearSelectedUser() {
+  companyState.selectedUser = null;
+  setText(ui.userEditId, "N/A");
+  if (ui.userEditFirstName) ui.userEditFirstName.value = "";
+  if (ui.userEditLastName) ui.userEditLastName.value = "";
+  if (ui.userEditEmail) ui.userEditEmail.value = "";
+  if (ui.userEditRole) ui.userEditRole.value = "HR";
+  if (ui.userToggleBtn) {
+    ui.userToggleBtn.disabled = true;
+    ui.userToggleBtn.textContent = "Activate / Deactivate";
+  }
+}
+
+function setSelectedUser(user) {
+  if (!user || !belongsToCurrentCompany(user)) {
+    clearSelectedUser();
+    if (user && !belongsToCurrentCompany(user)) {
+      setUserEditMessage("This user does not belong to your company.", "error");
+    }
+    return;
+  }
+
+  companyState.selectedUser = { ...user };
+  setText(ui.userEditId, firstValue(user, ["id"], "N/A"));
+  if (ui.userEditFirstName) ui.userEditFirstName.value = firstValue(user, ["first_name"], "");
+  if (ui.userEditLastName) ui.userEditLastName.value = firstValue(user, ["last_name"], "");
+  if (ui.userEditEmail) ui.userEditEmail.value = firstValue(user, ["email"], "");
+  if (ui.userEditRole) {
+    const role = firstValue(user, ["role"], "HR");
+    ui.userEditRole.value = COMPANY_ADMIN_CONFIG.managedRoles.includes(role) ? role : "HR";
+  }
+
+  if (ui.userToggleBtn) {
+    const active = isActive(firstValue(user, ["is_active", "status"], 1));
+    ui.userToggleBtn.disabled = false;
+    ui.userToggleBtn.textContent = active ? "Deactivate User" : "Activate User";
+  }
+}
+
+function renderUserRows(rows) {
+  if (!ui.userList) return;
+  if (!rows.length) {
+    showTableMessage(ui.userList, 6, "No users found");
+    return;
+  }
+
+  ui.userList.innerHTML = "";
+
+  rows.forEach((user) => {
+    const tr = document.createElement("tr");
+    tr.dataset.userId = firstValue(user, ["id"], "");
+
+    const idCell = document.createElement("td");
+    idCell.textContent = firstValue(user, ["id"], "N/A");
+    tr.appendChild(idCell);
+
+    const nameCell = document.createElement("td");
+    nameCell.textContent = fullName(user);
+    tr.appendChild(nameCell);
+
+    const emailCell = document.createElement("td");
+    emailCell.textContent = firstValue(user, ["email"], "N/A");
+    tr.appendChild(emailCell);
+
+    const roleCell = document.createElement("td");
+    roleCell.textContent = firstValue(user, ["role"], "N/A");
+    tr.appendChild(roleCell);
+
+    const statusCell = document.createElement("td");
+    statusCell.appendChild(createStatusBadge(firstValue(user, ["is_active", "status"], 1)));
+    tr.appendChild(statusCell);
+
+    const actionCell = document.createElement("td");
+    actionCell.className = "text-nowrap";
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "btn btn-outline-brand btn-sm me-2";
+    editBtn.textContent = "Edit";
+    editBtn.dataset.userAction = "edit";
+    editBtn.dataset.userId = firstValue(user, ["id"], "");
+    actionCell.appendChild(editBtn);
+
+    const active = isActive(firstValue(user, ["is_active", "status"], 1));
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = active ? "btn btn-outline-danger btn-sm" : "btn btn-outline-success btn-sm";
+    toggleBtn.textContent = active ? "Deactivate" : "Activate";
+    toggleBtn.dataset.userAction = "toggle";
+    toggleBtn.dataset.userId = firstValue(user, ["id"], "");
+    toggleBtn.dataset.userActive = active ? "1" : "0";
+    actionCell.appendChild(toggleBtn);
+
+    tr.appendChild(actionCell);
+    ui.userList.appendChild(tr);
+  });
+}
+
+async function loadUsersByRole() {
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+  const selectedRole = String(ui.userRoleFilter?.value || "all").trim();
+
+  try {
+    let rows = [];
+
+    if (selectedRole === "all") {
+      const calls = COMPANY_ADMIN_CONFIG.managedRoles.map((role) => companyAdminApi.listUsersByRole(role));
+      const results = await Promise.allSettled(calls);
+      const combined = [];
+
+      results.forEach((result) => {
+        if (result.status !== "fulfilled") return;
+        combined.push(...normalizeArrayResponse(result.value));
+      });
+
+      rows = dedupeById(combined);
+    } else {
+      rows = normalizeArrayResponse(await companyAdminApi.listUsersByRole(selectedRole));
+    }
+
+    rows = await filterUsersToCurrentCompany(rows);
+    companyState.usersRows = rows;
+    renderUserRows(rows);
+  } catch (error) {
+    console.error("Users load error:", error);
+    companyState.usersRows = [];
+    showTableMessage(ui.userList, 6, error.message || "Failed to load users");
+  }
+}
+
+async function loadSingleUserById() {
+  const userId = String(ui.userLoadIdInput?.value || "").trim();
+  if (!userId) {
+    setUserEditMessage("Enter a valid user id.", "error");
+    return;
+  }
+
+  try {
+    const user = await companyAdminApi.getUserById(userId);
+    if (!belongsToCurrentCompany(user)) {
+      setUserEditMessage("This user does not belong to your company.", "error");
+      return;
+    }
+    setSelectedUser(user);
+    setUserEditMessage("User loaded.", "success");
+  } catch (error) {
+    setUserEditMessage(error.message || "Failed to load user.", "error");
+  }
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+}
+
+async function submitCreateUser(event) {
+  event.preventDefault();
+  if (!COMPANY_ADMIN_CONFIG.useApi || !ui.userCreateForm) return;
+
+  const formData = new FormData(ui.userCreateForm);
+  const firstName = String(formData.get("first_name") || "").trim();
+  const lastName = String(formData.get("last_name") || "").trim();
+  const email = String(formData.get("email") || "").trim();
+  const password = String(formData.get("password") || "").trim();
+  const role = String(formData.get("role") || "HR").trim();
+
+  if (!firstName || !lastName || !email || !password || !role) {
+    setUserCreateMessage("All fields are required.", "error");
+    return;
+  }
+
+  if (!COMPANY_ADMIN_CONFIG.managedRoles.includes(role)) {
+    setUserCreateMessage("Role must be HR, HiringManager, or Interviewer.", "error");
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    setUserCreateMessage("Enter a valid email address.", "error");
+    return;
+  }
+
+  const companyId = getCurrentCompanyId();
+  if (!companyId) {
+    setUserCreateMessage("Company id not found in profile.", "error");
+    return;
+  }
+
+  try {
+    setUserCreateMessage("Creating user...", "info");
+    const result = await companyAdminApi.createUser({
+      company_id: companyId,
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      password,
+      role
+    });
+
+    ui.userCreateForm.reset();
+    await loadUsersByRole();
+    await loadDashboardKpis();
+    setUserCreateMessage(result?.message || "User created successfully.", "success");
+
+    const newUserId = firstValue(result, ["id"], "");
+    if (newUserId) {
+      try {
+        const user = await companyAdminApi.getUserById(newUserId);
+        setSelectedUser(user);
+      } catch (error) {
+        // Keep flow successful even if load-by-id fails.
+      }
+    }
+  } catch (error) {
+    setUserCreateMessage(error.message || "Failed to create user.", "error");
+  }
+}
+
+async function submitEditUser(event) {
+  event.preventDefault();
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+
+  const selected = companyState.selectedUser;
+  const selectedId = firstValue(selected || {}, ["id"], "");
+  if (!selectedId) {
+    setUserEditMessage("Select a user first.", "error");
+    return;
+  }
+
+  const firstName = String(ui.userEditFirstName?.value || "").trim();
+  const lastName = String(ui.userEditLastName?.value || "").trim();
+  const email = String(ui.userEditEmail?.value || "").trim();
+  const role = String(ui.userEditRole?.value || "").trim();
+
+  if (!firstName || !lastName || !email || !role) {
+    setUserEditMessage("All fields are required.", "error");
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    setUserEditMessage("Enter a valid email address.", "error");
+    return;
+  }
+
+  const companyId = getCurrentCompanyId();
+  if (!companyId) {
+    setUserEditMessage("Company id not found in profile.", "error");
+    return;
+  }
+
+  const initialText = ui.userSaveBtn?.textContent || "Save Changes";
+  if (ui.userSaveBtn) {
+    ui.userSaveBtn.disabled = true;
+    ui.userSaveBtn.textContent = "Saving...";
+  }
+
+  try {
+    await companyAdminApi.updateUser(selectedId, {
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      role,
+      company_id: companyId
+    });
+
+    const refreshed = await companyAdminApi.getUserById(selectedId);
+    setSelectedUser(refreshed);
+    await loadUsersByRole();
+    await loadDashboardKpis();
+    setUserEditMessage("User updated successfully.", "success");
+  } catch (error) {
+    setUserEditMessage(error.message || "Failed to update user.", "error");
+  } finally {
+    if (ui.userSaveBtn) {
+      ui.userSaveBtn.disabled = false;
+      ui.userSaveBtn.textContent = initialText;
+    }
+  }
+}
+
+async function toggleSelectedUserActive() {
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+
+  const selected = companyState.selectedUser;
+  const selectedId = firstValue(selected || {}, ["id"], "");
+  if (!selectedId) {
+    setUserEditMessage("Select a user first.", "error");
+    return;
+  }
+
+  const currentlyActive = isActive(firstValue(selected, ["is_active", "status"], 1));
+  const actionLabel = currentlyActive ? "deactivate" : "activate";
+
+  try {
+    if (currentlyActive) {
+      await companyAdminApi.deactivateUser(selectedId);
+    } else {
+      await companyAdminApi.activateUser(selectedId);
+    }
+
+    const refreshed = await companyAdminApi.getUserById(selectedId);
+    setSelectedUser(refreshed);
+    await loadUsersByRole();
+    await loadDashboardKpis();
+    setUserEditMessage(`User ${actionLabel}d successfully.`, "success");
+  } catch (error) {
+    setUserEditMessage(error.message || `Failed to ${actionLabel} user.`, "error");
+  }
+}
+
+async function handleUserTableAction(event) {
+  const button = event.target.closest("button[data-user-action]");
+  if (!button) return;
+
+  const action = button.dataset.userAction;
+  const userId = String(button.dataset.userId || "").trim();
+  if (!userId) return;
+
+  if (action === "edit") {
+    try {
+      const user = await companyAdminApi.getUserById(userId);
+      if (!belongsToCurrentCompany(user)) {
+        setUserEditMessage("This user does not belong to your company.", "error");
+        return;
+      }
+      setSelectedUser(user);
+      setUserEditMessage("User loaded for edit.", "success");
+    } catch (error) {
+      setUserEditMessage(error.message || "Failed to load user.", "error");
+    }
+    return;
+  }
+
+  if (action === "toggle") {
+    try {
+      const active = button.dataset.userActive === "1";
+      if (active) {
+        await companyAdminApi.deactivateUser(userId);
+      } else {
+        await companyAdminApi.activateUser(userId);
+      }
+
+      await loadUsersByRole();
+      await loadDashboardKpis();
+      if (companyState.selectedUser && String(companyState.selectedUser.id) === userId) {
+        const refreshed = await companyAdminApi.getUserById(userId);
+        setSelectedUser(refreshed);
+      }
+      setUserEditMessage(`User ${active ? "deactivated" : "activated"} successfully.`, "success");
+    } catch (error) {
+      setUserEditMessage(error.message || "Failed to update user status.", "error");
+    }
+  }
+}
+
+function setJobCreateMessage(text, type) {
+  setMessage(ui.jobCreateMsg, text, type);
+}
+
+function setJobEditMessage(text, type) {
+  setMessage(ui.jobEditMsg, text, type);
+}
+
+function clearSelectedJob() {
+  companyState.selectedJob = null;
+  setText(ui.jobEditId, "N/A");
+  if (ui.jobEditTitle) ui.jobEditTitle.value = "";
+  if (ui.jobEditLocation) ui.jobEditLocation.value = "";
+  if (ui.jobEditPositions) ui.jobEditPositions.value = "1";
+  if (ui.jobEditDescription) ui.jobEditDescription.value = "";
+  if (ui.jobEditRequirements) ui.jobEditRequirements.value = "";
+  if (ui.jobEditType) ui.jobEditType.value = "Full-time";
+}
+
+function setSelectedJob(job) {
+  if (!job) {
+    clearSelectedJob();
+    return;
+  }
+
+  companyState.selectedJob = { ...job };
+  setText(ui.jobEditId, firstValue(job, ["id"], "N/A"));
+  if (ui.jobEditTitle) ui.jobEditTitle.value = firstValue(job, ["title"], "");
+  if (ui.jobEditLocation) ui.jobEditLocation.value = firstValue(job, ["location"], "");
+  if (ui.jobEditPositions) ui.jobEditPositions.value = firstValue(job, ["positions_count"], "1");
+  if (ui.jobEditDescription) ui.jobEditDescription.value = firstValue(job, ["description"], "");
+  if (ui.jobEditRequirements) ui.jobEditRequirements.value = firstValue(job, ["requirements"], "");
+  if (ui.jobEditType) ui.jobEditType.value = firstValue(job, ["employment_type"], "Full-time");
+}
+
+function createJobStatusBadge(status) {
+  const normalized = String(status || "").toLowerCase();
+  let className = "text-bg-secondary";
+  if (normalized === "published") className = "text-bg-success";
+  if (normalized === "pending") className = "text-bg-warning";
+  if (normalized === "draft") className = "text-bg-info";
+  if (normalized === "closed") className = "text-bg-dark";
+
+  const badge = document.createElement("span");
+  badge.className = `badge ${className}`;
+  badge.textContent = status || "unknown";
+  return badge;
+}
+
+function renderJobRows(rows) {
+  if (!ui.jobList) return;
+  if (!rows.length) {
+    showTableMessage(ui.jobList, 6, "No jobs found");
+    return;
+  }
+
+  ui.jobList.innerHTML = "";
+
+  rows.forEach((job) => {
+    const jobId = firstValue(job, ["id"], "");
+    const tr = document.createElement("tr");
+    tr.dataset.jobId = jobId;
+
+    const idCell = document.createElement("td");
+    idCell.textContent = jobId || "N/A";
+    tr.appendChild(idCell);
+
+    const titleCell = document.createElement("td");
+    titleCell.textContent = firstValue(job, ["title"], "N/A");
+    tr.appendChild(titleCell);
+
+    const statusCell = document.createElement("td");
+    statusCell.appendChild(createJobStatusBadge(firstValue(job, ["status"], "")));
+    tr.appendChild(statusCell);
+
+    const locationCell = document.createElement("td");
+    locationCell.textContent = firstValue(job, ["location"], "-");
+    tr.appendChild(locationCell);
+
+    const positionsCell = document.createElement("td");
+    positionsCell.textContent = firstValue(job, ["positions_count"], "-");
+    tr.appendChild(positionsCell);
+
+    const actionCell = document.createElement("td");
+    actionCell.className = "text-nowrap";
+
+    const buttons = [
+      { action: "edit", label: "Edit", cls: "btn-outline-brand" },
+      { action: "publish", label: "Publish", cls: "btn-outline-success" },
+      { action: "submit", label: "Submit", cls: "btn-outline-warning" },
+      { action: "close", label: "Close", cls: "btn-outline-danger" }
+    ];
+
+    buttons.forEach((entry, index) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `btn ${entry.cls} btn-sm${index < buttons.length - 1 ? " me-2" : ""}`;
+      btn.textContent = entry.label;
+      btn.dataset.jobAction = entry.action;
+      btn.dataset.jobId = jobId;
+      actionCell.appendChild(btn);
+    });
+
+    tr.appendChild(actionCell);
+    ui.jobList.appendChild(tr);
+  });
+}
+
+async function loadJobs() {
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+  const selectedStatus = String(ui.jobStatusFilter?.value || "all").trim();
+
+  try {
+    const query = {};
+    if (selectedStatus && selectedStatus !== "all") {
+      query.status = selectedStatus;
+    }
+
+    const rows = normalizeArrayResponse(await companyAdminApi.listJobs(query));
+    companyState.jobsRows = rows;
+    renderJobRows(rows);
+  } catch (error) {
+    console.error("Jobs load error:", error);
+    companyState.jobsRows = [];
+    showTableMessage(ui.jobList, 6, error.message || "Failed to load jobs");
+  }
+}
+
+function parseJobPayload(formData) {
+  return {
+    title: String(formData.get("title") || "").trim(),
+    description: String(formData.get("description") || "").trim(),
+    requirements: String(formData.get("requirements") || "").trim(),
+    location: String(formData.get("location") || "").trim(),
+    employment_type: String(formData.get("employment_type") || "Full-time").trim() || "Full-time",
+    positions_count: toNumber(formData.get("positions_count")) || 1
+  };
+}
+
+async function submitCreateJob(event) {
+  event.preventDefault();
+  if (!COMPANY_ADMIN_CONFIG.useApi || !ui.jobCreateForm) return;
+
+  const payload = parseJobPayload(new FormData(ui.jobCreateForm));
+  if (!payload.title) {
+    setJobCreateMessage("Job title is required.", "error");
+    return;
+  }
+
+  const profile = companyState.currentProfile || {};
+  payload.company_id = toNumber(firstValue(profile, ["company_id"], "")) || undefined;
+  payload.created_by = toNumber(firstValue(profile, ["id"], "")) || undefined;
+
+  try {
+    setJobCreateMessage("Creating job draft...", "info");
+    const result = await companyAdminApi.createJobDraft(payload);
+    ui.jobCreateForm.reset();
+    await loadJobs();
+    await loadDashboardKpis();
+    setJobCreateMessage(result?.message || "Job draft created successfully.", "success");
+
+    const createdId = firstValue(result, ["id"], "");
+    if (createdId) {
+      try {
+        const job = await companyAdminApi.getJobById(createdId);
+        setSelectedJob(job);
+      } catch (error) {
+        // Keep create flow successful even if fetch-by-id fails.
+      }
+    }
+  } catch (error) {
+    setJobCreateMessage(error.message || "Failed to create job.", "error");
+  }
+}
+
+function collectEditJobPayload() {
+  return {
+    title: String(ui.jobEditTitle?.value || "").trim(),
+    description: String(ui.jobEditDescription?.value || "").trim(),
+    requirements: String(ui.jobEditRequirements?.value || "").trim(),
+    location: String(ui.jobEditLocation?.value || "").trim(),
+    employment_type: String(ui.jobEditType?.value || "Full-time").trim() || "Full-time",
+    positions_count: toNumber(ui.jobEditPositions?.value) || 1
+  };
+}
+
+async function submitEditJob(event) {
+  event.preventDefault();
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+
+  const selectedId = firstValue(companyState.selectedJob || {}, ["id"], "");
+  if (!selectedId) {
+    setJobEditMessage("Select a job first.", "error");
+    return;
+  }
+
+  const payload = collectEditJobPayload();
+  if (!payload.title) {
+    setJobEditMessage("Job title is required.", "error");
+    return;
+  }
+
+  const initialText = ui.jobSaveBtn?.textContent || "Save Job";
+  if (ui.jobSaveBtn) {
+    ui.jobSaveBtn.disabled = true;
+    ui.jobSaveBtn.textContent = "Saving...";
+  }
+
+  try {
+    await companyAdminApi.updateJob(selectedId, payload);
+    const refreshed = await companyAdminApi.getJobById(selectedId);
+    setSelectedJob(refreshed);
+    await loadJobs();
+    await loadDashboardKpis();
+    setJobEditMessage("Job updated successfully.", "success");
+  } catch (error) {
+    setJobEditMessage(error.message || "Failed to update job.", "error");
+  } finally {
+    if (ui.jobSaveBtn) {
+      ui.jobSaveBtn.disabled = false;
+      ui.jobSaveBtn.textContent = initialText;
+    }
+  }
+}
+
+function getApproverId() {
+  const inputValue = String(ui.jobApproverId?.value || "").trim();
+  if (inputValue) return toNumber(inputValue);
+
+  const prompted = window.prompt("Enter approver id for submit action:");
+  if (!prompted) return null;
+  return toNumber(prompted.trim());
+}
+
+async function runJobAction(action, jobId) {
+  if (!jobId) {
+    setJobEditMessage("Job id is required.", "error");
+    return;
+  }
+
+  try {
+    if (action === "publish") {
+      await companyAdminApi.publishJob(jobId);
+      setJobEditMessage("Job published.", "success");
+    }
+
+    if (action === "close") {
+      await companyAdminApi.closeJob(jobId);
+      setJobEditMessage("Job closed.", "success");
+    }
+
+    if (action === "submit") {
+      const approverId = getApproverId();
+      if (!approverId) {
+        setJobEditMessage("Approver id is required for submit.", "error");
+        return;
+      }
+      await companyAdminApi.submitJob(jobId, approverId);
+      setJobEditMessage("Job submitted for approval.", "success");
+    }
+
+    const refreshed = await companyAdminApi.getJobById(jobId);
+    setSelectedJob(refreshed);
+    await loadJobs();
+    await loadDashboardKpis();
+  } catch (error) {
+    setJobEditMessage(error.message || `Failed to ${action} job.`, "error");
+  }
+}
+
+async function handleJobTableAction(event) {
+  const button = event.target.closest("button[data-job-action]");
+  if (!button) return;
+
+  const action = button.dataset.jobAction;
+  const jobId = String(button.dataset.jobId || "").trim();
+  if (!jobId) return;
+
+  if (action === "edit") {
+    try {
+      const job = await companyAdminApi.getJobById(jobId);
+      setSelectedJob(job);
+      setJobEditMessage("Job loaded for edit.", "success");
+    } catch (error) {
+      setJobEditMessage(error.message || "Failed to load job.", "error");
+    }
+    return;
+  }
+
+  if (action === "publish" || action === "submit" || action === "close") {
+    await runJobAction(action, jobId);
+  }
+}
+
+function setAppMessage(text, type) {
+  setMessage(ui.appMsg, text, type);
+}
+
+function renderApplicationStats(rows) {
+  if (!ui.appStats) return;
+  const safeRows = Array.isArray(rows) ? rows : [];
+
+  if (!safeRows.length) {
+    ui.appStats.innerHTML = '<li class="list-group-item px-0 text-secondary">No stats found.</li>';
+    return;
+  }
+
+  ui.appStats.innerHTML = "";
+  safeRows.forEach((row) => {
+    const li = document.createElement("li");
+    li.className = "list-group-item px-0 d-flex justify-content-between align-items-center";
+    const status = firstValue(row, ["status"], "unknown");
+    const count = firstValue(row, ["count"], "0");
+    li.innerHTML = `<span>${status}</span><span class="badge text-bg-primary rounded-pill">${count}</span>`;
+    ui.appStats.appendChild(li);
+  });
+}
+
+function renderApplicationRows(rows) {
+  if (!ui.appList) return;
+  if (!rows.length) {
+    showTableMessage(ui.appList, 6, "No applications found");
+    return;
+  }
+
+  ui.appList.innerHTML = "";
+
+  rows.forEach((application) => {
+    const applicationId = firstValue(application, ["id"], "");
+    const tr = document.createElement("tr");
+    tr.dataset.applicationId = applicationId;
+
+    const idCell = document.createElement("td");
+    idCell.textContent = applicationId || "N/A";
+    tr.appendChild(idCell);
+
+    const candidateCell = document.createElement("td");
+    const candidateName = `${firstValue(application, ["first_name"], "")} ${firstValue(application, ["last_name"], "")}`.trim();
+    const email = firstValue(application, ["email"], "");
+    candidateCell.innerHTML = candidateName ? `${candidateName}<br /><small class="text-secondary">${email}</small>` : "N/A";
+    tr.appendChild(candidateCell);
+
+    const statusCell = document.createElement("td");
+    statusCell.textContent = firstValue(application, ["status"], "N/A");
+    tr.appendChild(statusCell);
+
+    const stageCell = document.createElement("td");
+    stageCell.textContent = firstValue(application, ["current_stage_id"], "-");
+    tr.appendChild(stageCell);
+
+    const resumeCell = document.createElement("td");
+    const resumeUrl = firstValue(application, ["resume_url"], "");
+    if (resumeUrl) {
+      const link = document.createElement("a");
+      link.href = resumeUrl;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      link.textContent = "Resume";
+      resumeCell.appendChild(link);
+    } else {
+      resumeCell.textContent = "-";
+    }
+    tr.appendChild(resumeCell);
+
+    const actionCell = document.createElement("td");
+    actionCell.className = "text-nowrap";
+
+    const actionDefs = [
+      { action: "move", label: "Move" },
+      { action: "screen", label: "Screen" },
+      { action: "final", label: "Final" },
+      { action: "recommend", label: "Recommend" }
+    ];
+
+    actionDefs.forEach((entry, index) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `btn btn-outline-brand btn-sm${index < actionDefs.length - 1 ? " me-2" : ""}`;
+      btn.textContent = entry.label;
+      btn.dataset.appAction = entry.action;
+      btn.dataset.applicationId = applicationId;
+      btn.dataset.applicationStatus = firstValue(application, ["status"], "");
+      btn.dataset.applicationStage = firstValue(application, ["current_stage_id"], "");
+      actionCell.appendChild(btn);
+    });
+
+    tr.appendChild(actionCell);
+    ui.appList.appendChild(tr);
+  });
+}
+
+async function loadApplicationsAndStats() {
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+
+  const jobId = String(ui.appJobIdInput?.value || "").trim();
+  if (!jobId) {
+    showTableMessage(ui.appList, 6, "Enter job id to load applications.");
+    renderApplicationStats([]);
+    setAppMessage("Job id is required.", "error");
+    return;
+  }
+
+  try {
+    setAppMessage("Loading applications...", "info");
+    const [applicationsPayload, statsPayload] = await Promise.all([
+      companyAdminApi.listApplications(jobId),
+      companyAdminApi.applicationStats(jobId)
+    ]);
+
+    const rows = normalizeArrayResponse(applicationsPayload);
+    const statsRows = normalizeArrayResponse(statsPayload);
+    companyState.applicationRows = rows;
+    companyState.currentApplicationJobId = jobId;
+    renderApplicationRows(rows);
+    renderApplicationStats(statsRows);
+    setAppMessage(`Loaded ${rows.length} application(s).`, "success");
+  } catch (error) {
+    companyState.applicationRows = [];
+    renderApplicationRows([]);
+    renderApplicationStats([]);
+    setAppMessage(error.message || "Failed to load applications.", "error");
+  }
+}
+
+async function handleApplicationAction(action, applicationId, currentStatus, currentStage) {
+  if (!applicationId) return;
+
+  try {
+    if (action === "move") {
+      const status = window.prompt("Enter new status for move-stage:", currentStatus || "interview");
+      if (!status) return;
+      const stageInput = window.prompt("Enter current_stage_id (optional):", currentStage || "");
+      const stageId = stageInput ? toNumber(stageInput) : null;
+
+      await companyAdminApi.moveApplicationStage(applicationId, {
+        status: status.trim(),
+        current_stage_id: stageId
+      });
+      setAppMessage("Application stage updated.", "success");
+    }
+
+    if (action === "screen") {
+      const status = window.prompt("Screen decision status (interview/rejected):", "interview");
+      if (!status) return;
+      await companyAdminApi.screenDecision(applicationId, status.trim());
+      setAppMessage("Screening decision updated.", "success");
+    }
+
+    if (action === "final") {
+      const status = window.prompt("Final decision status (selected/rejected):", "selected");
+      if (!status) return;
+      await companyAdminApi.finalDecision(applicationId, status.trim());
+      setAppMessage("Final decision updated.", "success");
+    }
+
+    if (action === "recommend") {
+      await companyAdminApi.recommendOffer(applicationId);
+      setAppMessage("Offer recommendation marked.", "success");
+    }
+
+    await loadApplicationsAndStats();
+  } catch (error) {
+    setAppMessage(error.message || "Failed to update application.", "error");
+  }
+}
+
+async function handleApplicationTableAction(event) {
+  const button = event.target.closest("button[data-app-action]");
+  if (!button) return;
+
+  const action = button.dataset.appAction;
+  const applicationId = String(button.dataset.applicationId || "").trim();
+  const currentStatus = String(button.dataset.applicationStatus || "").trim();
+  const currentStage = String(button.dataset.applicationStage || "").trim();
+
+  await handleApplicationAction(action, applicationId, currentStatus, currentStage);
+}
+
+function setOfferCreateMessage(text, type) {
+  setMessage(ui.offerCreateMsg, text, type);
+}
+
+function setOfferSendMessage(text, type) {
+  setMessage(ui.offerSendMsg, text, type);
+}
+
+function parseOfferDetails(rawText) {
+  const value = String(rawText || "").trim();
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    throw new Error("Offer details must be valid JSON");
+  }
+}
+
+function summarizeOfferDetails(details) {
+  if (details === null || details === undefined) return "-";
+  if (typeof details === "string") return details;
+  try {
+    return JSON.stringify(details);
+  } catch (error) {
+    return String(details);
+  }
+}
+
+function renderOfferRows(rows) {
+  if (!ui.offerList) return;
+  if (!rows.length) {
+    showTableMessage(ui.offerList, 5, "No offers found");
+    return;
+  }
+
+  ui.offerList.innerHTML = "";
+
+  rows.forEach((offer) => {
+    const offerId = firstValue(offer, ["id"], "");
+    const tr = document.createElement("tr");
+
+    const idCell = document.createElement("td");
+    idCell.textContent = offerId || "N/A";
+    tr.appendChild(idCell);
+
+    const statusCell = document.createElement("td");
+    statusCell.textContent = firstValue(offer, ["status"], "N/A");
+    tr.appendChild(statusCell);
+
+    const detailsCell = document.createElement("td");
+    detailsCell.textContent = summarizeOfferDetails(offer.offer_details);
+    tr.appendChild(detailsCell);
+
+    const sentAtCell = document.createElement("td");
+    sentAtCell.textContent = formatDateTime(firstValue(offer, ["sent_at", "updated_at", "created_at"], ""));
+    tr.appendChild(sentAtCell);
+
+    const actionCell = document.createElement("td");
+    actionCell.className = "text-nowrap";
+
+    const prepareBtn = document.createElement("button");
+    prepareBtn.type = "button";
+    prepareBtn.className = "btn btn-outline-brand btn-sm";
+    prepareBtn.textContent = "Prepare Send";
+    prepareBtn.dataset.offerAction = "prepare-send";
+    prepareBtn.dataset.offerId = offerId;
+    actionCell.appendChild(prepareBtn);
+
+    tr.appendChild(actionCell);
+    ui.offerList.appendChild(tr);
+  });
+}
+
+async function loadOffersByApplication() {
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+
+  const applicationId = String(ui.offerApplicationIdInput?.value || "").trim();
+  if (!applicationId) {
+    showTableMessage(ui.offerList, 5, "Enter application id to load offers.");
+    setOfferSendMessage("Application id is required.", "error");
+    return;
+  }
+
+  try {
+    const rows = normalizeArrayResponse(await companyAdminApi.getOffers(applicationId));
+    companyState.offerRows = rows;
+    companyState.currentOfferApplicationId = applicationId;
+    renderOfferRows(rows);
+    setOfferSendMessage(`Loaded ${rows.length} offer(s).`, "success");
+  } catch (error) {
+    companyState.offerRows = [];
+    renderOfferRows([]);
+    setOfferSendMessage(error.message || "Failed to load offers.", "error");
+  }
+}
+
+async function submitCreateOfferDraft(event) {
+  event.preventDefault();
+  if (!COMPANY_ADMIN_CONFIG.useApi || !ui.offerCreateForm) return;
+
+  const formData = new FormData(ui.offerCreateForm);
+  const applicationId = toNumber(formData.get("application_id"));
+  const createdBy = toNumber(firstValue(companyState.currentProfile || {}, ["id"], ""));
+
+  if (!applicationId) {
+    setOfferCreateMessage("Application id is required.", "error");
+    return;
+  }
+  if (!createdBy) {
+    setOfferCreateMessage("Profile id not available. Reload profile and retry.", "error");
+    return;
+  }
+
+  let offerDetails = null;
+  try {
+    offerDetails = parseOfferDetails(formData.get("offer_details"));
+  } catch (error) {
+    setOfferCreateMessage(error.message, "error");
+    return;
+  }
+
+  try {
+    setOfferCreateMessage("Creating offer draft...", "info");
+    const result = await companyAdminApi.createOfferDraft({
+      application_id: applicationId,
+      created_by: createdBy,
+      offer_details: offerDetails
+    });
+
+    ui.offerCreateForm.reset();
+    setOfferCreateMessage(result?.message || "Offer draft created.", "success");
+
+    if (ui.offerApplicationIdInput) {
+      ui.offerApplicationIdInput.value = String(applicationId);
+    }
+    await loadOffersByApplication();
+  } catch (error) {
+    setOfferCreateMessage(error.message || "Failed to create offer draft.", "error");
+  }
+}
+
+function prepareSendOffer(offerId) {
+  if (ui.offerSendId) ui.offerSendId.value = String(offerId || "");
+  setOfferSendMessage("Offer selected. Add document and e-sign links, then send.", "info");
+}
+
+async function submitSendOffer(event) {
+  event.preventDefault();
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+
+  const offerId = String(ui.offerSendId?.value || "").trim();
+  if (!offerId) {
+    setOfferSendMessage("Offer id is required.", "error");
+    return;
+  }
+
+  const initialText = document.querySelector("[data-company-offer-send-btn]")?.textContent || "Send Offer";
+  const sendButton = document.querySelector("[data-company-offer-send-btn]");
+  if (sendButton) {
+    sendButton.disabled = true;
+    sendButton.textContent = "Sending...";
+  }
+
+  try {
+    await companyAdminApi.sendOffer(offerId, {
+      document_url: String(ui.offerSendDocument?.value || "").trim(),
+      esign_link: String(ui.offerSendEsign?.value || "").trim()
+    });
+
+    setOfferSendMessage("Offer sent successfully.", "success");
+    if (companyState.currentOfferApplicationId) {
+      await loadOffersByApplication();
+    }
+  } catch (error) {
+    setOfferSendMessage(error.message || "Failed to send offer.", "error");
+  } finally {
+    if (sendButton) {
+      sendButton.disabled = false;
+      sendButton.textContent = initialText;
+    }
+  }
+}
+
+function handleOfferTableAction(event) {
+  const button = event.target.closest("button[data-offer-action]");
+  if (!button) return;
+
+  const action = button.dataset.offerAction;
+  const offerId = String(button.dataset.offerId || "").trim();
+  if (!offerId) return;
+
+  if (action === "prepare-send") {
+    prepareSendOffer(offerId);
+  }
+}
+
+async function reloadCompanyProfile() {
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+  setProfileStatus("Loading profile...", "info");
+
+  try {
+    const payload = await companyAdminApi.getMyProfile();
+    companyState.currentProfile = payload?.profile || payload || null;
+    renderProfilePanel();
+    showSection(companyState.currentView || "profile");
+    setProfileStatus("Profile loaded from API.", "success");
+  } catch (error) {
+    setProfileStatus(error.message || "Failed to load profile.", "error");
+  }
+}
+
+async function submitProfileUpdate(event) {
+  event.preventDefault();
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+
+  const firstName = String(ui.profileFirstName?.value || "").trim();
+  const lastName = String(ui.profileLastName?.value || "").trim();
+  const email = String(ui.profileEditEmail?.value || "").trim();
+
+  if (!firstName || !lastName || !email) {
+    setProfileStatus("First name, last name and email are required.", "error");
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    setProfileStatus("Enter a valid email address.", "error");
+    return;
+  }
+
+  const payload = {
+    first_name: firstName,
+    last_name: lastName,
+    email
+  };
+
+  const initialText = ui.profileSaveBtn?.textContent || "Save Profile";
+  if (ui.profileSaveBtn) {
+    ui.profileSaveBtn.disabled = true;
+    ui.profileSaveBtn.textContent = "Saving...";
+  }
+
+  setProfileStatus("Updating profile...", "info");
+
+  try {
+    const result = await companyAdminApi.updateMyProfile(payload);
+    const updated = result?.data || result?.profile || null;
+
+    companyState.currentProfile = updated && typeof updated === "object"
+      ? { ...(companyState.currentProfile || {}), ...updated }
+      : { ...(companyState.currentProfile || {}), ...payload };
+
+    renderProfilePanel();
+    showSection(companyState.currentView || "profile");
+    setProfileStatus(result?.message || "Profile updated successfully.", "success");
+  } catch (error) {
+    setProfileStatus(error.message || "Failed to update profile.", "error");
+  } finally {
+    if (ui.profileSaveBtn) {
+      ui.profileSaveBtn.disabled = false;
+      ui.profileSaveBtn.textContent = initialText;
+    }
+  }
+}
+
+async function openDashboard() {
+  showSection("dashboard");
+  await loadDashboardKpis();
+}
+
+async function openUsers() {
+  showSection("users");
+  if (!companyState.usersLoaded) {
+    companyState.usersLoaded = true;
+    await loadUsersByRole();
+  }
+}
+
+async function openJobs() {
+  showSection("jobs");
+  if (!companyState.jobsLoaded) {
+    companyState.jobsLoaded = true;
+    await loadJobs();
+  }
+}
+
+async function openApplications() {
+  showSection("applications");
+  const currentJobId = String(ui.appJobIdInput?.value || "").trim();
+  if (currentJobId && !companyState.applicationsLoaded) {
+    companyState.applicationsLoaded = true;
+    await loadApplicationsAndStats();
+  }
+}
+
+async function openOffers() {
+  showSection("offers");
+  const currentApplicationId = String(ui.offerApplicationIdInput?.value || "").trim();
+  if (currentApplicationId && !companyState.offersLoaded) {
+    companyState.offersLoaded = true;
+    await loadOffersByApplication();
+  }
+}
+
+async function openProfile() {
+  showSection("profile");
+  renderProfilePanel();
+  await reloadCompanyProfile();
+}
+
+async function handleLogoutClick(event) {
+  event.preventDefault();
+  if (!window.confirm("Do you want to logout?")) return;
+  await performLogout();
+}
+
+function bindNavigation() {
+  ui.navLinks.forEach((link) => {
+    const section = link.dataset.companyNav;
+    if (!section) return;
+
+    if (section === "logout") {
+      link.addEventListener("click", handleLogoutClick);
+      return;
+    }
+
+    link.addEventListener("click", async (event) => {
+      event.preventDefault();
+
+      if (section === "dashboard") await openDashboard();
+      if (section === "users") await openUsers();
+      if (section === "jobs") await openJobs();
+      if (section === "applications") await openApplications();
+      if (section === "offers") await openOffers();
+      if (section === "profile") await openProfile();
+
+      if (window.innerWidth < 992) {
+        document.body.classList.remove("dashboard-sidebar-open");
+      }
+    });
+  });
+}
+
+function bindActionButtons() {
+  if (ui.userCreateForm) {
+    ui.userCreateForm.addEventListener("submit", submitCreateUser);
+  }
+
+  if (ui.userLoadBtn) {
+    ui.userLoadBtn.addEventListener("click", async () => {
+      await loadUsersByRole();
+      await loadDashboardKpis();
+      setUserCreateMessage("", "info");
+    });
+  }
+
+  if (ui.userLoadIdBtn) {
+    ui.userLoadIdBtn.addEventListener("click", async () => {
+      await loadSingleUserById();
+    });
+  }
+
+  if (ui.userEditForm) {
+    ui.userEditForm.addEventListener("submit", submitEditUser);
+  }
+
+  if (ui.userToggleBtn) {
+    ui.userToggleBtn.addEventListener("click", async () => {
+      await toggleSelectedUserActive();
+    });
+  }
+
+  if (ui.userClearBtn) {
+    ui.userClearBtn.addEventListener("click", () => {
+      clearSelectedUser();
+      setUserEditMessage("", "info");
+    });
+  }
+
+  if (ui.userList) {
+    ui.userList.addEventListener("click", (event) => {
+      handleUserTableAction(event);
+    });
+  }
+
+  if (ui.jobCreateForm) {
+    ui.jobCreateForm.addEventListener("submit", submitCreateJob);
+  }
+
+  if (ui.jobLoadBtn) {
+    ui.jobLoadBtn.addEventListener("click", async () => {
+      await loadJobs();
+      await loadDashboardKpis();
+    });
+  }
+
+  if (ui.jobList) {
+    ui.jobList.addEventListener("click", (event) => {
+      handleJobTableAction(event);
+    });
+  }
+
+  if (ui.jobEditForm) {
+    ui.jobEditForm.addEventListener("submit", submitEditJob);
+  }
+
+  if (ui.jobPublishBtn) {
+    ui.jobPublishBtn.addEventListener("click", async () => {
+      const selectedId = firstValue(companyState.selectedJob || {}, ["id"], "");
+      await runJobAction("publish", selectedId);
+    });
+  }
+
+  if (ui.jobSubmitBtn) {
+    ui.jobSubmitBtn.addEventListener("click", async () => {
+      const selectedId = firstValue(companyState.selectedJob || {}, ["id"], "");
+      await runJobAction("submit", selectedId);
+    });
+  }
+
+  if (ui.jobCloseBtn) {
+    ui.jobCloseBtn.addEventListener("click", async () => {
+      const selectedId = firstValue(companyState.selectedJob || {}, ["id"], "");
+      await runJobAction("close", selectedId);
+    });
+  }
+
+  if (ui.jobClearBtn) {
+    ui.jobClearBtn.addEventListener("click", () => {
+      clearSelectedJob();
+      setJobEditMessage("", "info");
+    });
+  }
+
+  if (ui.appLoadBtn) {
+    ui.appLoadBtn.addEventListener("click", async () => {
+      companyState.applicationsLoaded = true;
+      await loadApplicationsAndStats();
+    });
+  }
+
+  if (ui.appList) {
+    ui.appList.addEventListener("click", (event) => {
+      handleApplicationTableAction(event);
+    });
+  }
+
+  if (ui.offerCreateForm) {
+    ui.offerCreateForm.addEventListener("submit", submitCreateOfferDraft);
+  }
+
+  if (ui.offerLoadBtn) {
+    ui.offerLoadBtn.addEventListener("click", async () => {
+      companyState.offersLoaded = true;
+      await loadOffersByApplication();
+    });
+  }
+
+  if (ui.offerList) {
+    ui.offerList.addEventListener("click", handleOfferTableAction);
+  }
+
+  if (ui.offerSendForm) {
+    ui.offerSendForm.addEventListener("submit", submitSendOffer);
+  }
+
+  if (ui.profileForm) {
+    ui.profileForm.addEventListener("submit", submitProfileUpdate);
+  }
+
+  if (ui.reloadProfileBtn) {
+    ui.reloadProfileBtn.addEventListener("click", async () => {
+      await reloadCompanyProfile();
+    });
+  }
+
+  if (ui.profileLogoutBtn) {
+    ui.profileLogoutBtn.addEventListener("click", async () => {
+      if (!window.confirm("Do you want to logout?")) return;
+      await performLogout();
+    });
+  }
+}
+
+async function initCompanyAdminDashboard() {
+  if (!ui.navLinks.length || !ui.sections.length) return;
+
+  bindNavigation();
+  bindActionButtons();
+  clearSelectedUser();
+  clearSelectedJob();
+
+  const sessionReady = await loadAuthProfile();
+  if (!sessionReady) return;
+
+  await openDashboard();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initCompanyAdminDashboard();
+});
+
+window.companyAdminApi = {
+  config: COMPANY_ADMIN_CONFIG,
+  auth: authApi,
+  ...companyAdminApi,
+  openDashboard,
+  openUsers,
+  openJobs,
+  openApplications,
+  openOffers,
+  openProfile,
+  loadDashboardKpis,
+  loadUsersByRole,
+  loadJobs,
+  loadApplicationsAndStats,
+  loadOffersByApplication,
+  performLogout
+};

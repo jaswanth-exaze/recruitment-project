@@ -28,8 +28,8 @@ exports.updateMyProfile = async (req, res) => {
 
 exports.listPendingApprovals = async (req, res) => {
   try {
-    const approverId = req.query.approver_id || req.user.user_id;
-    return res.json(await service.listPendingApprovals(approverId));
+    const approverId = req.user.user_id;
+    return res.json(await service.listPendingApprovals(approverId, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -39,8 +39,9 @@ exports.approveJob = async (req, res) => {
   try {
     const affected = await service.approveJob(
       req.params.id,
-      req.body.approver_id || req.user.user_id,
+      req.user.user_id,
       req.body.comments,
+      req.user.company_id,
     );
     if (!affected) return res.status(404).json({ message: "Approval record not found" });
     return res.json({ message: "Job approved and published" });
@@ -53,8 +54,9 @@ exports.rejectJob = async (req, res) => {
   try {
     const affected = await service.rejectJob(
       req.params.id,
-      req.body.approver_id || req.user.user_id,
+      req.user.user_id,
       req.body.comments,
+      req.user.company_id,
     );
     if (!affected) return res.status(404).json({ message: "Approval record not found" });
     return res.json({ message: "Job rejected" });
@@ -65,7 +67,7 @@ exports.rejectJob = async (req, res) => {
 
 exports.finalDecision = async (req, res) => {
   try {
-    const affected = await service.finalDecision(req.params.id, req.body.status);
+    const affected = await service.finalDecision(req.params.id, req.body.status, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Application not found" });
     return res.json({ message: "Final decision updated" });
   } catch (err) {
@@ -75,7 +77,7 @@ exports.finalDecision = async (req, res) => {
 
 exports.publishJob = async (req, res) => {
   try {
-    const affected = await service.publishJob(req.params.id);
+    const affected = await service.publishJob(req.params.id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Job not found" });
     return res.json({ message: "Job published" });
   } catch (err) {
@@ -85,7 +87,7 @@ exports.publishJob = async (req, res) => {
 
 exports.closeJob = async (req, res) => {
   try {
-    const affected = await service.closeJob(req.params.id);
+    const affected = await service.closeJob(req.params.id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Job not found" });
     return res.json({ message: "Job closed" });
   } catch (err) {
@@ -95,7 +97,7 @@ exports.closeJob = async (req, res) => {
 
 exports.getJobById = async (req, res) => {
   try {
-    const job = await service.getJobById(req.params.id);
+    const job = await service.getJobById(req.params.id, req.user.company_id);
     if (!job) return res.status(404).json({ message: "Job not found" });
     return res.json(job);
   } catch (err) {

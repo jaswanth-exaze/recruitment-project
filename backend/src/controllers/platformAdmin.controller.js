@@ -166,10 +166,18 @@ exports.insertAuditLog = async (req, res) => {
 
 exports.getAuditTrail = async (req, res) => {
   try {
-    if (!req.query.entity || !req.query.id) {
-      return res.status(400).json({ message: "entity and id query params are required" });
+    const entity = String(req.query.entity || "").trim();
+    const id = String(req.query.id || "").trim();
+
+    if (!entity && !id) {
+      return res.json(await service.getAllAuditLogs());
     }
-    return res.json(await service.getAuditTrail(req.query.entity, req.query.id));
+
+    if (!entity || !id) {
+      return res.status(400).json({ message: "entity and id query params must be provided together" });
+    }
+
+    return res.json(await service.getAuditTrail(entity, id));
   } catch (err) {
     return handleError(res, err);
   }

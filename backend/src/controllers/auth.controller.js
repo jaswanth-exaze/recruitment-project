@@ -20,6 +20,25 @@ exports.login = async (req, res) => {
   }
 };
 
+exports.signupCandidate = async (req, res) => {
+  try {
+    const result = await authService.signupCandidate(req.body);
+
+    res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, getRefreshCookieOptions());
+
+    return res.status(201).json({
+      message: result.message,
+      token: result.token,
+      role: result.role,
+    });
+  } catch (err) {
+    if (err.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ message: "Email already exists" });
+    }
+    return res.status(400).json({ message: err.message || "Signup failed" });
+  }
+};
+
 exports.profile = async (req, res) => {
   try {
     const profile = await authService.getProfile(req.user.user_id);

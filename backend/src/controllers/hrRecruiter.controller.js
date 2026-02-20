@@ -28,7 +28,8 @@ exports.updateMyProfile = async (req, res) => {
 
 exports.listJobs = async (req, res) => {
   try {
-    return res.json(await service.listJobs(req.query));
+    const query = { ...req.query, company_id: req.user.company_id };
+    return res.json(await service.listJobs(query, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -36,7 +37,7 @@ exports.listJobs = async (req, res) => {
 
 exports.getJobById = async (req, res) => {
   try {
-    const job = await service.getJobById(req.params.id);
+    const job = await service.getJobById(req.params.id, req.user.company_id);
     if (!job) return res.status(404).json({ message: "Job not found" });
     return res.json(job);
   } catch (err) {
@@ -47,8 +48,8 @@ exports.getJobById = async (req, res) => {
 exports.createJobDraft = async (req, res) => {
   try {
     const payload = { ...req.body };
-    if (!payload.created_by) payload.created_by = req.user.user_id;
-    if (!payload.company_id) payload.company_id = req.user.company_id;
+    payload.created_by = req.user.user_id;
+    payload.company_id = req.user.company_id;
     return res.status(201).json(await service.createJobDraft(payload));
   } catch (err) {
     return handleError(res, err);
@@ -57,7 +58,7 @@ exports.createJobDraft = async (req, res) => {
 
 exports.updateJob = async (req, res) => {
   try {
-    const affected = await service.updateJob(req.params.id, req.body);
+    const affected = await service.updateJob(req.params.id, req.body, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Job not found or not editable" });
     return res.json({ message: "Job updated" });
   } catch (err) {
@@ -67,7 +68,7 @@ exports.updateJob = async (req, res) => {
 
 exports.submitJob = async (req, res) => {
   try {
-    const affected = await service.submitJob(req.params.id, req.body.approver_id);
+    const affected = await service.submitJob(req.params.id, req.body.approver_id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Job not found" });
     return res.json({ message: "Job submitted for approval" });
   } catch (err) {
@@ -77,7 +78,7 @@ exports.submitJob = async (req, res) => {
 
 exports.getCandidateProfile = async (req, res) => {
   try {
-    const profile = await service.getCandidateProfile(Number(req.params.id));
+    const profile = await service.getCandidateProfile(Number(req.params.id), req.user.company_id);
     if (!profile) return res.status(404).json({ message: "Candidate profile not found" });
     return res.json(profile);
   } catch (err) {
@@ -87,7 +88,7 @@ exports.getCandidateProfile = async (req, res) => {
 
 exports.updateCandidateProfile = async (req, res) => {
   try {
-    const affected = await service.updateCandidateProfile(Number(req.params.id), req.body);
+    const affected = await service.updateCandidateProfile(Number(req.params.id), req.body, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Candidate profile not found" });
     return res.json({ message: "Candidate profile updated" });
   } catch (err) {
@@ -97,7 +98,7 @@ exports.updateCandidateProfile = async (req, res) => {
 
 exports.uploadResume = async (req, res) => {
   try {
-    const affected = await service.uploadResume(Number(req.params.id), req.body.resume_url);
+    const affected = await service.uploadResume(Number(req.params.id), req.body.resume_url, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Candidate profile not found" });
     return res.json({ message: "Resume uploaded" });
   } catch (err) {
@@ -108,7 +109,7 @@ exports.uploadResume = async (req, res) => {
 exports.listApplications = async (req, res) => {
   try {
     if (!req.query.job_id) return res.status(400).json({ message: "job_id query param is required" });
-    return res.json(await service.listApplicationsForJob(req.query.job_id));
+    return res.json(await service.listApplicationsForJob(req.query.job_id, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -116,7 +117,12 @@ exports.listApplications = async (req, res) => {
 
 exports.moveApplicationStage = async (req, res) => {
   try {
-    const affected = await service.moveApplicationStage(req.params.id, req.body.status, req.body.current_stage_id);
+    const affected = await service.moveApplicationStage(
+      req.params.id,
+      req.body.status,
+      req.body.current_stage_id,
+      req.user.company_id,
+    );
     if (!affected) return res.status(404).json({ message: "Application not found" });
     return res.json({ message: "Application updated" });
   } catch (err) {
@@ -126,7 +132,7 @@ exports.moveApplicationStage = async (req, res) => {
 
 exports.screenDecision = async (req, res) => {
   try {
-    const affected = await service.screenDecision(req.params.id, req.body.status);
+    const affected = await service.screenDecision(req.params.id, req.body.status, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Application not found" });
     return res.json({ message: "Screening decision updated" });
   } catch (err) {
@@ -136,7 +142,7 @@ exports.screenDecision = async (req, res) => {
 
 exports.recommendOffer = async (req, res) => {
   try {
-    const affected = await service.recommendOffer(req.params.id);
+    const affected = await service.recommendOffer(req.params.id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Application not found" });
     return res.json({ message: "Offer recommended" });
   } catch (err) {
@@ -146,7 +152,7 @@ exports.recommendOffer = async (req, res) => {
 
 exports.scheduleInterview = async (req, res) => {
   try {
-    return res.status(201).json(await service.scheduleInterview(req.body));
+    return res.status(201).json(await service.scheduleInterview(req.body, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -154,7 +160,7 @@ exports.scheduleInterview = async (req, res) => {
 
 exports.getInterviews = async (req, res) => {
   try {
-    return res.json(await service.getInterviews(req.query));
+    return res.json(await service.getInterviews(req.query, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -162,7 +168,7 @@ exports.getInterviews = async (req, res) => {
 
 exports.updateInterview = async (req, res) => {
   try {
-    const affected = await service.updateInterview(req.params.id, req.body.status, req.body.notes);
+    const affected = await service.updateInterview(req.params.id, req.body.status, req.body.notes, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Interview not found" });
     return res.json({ message: "Interview updated" });
   } catch (err) {
@@ -172,7 +178,9 @@ exports.updateInterview = async (req, res) => {
 
 exports.createOfferDraft = async (req, res) => {
   try {
-    return res.status(201).json(await service.createOfferDraft(req.body));
+    const payload = { ...req.body };
+    payload.created_by = req.user.user_id;
+    return res.status(201).json(await service.createOfferDraft(payload, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -180,7 +188,7 @@ exports.createOfferDraft = async (req, res) => {
 
 exports.sendOffer = async (req, res) => {
   try {
-    const affected = await service.sendOffer(req.params.id, req.body);
+    const affected = await service.sendOffer(req.params.id, req.body, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Offer not found" });
     return res.json({ message: "Offer sent" });
   } catch (err) {

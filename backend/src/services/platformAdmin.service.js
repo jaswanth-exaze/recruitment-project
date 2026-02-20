@@ -191,6 +191,17 @@ exports.getAuditTrail = async (entityType, entityId) => {
   return rows;
 };
 
+exports.getAllAuditLogs = async () => {
+  const [rows] = await db.promise().query(
+    `SELECT * FROM audit_logs ORDER BY created_at DESC`,
+  );
+  rows.forEach((row) => {
+    row.old_data = parseJsonField(row.old_data);
+    row.new_data = parseJsonField(row.new_data);
+  });
+  return rows;
+};
+
 exports.insertBackgroundJob = async ({ job_type, payload, scheduled_at }) => {
   if (!job_type) throw new Error("job_type is required");
   const [result] = await db.promise().query(

@@ -47,18 +47,18 @@ exports.updateMyProfile = async (userId, body) => {
   return getUserProfileById(userId);
 };
 
-exports.listJobs = async ({ status, company_id }) => {
+exports.listJobs = async ({ status, company_id }, companyId) => {
   const where = [];
   const params = [];
+  const resolvedCompanyId = companyId || company_id;
+  if (!resolvedCompanyId) throw new Error("company_id is required");
 
   if (status) {
     where.push("j.status = ?");
     params.push(status);
   }
-  if (company_id) {
-    where.push("j.company_id = ?");
-    params.push(company_id);
-  }
+  where.push("j.company_id = ?");
+  params.push(resolvedCompanyId);
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const [rows] = await db.promise().query(
@@ -74,17 +74,18 @@ exports.listJobs = async ({ status, company_id }) => {
   return rows;
 };
 
-exports.getJobById = async (id) => {
+exports.getJobById = async (id, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
   const [rows] = await db.promise().query(
     `
       SELECT j.*, c.name AS company_name, u.first_name AS creator_first, u.last_name AS creator_last
       FROM job_requisitions j
       JOIN companies c ON j.company_id = c.id
       JOIN users u ON j.created_by = u.id
-      WHERE j.id = ?
+      WHERE j.id = ? AND j.company_id = ?
       LIMIT 1
     `,
-    [id],
+    [id, companyId],
   );
   return rows[0] || null;
 };
@@ -124,13 +125,14 @@ exports.createJobDraft = async (payload) => {
   return { id: result.insertId };
 };
 
-exports.updateJob = async (id, payload) => {
+exports.updateJob = async (id, payload, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
   const { title, description, requirements, location, employment_type, positions_count } = payload;
   const [result] = await db.promise().query(
     `
       UPDATE job_requisitions
       SET title = ?, description = ?, requirements = ?, location = ?, employment_type = ?, positions_count = ?, updated_at = NOW()
-      WHERE id = ? AND status IN ('draft', 'pending')
+      WHERE id = ? AND company_id = ? AND status IN ('draft', 'pending')
     `,
     [
       title,
@@ -140,25 +142,36 @@ exports.updateJob = async (id, payload) => {
       employment_type || "Full-time",
       positions_count || 1,
       id,
+      companyId,
     ],
   );
   return result.affectedRows;
 };
 
-exports.submitJob = async (jobId, approverId) => {
+exports.submitJob = async (jobId, approverId, companyId) => {
   if (!approverId) {
     throw new Error("approver_id is required");
   }
+  if (!companyId) throw new Error("company_id is required");
   const connection = await db.promise().getConnection();
   try {
     await connection.beginTransaction();
+    const [approverRows] = await connection.query(
+      `SELECT id FROM users WHERE id = ? AND company_id = ? LIMIT 1`,
+      [approverId, companyId],
+    );
+    if (!approverRows.length) {
+      await connection.rollback();
+      throw new Error("approver_id is not part of your company");
+    }
+
     const [jobResult] = await connection.query(
       `
         UPDATE job_requisitions
         SET status = 'pending', updated_at = NOW()
-        WHERE id = ?
+        WHERE id = ? AND company_id = ?
       `,
-      [jobId],
+      [jobId, companyId],
     );
     if (!jobResult.affectedRows) {
       await connection.rollback();
@@ -183,16 +196,23 @@ exports.submitJob = async (jobId, approverId) => {
   }
 };
 
-exports.getCandidateProfile = async (userId) => {
+exports.getCandidateProfile = async (userId, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
   const [rows] = await db.promise().query(
     `
       SELECT cp.user_id, u.first_name, u.last_name, u.email, cp.phone, cp.address, cp.resume_url, cp.profile_data, cp.is_verified, cp.updated_at
       FROM candidate_profiles cp
       JOIN users u ON cp.user_id = u.id
       WHERE cp.user_id = ?
+        AND EXISTS (
+          SELECT 1
+          FROM applications a
+          JOIN job_requisitions j ON a.job_id = j.id
+          WHERE a.candidate_id = cp.user_id AND j.company_id = ?
+        )
       LIMIT 1
     `,
-    [userId],
+    [userId, companyId],
   );
 
   if (!rows.length) return null;
@@ -200,114 +220,155 @@ exports.getCandidateProfile = async (userId) => {
   return rows[0];
 };
 
-exports.updateCandidateProfile = async (userId, payload) => {
+exports.updateCandidateProfile = async (userId, payload, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
   const { phone, address, profile_data } = payload;
   const [result] = await db.promise().query(
     `
       UPDATE candidate_profiles
       SET phone = ?, address = ?, profile_data = ?, updated_at = NOW()
       WHERE user_id = ?
+        AND EXISTS (
+          SELECT 1
+          FROM applications a
+          JOIN job_requisitions j ON a.job_id = j.id
+          WHERE a.candidate_id = candidate_profiles.user_id AND j.company_id = ?
+        )
     `,
-    [phone || null, address || null, profile_data ? JSON.stringify(profile_data) : null, userId],
+    [phone || null, address || null, profile_data ? JSON.stringify(profile_data) : null, userId, companyId],
   );
   return result.affectedRows;
 };
 
-exports.uploadResume = async (userId, resumeUrl) => {
+exports.uploadResume = async (userId, resumeUrl, companyId) => {
   if (!resumeUrl) {
     throw new Error("resume_url is required");
   }
+  if (!companyId) throw new Error("company_id is required");
   const [result] = await db.promise().query(
     `
       UPDATE candidate_profiles
       SET resume_url = ?, updated_at = NOW()
       WHERE user_id = ?
+        AND EXISTS (
+          SELECT 1
+          FROM applications a
+          JOIN job_requisitions j ON a.job_id = j.id
+          WHERE a.candidate_id = candidate_profiles.user_id AND j.company_id = ?
+        )
     `,
-    [resumeUrl, userId],
+    [resumeUrl, userId, companyId],
   );
   return result.affectedRows;
 };
 
-exports.listApplicationsForJob = async (jobId) => {
+exports.listApplicationsForJob = async (jobId, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
   const [rows] = await db.promise().query(
     `
       SELECT a.*, u.first_name, u.last_name, u.email, cp.resume_url
       FROM applications a
+      JOIN job_requisitions j ON a.job_id = j.id
       JOIN users u ON a.candidate_id = u.id
       LEFT JOIN candidate_profiles cp ON u.id = cp.user_id
-      WHERE a.job_id = ?
+      WHERE a.job_id = ? AND j.company_id = ?
       ORDER BY a.applied_at DESC
     `,
-    [jobId],
+    [jobId, companyId],
   );
   return rows;
 };
 
-exports.moveApplicationStage = async (id, status, current_stage_id) => {
+exports.moveApplicationStage = async (id, status, current_stage_id, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
   const [result] = await db.promise().query(
     `
-      UPDATE applications
-      SET status = ?, current_stage_id = ?, updated_at = NOW()
-      WHERE id = ?
+      UPDATE applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      SET a.status = ?, a.current_stage_id = ?, a.updated_at = NOW()
+      WHERE a.id = ? AND j.company_id = ?
     `,
-    [status, current_stage_id || null, id],
+    [status, current_stage_id || null, id, companyId],
   );
   return result.affectedRows;
 };
 
-exports.screenDecision = async (id, status) => {
+exports.screenDecision = async (id, status, companyId) => {
   if (!["rejected", "interview"].includes(status)) {
     throw new Error("status must be rejected or interview");
   }
+  if (!companyId) throw new Error("company_id is required");
   const [result] = await db.promise().query(
     `
-      UPDATE applications
-      SET status = ?, screening_decision_at = NOW(), updated_at = NOW()
-      WHERE id = ?
+      UPDATE applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      SET a.status = ?, a.screening_decision_at = NOW(), a.updated_at = NOW()
+      WHERE a.id = ? AND j.company_id = ?
     `,
-    [status, id],
+    [status, id, companyId],
   );
   return result.affectedRows;
 };
 
-exports.recommendOffer = async (id) => {
+exports.recommendOffer = async (id, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
   const [result] = await db.promise().query(
     `
-      UPDATE applications
-      SET offer_recommended = 1, updated_at = NOW()
-      WHERE id = ?
+      UPDATE applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      SET a.offer_recommended = 1, a.updated_at = NOW()
+      WHERE a.id = ? AND j.company_id = ?
     `,
-    [id],
+    [id, companyId],
   );
   return result.affectedRows;
 };
 
-exports.scheduleInterview = async (payload) => {
+exports.scheduleInterview = async (payload, companyId) => {
   const { application_id, interviewer_id, scheduled_at, duration_minutes, meeting_link, notes } = payload;
   if (!application_id || !interviewer_id || !scheduled_at) {
     throw new Error("application_id, interviewer_id and scheduled_at are required");
   }
+  if (!companyId) throw new Error("company_id is required");
+
+  const [interviewerRows] = await db.promise().query(
+    `SELECT id FROM users WHERE id = ? AND company_id = ? LIMIT 1`,
+    [interviewer_id, companyId],
+  );
+  if (!interviewerRows.length) {
+    throw new Error("interviewer_id is not part of your company");
+  }
+
   const [result] = await db.promise().query(
     `
       INSERT INTO interviews (application_id, interviewer_id, scheduled_at, duration_minutes, meeting_link, status, notes, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'scheduled', ?, NOW(), NOW())
+      SELECT a.id, ?, ?, ?, ?, 'scheduled', ?, NOW(), NOW()
+      FROM applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      WHERE a.id = ? AND j.company_id = ?
     `,
-    [application_id, interviewer_id, scheduled_at, duration_minutes || null, meeting_link || null, notes || null],
+    [interviewer_id, scheduled_at, duration_minutes || null, meeting_link || null, notes || null, application_id, companyId],
   );
+  if (!result.affectedRows) {
+    throw new Error("application_id is not part of your company");
+  }
   return { id: result.insertId };
 };
 
-exports.getInterviews = async ({ application_id, interviewer_id }) => {
+exports.getInterviews = async ({ application_id, interviewer_id }, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
   if (application_id) {
     const [rows] = await db.promise().query(
       `
         SELECT i.*, u.first_name AS interviewer_first, u.last_name AS interviewer_last
         FROM interviews i
+        JOIN applications a ON i.application_id = a.id
+        JOIN job_requisitions j ON a.job_id = j.id
         JOIN users u ON i.interviewer_id = u.id
-        WHERE i.application_id = ?
+        WHERE i.application_id = ? AND j.company_id = ?
         ORDER BY i.scheduled_at
       `,
-      [application_id],
+      [application_id, companyId],
     );
     return rows;
   }
@@ -320,10 +381,11 @@ exports.getInterviews = async ({ application_id, interviewer_id }) => {
         JOIN applications a ON i.application_id = a.id
         JOIN users u ON a.candidate_id = u.id
         JOIN job_requisitions j ON a.job_id = j.id
-        WHERE i.interviewer_id = ? AND i.status = 'scheduled'
+        JOIN users interviewer ON i.interviewer_id = interviewer.id
+        WHERE i.interviewer_id = ? AND i.status = 'scheduled' AND j.company_id = ? AND interviewer.company_id = ?
         ORDER BY i.scheduled_at
       `,
-      [interviewer_id],
+      [interviewer_id, companyId, companyId],
     );
     return rows;
   }
@@ -331,42 +393,55 @@ exports.getInterviews = async ({ application_id, interviewer_id }) => {
   throw new Error("application_id or interviewer_id query param is required");
 };
 
-exports.updateInterview = async (id, status, notes) => {
+exports.updateInterview = async (id, status, notes, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
   const [result] = await db.promise().query(
     `
-      UPDATE interviews
-      SET status = ?, notes = ?, updated_at = NOW()
-      WHERE id = ?
+      UPDATE interviews i
+      JOIN applications a ON i.application_id = a.id
+      JOIN job_requisitions j ON a.job_id = j.id
+      SET i.status = ?, i.notes = ?, i.updated_at = NOW()
+      WHERE i.id = ? AND j.company_id = ?
     `,
-    [status, notes || null, id],
+    [status, notes || null, id, companyId],
   );
   return result.affectedRows;
 };
 
-exports.createOfferDraft = async (payload) => {
+exports.createOfferDraft = async (payload, companyId) => {
   const { application_id, created_by, offer_details } = payload;
   if (!application_id || !created_by) {
     throw new Error("application_id and created_by are required");
   }
+  if (!companyId) throw new Error("company_id is required");
   const [result] = await db.promise().query(
     `
       INSERT INTO offers (application_id, created_by, status, offer_details, created_at, updated_at)
-      VALUES (?, ?, 'draft', ?, NOW(), NOW())
+      SELECT a.id, ?, 'draft', ?, NOW(), NOW()
+      FROM applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      WHERE a.id = ? AND j.company_id = ?
     `,
-    [application_id, created_by, offer_details ? JSON.stringify(offer_details) : null],
+    [created_by, offer_details ? JSON.stringify(offer_details) : null, application_id, companyId],
   );
+  if (!result.affectedRows) {
+    throw new Error("application_id is not part of your company");
+  }
   return { id: result.insertId };
 };
 
-exports.sendOffer = async (id, payload) => {
+exports.sendOffer = async (id, payload, companyId) => {
   const { document_url, esign_link } = payload;
+  if (!companyId) throw new Error("company_id is required");
   const [result] = await db.promise().query(
     `
-      UPDATE offers
-      SET status = 'sent', document_url = ?, esign_link = ?, sent_at = NOW(), updated_at = NOW()
-      WHERE id = ?
+      UPDATE offers o
+      JOIN applications a ON o.application_id = a.id
+      JOIN job_requisitions j ON a.job_id = j.id
+      SET o.status = 'sent', o.document_url = ?, o.esign_link = ?, o.sent_at = NOW(), o.updated_at = NOW()
+      WHERE o.id = ? AND j.company_id = ?
     `,
-    [document_url || null, esign_link || null, id],
+    [document_url || null, esign_link || null, id, companyId],
   );
   return result.affectedRows;
 };

@@ -28,7 +28,7 @@ exports.updateMyProfile = async (req, res) => {
 
 exports.getInterviews = async (req, res) => {
   try {
-    return res.json(await service.getInterviews(req.query));
+    return res.json(await service.getInterviews(req.query, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -36,7 +36,13 @@ exports.getInterviews = async (req, res) => {
 
 exports.updateInterview = async (req, res) => {
   try {
-    const affected = await service.updateInterview(req.params.id, req.body.status, req.body.notes);
+    const affected = await service.updateInterview(
+      req.params.id,
+      req.body.status,
+      req.body.notes,
+      req.user.user_id,
+      req.user.company_id,
+    );
     if (!affected) return res.status(404).json({ message: "Interview not found" });
     return res.json({ message: "Interview updated" });
   } catch (err) {
@@ -46,7 +52,7 @@ exports.updateInterview = async (req, res) => {
 
 exports.submitScorecard = async (req, res) => {
   try {
-    return res.status(201).json(await service.submitScorecard(req.body));
+    return res.status(201).json(await service.submitScorecard(req.body, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }
@@ -54,7 +60,7 @@ exports.submitScorecard = async (req, res) => {
 
 exports.finalizeScorecard = async (req, res) => {
   try {
-    const affected = await service.finalizeScorecard(req.params.id);
+    const affected = await service.finalizeScorecard(req.params.id, req.user.user_id, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Scorecard not found" });
     return res.json({ message: "Scorecard finalized" });
   } catch (err) {
@@ -67,7 +73,7 @@ exports.getScorecards = async (req, res) => {
     if (!req.query.interview_id) {
       return res.status(400).json({ message: "interview_id query param is required" });
     }
-    return res.json(await service.getScorecardsByInterview(req.query.interview_id));
+    return res.json(await service.getScorecardsByInterview(req.query.interview_id, req.user.user_id, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }

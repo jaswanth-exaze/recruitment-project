@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HireFlow | Recruitment Management Platform</title>
+    <meta
+      name="description"
+      content="HireFlow helps platform admins, company admins, HR teams, hiring managers, interviewers, and candidates run hiring operations end to end."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
+    <link rel="stylesheet" href="../css/styles.css" />
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg fixed-top app-navbar">
+      <div class="container">
+        <a class="navbar-brand d-flex align-items-center fw-semibold" href="index.html">
+          <span class="brand-mark">H</span>
+          HireFlow
+        </a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#mainNav"
+          aria-controls="mainNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav ms-auto me-lg-3">
+            <li class="nav-item"><a class="nav-link js-scroll-link active" href="#home">Home</a></li>
+            <li class="nav-item"><a class="nav-link js-scroll-link" href="#about">About</a></li>
+            <li class="nav-item"><a class="nav-link js-scroll-link" href="#features">Features</a></li>
+            <li class="nav-item"><a class="nav-link js-scroll-link" href="#roles">Roles</a></li>
+            <li class="nav-item"><a class="nav-link js-scroll-link" href="#contact">Contact</a></li>
+          </ul>
+          <a href="./login.html" class="btn btn-brand">Login</a>
+        </div>
+      </div>
+    </nav>
+
+    <main>
+      <section id="home" class="hero">
+        <div class="container">
+          <div class="row align-items-center g-4">
+            <div class="col-lg-6 reveal">
+              <span class="pill"><i class="bi bi-stars"></i> Modern hiring operations</span>
+              <h1 class="hero-title mt-3">Recruit smarter with one unified hiring platform.</h1>
+              <p class="hero-text">
+                HireFlow centralizes job management, candidate tracking, interviews, and analytics
+                into one secure workflow for every recruitment role.
+              </p>
+              <div class="d-flex flex-wrap gap-2 mt-4">
+                <a href="dashboard.html" class="btn btn-brand">Get Started</a>
+                <a href="#roles" class="btn btn-outline-brand js-scroll-link">Explore Roles</a>
+                <a href="about.html" class="btn btn-outline-brand">Company Page</a>
+              </div>
+            </div>
+            <div class="col-lg-6 reveal">
+              <div class="hero-visual">
+                <img src="assets/images/hero-illustration.svg" alt="Recruitment platform dashboard illustration" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="about" class="section">
+        <div class="container">
+          <div class="row g-4 align-items-center">
+            <div class="col-lg-6 reveal">
+              <h2 class="section-title">Built for recruitment teams at every scale</h2>
+              <p class="section-subtitle mb-3">
+                From startup hiring pods to enterprise talent functions, HireFlow standardizes your
+                process without slowing teams down.
+              </p>
+              <div class="row g-3">
+                <div class="col-sm-6">
+                  <div class="glass-card p-3 h-100">
+                    <h3 class="h6">Enterprise-ready security</h3>
+                    <p class="mb-0 text-secondary">Role-level permissions and audit-first workflows.</p>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="glass-card p-3 h-100">
+                    <h3 class="h6">Actionable visibility</h3>
+                    <p class="mb-0 text-secondary">Pipeline health across all teams and job lines.</p>
+                  </div>
+                </div>
+              </div>
+              <a href="about.html" class="btn btn-outline-brand mt-4">Read full company story</a>
+            </div>
+            <div class="col-lg-6 reveal">
+              <div class="highlight-panel">
+                <h5 class="mb-3">Recruitment lifecycle coverage</h5>
+                <p class="mb-2">Intake -> Posting -> Screening -> Interview -> Offer -> Onboarding</p>
+                <p class="mb-0">
+                  Aligns with your backend role model for Platform Admin, Company Admin, HR, Hiring
+                  Manager, Interviewer, and Candidate.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section pt-0">
+        <div class="container">
+          <h2 class="section-title text-center reveal">Platform Features</h2>
+          <p class="section-subtitle text-center mx-auto reveal">
+            Everything needed to run modern recruitment operations with transparency, speed, and quality.
+          </p>
+          <div class="row g-4">
+            <div class="col-md-6 col-lg-4 reveal">
+              <article class="feature-card">
+                <span class="card-icon"><i class="bi bi-briefcase"></i></span>
+                <h3 class="h5">Job Management</h3>
+                <p class="mb-0">Create, approve, and publish jobs with structured role templates.</p>
+              </article>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+              <article class="feature-card">
+                <span class="card-icon"><i class="bi bi-people"></i></span>
+                <h3 class="h5">Candidate Tracking</h3>
+                <p class="mb-0">Track application status, resume versions, and profile progress.</p>
+              </article>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+              <article class="feature-card">
+                <span class="card-icon"><i class="bi bi-calendar-check"></i></span>
+                <h3 class="h5">Interview Scheduling</h3>
+                <p class="mb-0">Coordinate interviewer slots and automate interview workflow updates.</p>
+              </article>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+              <article class="feature-card">
+                <span class="card-icon"><i class="bi bi-graph-up-arrow"></i></span>
+                <h3 class="h5">Analytics Dashboard</h3>
+                <p class="mb-0">Measure source performance, funnel conversion, and hire velocity.</p>
+              </article>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+              <article class="feature-card">
+                <span class="card-icon"><i class="bi bi-person-lock"></i></span>
+                <h3 class="h5">Role-Based Access</h3>
+                <p class="mb-0">Permission-driven screens for each stakeholder in the hiring journey.</p>
+              </article>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+              <article class="feature-card">
+                <span class="card-icon"><i class="bi bi-envelope-paper"></i></span>
+                <h3 class="h5">Email Notifications</h3>
+                <p class="mb-0">Keep teams and applicants updated at every milestone automatically.</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="roles" class="section pt-0">
+        <div class="container">
+          <h2 class="section-title text-center reveal">Role-Based Experience</h2>
+          <p class="section-subtitle text-center mx-auto reveal">
+            Each user role gets focused capabilities without unnecessary complexity.
+          </p>
+          <div class="row g-4">
+            <div class="col-md-6 col-xl-4 reveal">
+              <article class="role-card">
+                <span class="card-icon"><i class="bi bi-building-gear"></i></span>
+                <h3 class="h5">Platform Admin</h3>
+                <ul class="role-list">
+                  <li>Manage companies</li>
+                  <li>Manage subscriptions</li>
+                  <li>Monitor activity</li>
+                  <li>Global analytics</li>
+                  <li>Role permissions</li>
+                </ul>
+              </article>
+            </div>
+            <div class="col-md-6 col-xl-4 reveal">
+              <article class="role-card">
+                <span class="card-icon"><i class="bi bi-diagram-3"></i></span>
+                <h3 class="h5">Company Admin</h3>
+                <ul class="role-list">
+                  <li>Manage HR and Managers</li>
+                  <li>Approve job postings</li>
+                  <li>Company analytics</li>
+                  <li>Access control</li>
+                </ul>
+              </article>
+            </div>
+            <div class="col-md-6 col-xl-4 reveal">
+              <article class="role-card">
+                <span class="card-icon"><i class="bi bi-person-workspace"></i></span>
+                <h3 class="h5">HR</h3>
+                <ul class="role-list">
+                  <li>Create job postings</li>
+                  <li>Shortlist candidates</li>
+                  <li>Schedule interviews</li>
+                  <li>Communicate with applicants</li>
+                </ul>
+              </article>
+            </div>
+            <div class="col-md-6 col-xl-4 reveal">
+              <article class="role-card">
+                <span class="card-icon"><i class="bi bi-person-vcard"></i></span>
+                <h3 class="h5">Hiring Manager</h3>
+                <ul class="role-list">
+                  <li>Review shortlisted profiles</li>
+                  <li>Approve/reject candidates</li>
+                  <li>Provide interview feedback</li>
+                  <li>Track hiring pipeline</li>
+                </ul>
+              </article>
+            </div>
+            <div class="col-md-6 col-xl-4 reveal">
+              <article class="role-card">
+                <span class="card-icon"><i class="bi bi-camera-video"></i></span>
+                <h3 class="h5">Interviewer</h3>
+                <ul class="role-list">
+                  <li>View assigned interviews</li>
+                  <li>Submit evaluation</li>
+                  <li>Rate candidates</li>
+                </ul>
+              </article>
+            </div>
+            <div class="col-md-6 col-xl-4 reveal">
+              <article class="role-card">
+                <span class="card-icon"><i class="bi bi-person-badge"></i></span>
+                <h3 class="h5">Candidate</h3>
+                <ul class="role-list">
+                  <li>Sign up / Login</li>
+                  <li>Browse jobs</li>
+                  <li>Apply for jobs</li>
+                  <li>Track application status</li>
+                  <li>Update profile</li>
+                  <li>Upload resume</li>
+                </ul>
+              </article>
+            </div>
+          </div>
+
+          <div class="row g-4 mt-2">
+            <div class="col-lg-6 reveal">
+              <div class="contact-wrapper h-100">
+                <h3 class="h5 mb-3">Role Switch Preview</h3>
+                <p class="text-secondary mb-3">See a quick capability snapshot by role.</p>
+                <label for="roleSelect" class="form-label">Select role</label>
+                <select id="roleSelect" class="form-select" data-role-select>
+                  <option value="platform_admin">Platform Admin</option>
+                  <option value="company_admin">Company Admin</option>
+                  <option value="hr">HR</option>
+                  <option value="hiring_manager">Hiring Manager</option>
+                  <option value="interviewer">Interviewer</option>
+                  <option value="candidate">Candidate</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-6 reveal">
+              <div class="highlight-panel h-100">
+                <h4 class="h5" data-role-title>Platform Admin</h4>
+                <ul class="role-list text-light mt-3 mb-0" data-role-list></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="testimonials" class="section pt-0">
+        <div class="container">
+          <h2 class="section-title text-center reveal">Trusted by hiring teams</h2>
+          <p class="section-subtitle text-center mx-auto reveal">
+            Teams use HireFlow to reduce time-to-hire and improve interviewer consistency.
+          </p>
+          <div class="row g-4">
+            <div class="col-md-6 col-lg-4 reveal">
+              <article class="testimonial-card">
+                <p>
+                  "We replaced multiple tools with one reliable workflow. Our hiring velocity improved
+                  by 34% in two quarters."
+                </p>
+                <p class="fw-semibold mb-1">Priya Menon</p>
+                <p class="testimonial-meta mb-0">Head of Talent, Novalynx Technologies</p>
+              </article>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+              <article class="testimonial-card">
+                <p>
+                  "Role-based dashboards made collaboration clean. HR, managers, and interviewers now
+                  work from the same context."
+                </p>
+                <p class="fw-semibold mb-1">David Carter</p>
+                <p class="testimonial-meta mb-0">Company Admin, BlueOrbit Labs</p>
+              </article>
+            </div>
+            <div class="col-md-6 col-lg-4 reveal">
+              <article class="testimonial-card">
+                <p>
+                  "Candidate communication is clear and timely now. Offer conversion improved because
+                  applicants stay informed."
+                </p>
+                <p class="fw-semibold mb-1">Elena Ruiz</p>
+                <p class="testimonial-meta mb-0">Recruitment Ops Lead, Cora Systems</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="contact" class="section pt-0">
+        <div class="container">
+          <div class="contact-wrapper reveal">
+            <div class="row g-4 align-items-center">
+              <div class="col-lg-5">
+                <h2 class="section-title mb-2">Contact Our Team</h2>
+                <p class="section-subtitle mb-0">
+                  Tell us about your hiring goals. We will share a rollout plan aligned to your team
+                  structure and workflow.
+                </p>
+              </div>
+              <div class="col-lg-7">
+                <form class="row g-3 needs-validation" novalidate data-contact-form>
+                  <div class="col-md-6">
+                    <label for="fullName" class="form-label">Full Name</label>
+                    <input id="fullName" type="text" class="form-control" required />
+                    <div class="invalid-feedback">Please provide your name.</div>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="emailAddress" class="form-label">Work Email</label>
+                    <input id="emailAddress" type="email" class="form-control" required />
+                    <div class="invalid-feedback">Please provide a valid email.</div>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="companyName" class="form-label">Company</label>
+                    <input id="companyName" type="text" class="form-control" required />
+                    <div class="invalid-feedback">Company name is required.</div>
+                  </div>
+                  <div class="col-md-6">
+                    <label for="userRole" class="form-label">Your Role</label>
+                    <select id="userRole" class="form-select" required>
+                      <option value="" selected disabled>Select role</option>
+                      <option>Platform Admin</option>
+                      <option>Company Admin</option>
+                      <option>HR</option>
+                      <option>Hiring Manager</option>
+                      <option>Interviewer</option>
+                    </select>
+                    <div class="invalid-feedback">Please select a role.</div>
+                  </div>
+                  <div class="col-12">
+                    <label for="message" class="form-label">Message</label>
+                    <textarea id="message" rows="4" class="form-control" required></textarea>
+                    <div class="invalid-feedback">Please share your requirement.</div>
+                  </div>
+                  <div class="col-12">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="" id="agreeTerms" required />
+                      <label class="form-check-label" for="agreeTerms">
+                        I agree to be contacted regarding recruitment platform onboarding.
+                      </label>
+                      <div class="invalid-feedback">You must agree before submitting.</div>
+                    </div>
+                  </div>
+                  <div class="col-12 d-flex align-items-center gap-3">
+                    <button type="submit" class="btn btn-brand">Send Message</button>
+                    <span class="text-success fw-semibold d-none" data-form-success>
+                      Message submitted successfully.
+                    </span>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer py-5">
+      <div class="container">
+        <div class="row g-4 align-items-center">
+          <div class="col-lg-4">
+            <a class="d-inline-flex align-items-center fw-semibold mb-2" href="index.html">
+              <span class="brand-mark">H</span>
+              HireFlow
+            </a>
+            <p class="mb-0">Unified recruitment workflows for high-performance hiring teams.</p>
+          </div>
+          <div class="col-lg-4 text-lg-center">
+            <a class="me-3" href="#features">Features</a>
+            <a class="me-3" href="#roles">Roles</a>
+            <a href="about.html">About</a>
+          </div>
+          <div class="col-lg-4 text-lg-end">
+            <a class="social-link me-2" href="#" aria-label="LinkedIn"><i class="bi bi-linkedin"></i></a>
+            <a class="social-link me-2" href="#" aria-label="Twitter"><i class="bi bi-twitter-x"></i></a>
+            <a class="social-link" href="#" aria-label="YouTube"><i class="bi bi-youtube"></i></a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <button class="back-to-top" type="button" aria-label="Back to top" data-back-to-top>
+      <i class="bi bi-arrow-up"></i>
+    </button>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="../js/script.js"></script>
+  </body>
+</html>

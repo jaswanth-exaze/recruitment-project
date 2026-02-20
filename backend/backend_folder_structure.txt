@@ -1,0 +1,41 @@
+backend/
+├── src/
+│   ├── config/
+│   │   ├── db.js
+│   │   └── env.js
+│   ├── controllers/
+│   │   ├── auth.controller.js
+│   │   ├── platformAdmin.controller.js
+│   │   ├── companyAdmin.controller.js
+│   │   ├── hrRecruiter.controller.js
+│   │   ├── hiringManager.controller.js
+│   │   ├── interviewer.controller.js
+│   │   └── candidate.controller.js
+│   ├── routes/
+│   │   ├── auth.routes.js
+│   │   ├── platformAdmin.routes.js
+│   │   ├── companyAdmin.routes.js
+│   │   ├── hrRecruiter.routes.js
+│   │   ├── hiringManager.routes.js
+│   │   ├── interviewer.routes.js
+│   │   └── candidate.routes.js
+│   ├── middlewares/
+│   │   ├── auth.middleware.js
+│   │   └── role.middleware.js
+│   ├── services/
+│   │   ├── auth.service.js
+│   │   ├── platformAdmin.service.js
+│   │   ├── companyAdmin.service.js
+│   │   ├── hrRecruiter.service.js
+│   │   ├── hiringManager.service.js
+│   │   ├── interviewer.service.js
+│   │   └── candidate.service.js
+│   ├── utils/
+│   │   ├── jwt.util.js
+│   │   └── password.util.js
+│   ├── app.js
+│   └── server.js
+├── node_modules
+├── .env
+├── package.json
+└── package-lock.json

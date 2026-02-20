@@ -1,82 +1,46 @@
-/**
- * Login page logic.
- * Handles credential submission, response messaging, and role-based redirect.
- */
+import { apiRequest } from "./api.js";
+import { getDashboardPathByRole } from "./config.js";
+import { setAuthState } from "./auth.js";
 
-const API_BASE = window.location.origin.includes("localhost:3000")
-  ? window.location.origin
-  : "http://localhost:3000";
+const form = document.getElementById("loginForm");
+const messageEl = document.getElementById("loginMsg");
 
-// Authenticates the user and routes them to the correct dashboard.
-async function login(event) {
+function setMessage(message, type = "error") {
+  if (!messageEl) return;
+  messageEl.textContent = message;
+  messageEl.className = `notice ${type}`;
+}
+
+function loadSessionMessage() {
+  const expired = localStorage.getItem("sessionExpiredMessage");
+  if (expired) {
+    setMessage(expired, "error");
+    localStorage.removeItem("sessionExpiredMessage");
+  }
+}
+
+async function onLogin(event) {
   event.preventDefault();
+  const email = document.getElementById("email")?.value?.trim();
+  const password = document.getElementById("password")?.value || "";
 
-  const emailInput = document.getElementById("email");
-  const passwordInput = document.getElementById("password");
-  const msg = document.getElementById("loginMsg");
+  try {
+    const result = await apiRequest("/auth/login", {
+      method: "POST",
+      auth: false,
+      body: JSON.stringify({ email, password }),
+    });
 
-  const email = emailInput?.value?.trim();
-  const password = passwordInput?.value || "";
-
-  // Send credentials to backend auth endpoint.
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ email, password }),
-  });
-
-  // Parse backend response (success payload or error payload).
-  const data = await res.json().catch(() => ({}));
-
-  // If login failed, show backend message and stop.
-  if (!res.ok) {
-    if (msg) {
-      msg.style.color = "red";
-      msg.innerText = data.message || "Login failed. Please try again.";
-    }
-    return;
+    setAuthState(result.token, result.role);
+    setMessage("Login successful. Redirecting...", "success");
+    window.location.href = getDashboardPathByRole(result.role);
+  } catch (err) {
+    setMessage(err.message || "Login failed", "error");
   }
-
-  // Save auth session data for protected pages.
-  localStorage.setItem("token", data.token);
-  localStorage.setItem("role", data.role);
-  localStorage.removeItem("sessionExpiredMessage");
-  if (msg) msg.innerText = "";
-  console.log("Login successful, token and role saved to localStorage.", data);
-  // Redirect based on role returned by backend.
-  if (data.role === "Candidate")
-    window.location.href = "./dashboards/candidate.html";
-  else if (data.role === "PlatformAdmin")
-    window.location.href = "./dashboards/platformAdmin.html";
-  else if (data.role === "CompanyAdmin")
-    window.location.href = "./dashboards/companyAdmin.html";
-  else if (data.role === "HR") window.location.href = "./dashboards/hr.html";
-  else if (data.role === "HiringManager")
-    window.location.href = "./dashboards/hrManager.html";
-  else window.location.href = "./dashboards/interviewer.html";
 }
 
-// Shows a one-time message when a previous session expired.
-function showSessionExpiredMessage() {
-  // Read message written by auth interceptor before redirect.
-  const msgText = localStorage.getItem("sessionExpiredMessage");
-  if (!msgText) return;
-
-  const msg = document.getElementById("loginMsg");
-  if (msg) {
-    msg.style.color = "#b45309";
-    msg.innerText = msgText;
-  }
-
-  // Remove it so it does not show again on next refresh.
-  localStorage.removeItem("sessionExpiredMessage");
+if (form) {
+  form.addEventListener("submit", onLogin);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("loginForm");
-  if (form) {
-    form.addEventListener("submit", login);
-  }
-  showSessionExpiredMessage();
-});
+loadSessionMessage();

@@ -21,18 +21,29 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
     />
     <link rel="stylesheet" href="../css/styles.css" />
-    <link rel="icon" type="image/svg+xml" href="../public/assets/images/favicon.svg" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="../public/assets/images/favicon.svg"
+    />
   </head>
   <body class="dashboard-body">
     <div class="dashboard-layout">
       <aside class="dash-sidebar d-flex flex-column">
-        <a class="d-inline-flex align-items-center fw-semibold text-white" href="../public/index.html">
+        <a
+          class="d-inline-flex align-items-center fw-semibold text-white"
+          href="../public/index.html"
+        >
           <span class="brand-mark">H</span>
           <span class="dash-brand-text">HireFlow</span>
         </a>
 
         <nav class="mt-4">
-          <a class="dash-nav-link active" href="platformAdmin.html" data-admin-nav="dashboard">
+          <a
+            class="dash-nav-link active"
+            href="platformAdmin.html"
+            data-admin-nav="dashboard"
+          >
             <i class="bi bi-speedometer2"></i>
             <span class="sidebar-label">Dashboard</span>
           </a>
@@ -52,26 +63,39 @@
             <i class="bi bi-person-circle"></i>
             <span class="sidebar-label">Profile</span>
           </a>
-          <a class="dash-nav-link" href="../public/login.html" data-admin-nav="logout">
+          <a
+            class="dash-nav-link"
+            href="../public/login.html"
+            data-admin-nav="logout"
+          >
             <i class="bi bi-box-arrow-right"></i>
             <span class="sidebar-label">Logout</span>
           </a>
         </nav>
 
         <div class="mt-auto sidebar-footnote small text-white-50">
-          System role with global visibility across all companies and hiring pipelines.
+          System role with global visibility across all companies and hiring
+          pipelines.
         </div>
       </aside>
 
       <div class="dash-main">
         <header class="dash-topbar">
-          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+          <div
+            class="d-flex flex-wrap justify-content-between align-items-center gap-3"
+          >
             <div class="d-flex align-items-center gap-2">
-              <button type="button" class="btn btn-outline-brand" data-sidebar-toggle>
+              <button
+                type="button"
+                class="btn btn-outline-brand"
+                data-sidebar-toggle
+              >
                 <i class="bi bi-list"></i>
               </button>
               <div>
-                <h1 class="h5 mb-0" data-admin-header-title>Platform Admin Dashboard</h1>
+                <h1 class="h5 mb-0" data-admin-header-title>
+                  Platform Admin Dashboard
+                </h1>
                 <p class="mb-0 text-secondary small" data-admin-header-subtitle>
                   Governance, subscriptions, and global recruitment activity.
                 </p>
@@ -100,7 +124,7 @@
               </div>
               <div class="col-6 col-xl-3">
                 <article class="metric-card">
-                  <p class="kpi-title mb-1">Active Users (HR)</p>
+                  <p class="kpi-title mb-1">Active Users</p>
                   <p class="kpi-value mb-0" data-kpi-active-users>34</p>
                 </article>
               </div>
@@ -190,9 +214,13 @@
                     <li>Monitor inactivity alerts and SLA issues.</li>
                   </ul>
                   <p class="small text-secondary mb-1">Access Policy Health</p>
-                  <div class="progress mb-3"><div class="progress-bar progress-value-91"></div></div>
+                  <div class="progress mb-3">
+                    <div class="progress-bar progress-value-91"></div>
+                  </div>
                   <p class="small text-secondary mb-1">Subscription Health</p>
-                  <div class="progress"><div class="progress-bar progress-value-88"></div></div>
+                  <div class="progress">
+                    <div class="progress-bar progress-value-88"></div>
+                  </div>
                 </section>
               </div>
             </div>
@@ -205,11 +233,21 @@
                   <h2 class="h6 mb-3">Add New Company</h2>
                   <form class="row g-3" data-company-form>
                     <div class="col-12">
-                      <label class="form-label" for="companyName">Company Name</label>
-                      <input id="companyName" name="name" type="text" class="form-control" required />
+                      <label class="form-label" for="companyName"
+                        >Company Name</label
+                      >
+                      <input
+                        id="companyName"
+                        name="name"
+                        type="text"
+                        class="form-control"
+                        required
+                      />
                     </div>
                     <div class="col-12">
-                      <label class="form-label" for="companyDomain">Domain</label>
+                      <label class="form-label" for="companyDomain"
+                        >Domain</label
+                      >
                       <input
                         id="companyDomain"
                         name="domain"
@@ -219,7 +257,9 @@
                       />
                     </div>
                     <div class="col-12">
-                      <label class="form-label" for="companyAdminEmail">Company Admin Email</label>
+                      <label class="form-label" for="companyAdminEmail"
+                        >Company Admin Email</label
+                      >
                       <input
                         id="companyAdminEmail"
                         name="company_admin_email"
@@ -230,7 +270,9 @@
                       />
                     </div>
                     <div class="col-12">
-                      <label class="form-label" for="companyAdminPassword">Company Admin Password</label>
+                      <label class="form-label" for="companyAdminPassword"
+                        >Company Admin Password</label
+                      >
                       <input
                         id="companyAdminPassword"
                         name="company_admin_password"
@@ -242,10 +284,17 @@
                       />
                     </div>
                     <div class="col-12">
-                      <button type="submit" class="btn btn-brand w-100">Add Company</button>
+                      <button type="submit" class="btn btn-brand w-100">
+                        Add Company
+                      </button>
                     </div>
                     <div class="col-12">
-                      <p class="small text-success mb-0 d-none" data-company-msg>Company added to list.</p>
+                      <p
+                        class="small text-success mb-0 d-none"
+                        data-company-msg
+                      >
+                        Company added to list.
+                      </p>
                     </div>
                   </form>
                 </section>
@@ -271,7 +320,9 @@
                           <td>BlueOrbit Labs</td>
                           <td>blueorbit.com</td>
                           <td>admin@blueorbit.com</td>
-                          <td><span class="badge text-bg-success">Active</span></td>
+                          <td>
+                            <span class="badge text-bg-success">Active</span>
+                          </td>
                           <td>2026-01-08</td>
                         </tr>
                         <tr>
@@ -279,7 +330,9 @@
                           <td>Novalynx Technologies</td>
                           <td>novalynx.com</td>
                           <td>admin@novalynx.com</td>
-                          <td><span class="badge text-bg-success">Active</span></td>
+                          <td>
+                            <span class="badge text-bg-success">Active</span>
+                          </td>
                           <td>2026-01-14</td>
                         </tr>
                         <tr>
@@ -287,7 +340,9 @@
                           <td>Arcadia Health</td>
                           <td>arcadiahealth.com</td>
                           <td>admin@arcadiahealth.com</td>
-                          <td><span class="badge text-bg-warning">Pending</span></td>
+                          <td>
+                            <span class="badge text-bg-warning">Pending</span>
+                          </td>
                           <td>2026-01-20</td>
                         </tr>
                       </tbody>
@@ -302,12 +357,22 @@
             <div class="row g-3">
               <div class="col-12">
                 <section class="table-card p-3">
-                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                  <div
+                    class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3"
+                  >
                     <h2 class="h6 mb-0">User List</h2>
                     <div class="d-flex align-items-end gap-2">
                       <div>
-                        <label class="form-label small mb-1" for="userRoleFilter">Role</label>
-                        <select id="userRoleFilter" class="form-select form-select-sm" data-user-role-filter>
+                        <label
+                          class="form-label small mb-1"
+                          for="userRoleFilter"
+                          >Role</label
+                        >
+                        <select
+                          id="userRoleFilter"
+                          class="form-select form-select-sm"
+                          data-user-role-filter
+                        >
                           <option value="all" selected>All Roles</option>
                           <option value="HR">HR</option>
                           <option value="PlatformAdmin">PlatformAdmin</option>
@@ -317,7 +382,13 @@
                           <option value="Candidate">Candidate</option>
                         </select>
                       </div>
-                      <button type="button" class="btn btn-outline-brand btn-sm" data-user-load>Load</button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-brand btn-sm"
+                        data-user-load
+                      >
+                        Load
+                      </button>
                     </div>
                   </div>
                   <div class="table-responsive">
@@ -338,7 +409,9 @@
                           <td>Anika Patel</td>
                           <td>anika.patel@blueorbit.com</td>
                           <td>HR</td>
-                          <td><span class="badge text-bg-success">Active</span></td>
+                          <td>
+                            <span class="badge text-bg-success">Active</span>
+                          </td>
                           <td>2026-01-04</td>
                         </tr>
                         <tr>
@@ -346,7 +419,9 @@
                           <td>Kevin Brooks</td>
                           <td>k.brooks@novalynx.com</td>
                           <td>HR</td>
-                          <td><span class="badge text-bg-success">Active</span></td>
+                          <td>
+                            <span class="badge text-bg-success">Active</span>
+                          </td>
                           <td>2026-01-06</td>
                         </tr>
                         <tr>
@@ -354,7 +429,9 @@
                           <td>Ria Nair</td>
                           <td>ria.nair@cora.com</td>
                           <td>HR</td>
-                          <td><span class="badge text-bg-success">Active</span></td>
+                          <td>
+                            <span class="badge text-bg-success">Active</span>
+                          </td>
                           <td>2026-01-12</td>
                         </tr>
                         <tr>
@@ -362,16 +439,34 @@
                           <td>Nisha Rao</td>
                           <td>nisha.rao@arcadiahealth.com</td>
                           <td>HR</td>
-                          <td><span class="badge text-bg-success">Active</span></td>
+                          <td>
+                            <span class="badge text-bg-success">Active</span>
+                          </td>
                           <td>2026-01-16</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
-                  <div class="d-flex justify-content-between align-items-center mt-3">
-                    <button type="button" class="btn btn-outline-brand btn-sm" data-users-prev>Previous</button>
-                    <span class="small text-secondary" data-users-page-meta>Page 1 / 1</span>
-                    <button type="button" class="btn btn-outline-brand btn-sm" data-users-next>Next</button>
+                  <div
+                    class="d-flex justify-content-between align-items-center mt-3"
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-outline-brand btn-sm"
+                      data-users-prev
+                    >
+                      Previous
+                    </button>
+                    <span class="small text-secondary" data-users-page-meta
+                      >Page 1 / 1</span
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-outline-brand btn-sm"
+                      data-users-next
+                    >
+                      Next
+                    </button>
                   </div>
                 </section>
               </div>
@@ -382,11 +477,15 @@
             <div class="row g-3">
               <div class="col-12">
                 <section class="table-card p-3">
-                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                  <div
+                    class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3"
+                  >
                     <h2 class="h6 mb-0">Log History</h2>
                     <div class="d-flex align-items-end gap-2">
                       <div>
-                        <label class="form-label small mb-1" for="auditEntity">Entity</label>
+                        <label class="form-label small mb-1" for="auditEntity"
+                          >Entity</label
+                        >
                         <input
                           id="auditEntity"
                           type="text"
@@ -396,7 +495,9 @@
                         />
                       </div>
                       <div>
-                        <label class="form-label small mb-1" for="auditEntityId">Entity ID</label>
+                        <label class="form-label small mb-1" for="auditEntityId"
+                          >Entity ID</label
+                        >
                         <input
                           id="auditEntityId"
                           type="number"
@@ -406,7 +507,13 @@
                           data-audit-id
                         />
                       </div>
-                      <button type="button" class="btn btn-outline-brand btn-sm" data-audit-load>Load</button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-brand btn-sm"
+                        data-audit-load
+                      >
+                        Load
+                      </button>
                     </div>
                   </div>
                   <div class="table-responsive">
@@ -452,10 +559,26 @@
                       </tbody>
                     </table>
                   </div>
-                  <div class="d-flex justify-content-between align-items-center mt-3">
-                    <button type="button" class="btn btn-outline-brand btn-sm" data-audit-prev>Previous</button>
-                    <span class="small text-secondary" data-audit-page-meta>Page 1 / 1</span>
-                    <button type="button" class="btn btn-outline-brand btn-sm" data-audit-next>Next</button>
+                  <div
+                    class="d-flex justify-content-between align-items-center mt-3"
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-outline-brand btn-sm"
+                      data-audit-prev
+                    >
+                      Previous
+                    </button>
+                    <span class="small text-secondary" data-audit-page-meta
+                      >Page 1 / 1</span
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-outline-brand btn-sm"
+                      data-audit-next
+                    >
+                      Next
+                    </button>
                   </div>
                 </section>
               </div>
@@ -497,7 +620,9 @@
                   <h3 class="h6 mb-3">Edit Profile</h3>
                   <form class="row g-3" data-admin-profile-form>
                     <div class="col-md-6">
-                      <label class="form-label" for="adminProfileFirstName">First Name</label>
+                      <label class="form-label" for="adminProfileFirstName"
+                        >First Name</label
+                      >
                       <input
                         id="adminProfileFirstName"
                         type="text"
@@ -507,7 +632,9 @@
                       />
                     </div>
                     <div class="col-md-6">
-                      <label class="form-label" for="adminProfileLastName">Last Name</label>
+                      <label class="form-label" for="adminProfileLastName"
+                        >Last Name</label
+                      >
                       <input
                         id="adminProfileLastName"
                         type="text"
@@ -517,7 +644,9 @@
                       />
                     </div>
                     <div class="col-12">
-                      <label class="form-label" for="adminProfileEmail">Email</label>
+                      <label class="form-label" for="adminProfileEmail"
+                        >Email</label
+                      >
                       <input
                         id="adminProfileEmail"
                         type="email"
@@ -527,7 +656,11 @@
                       />
                     </div>
                     <div class="col-12">
-                      <button type="submit" class="btn btn-brand" data-admin-profile-save>
+                      <button
+                        type="submit"
+                        class="btn btn-brand"
+                        data-admin-profile-save
+                      >
                         Save Profile
                       </button>
                     </div>
@@ -538,20 +671,36 @@
                 <section class="table-card p-3 h-100">
                   <h2 class="h6 mb-3">Session Actions</h2>
                   <p class="small text-secondary">
-                    Refresh session token, reload profile from backend, or logout securely.
+                    Refresh session token, reload profile from backend, or
+                    logout securely.
                   </p>
                   <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-outline-brand" data-admin-refresh-session>
+                    <button
+                      type="button"
+                      class="btn btn-outline-brand"
+                      data-admin-refresh-session
+                    >
                       Refresh Session
                     </button>
-                    <button type="button" class="btn btn-outline-brand" data-admin-reload-profile>
+                    <button
+                      type="button"
+                      class="btn btn-outline-brand"
+                      data-admin-reload-profile
+                    >
                       Reload Profile
                     </button>
-                    <button type="button" class="btn btn-danger" data-admin-logout>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      data-admin-logout
+                    >
                       Logout
                     </button>
                   </div>
-                  <p class="small mt-3 mb-0 text-secondary" data-admin-profile-status></p>
+                  <p
+                    class="small mt-3 mb-0 text-secondary"
+                    data-admin-profile-status
+                  ></p>
                 </section>
               </div>
             </div>
@@ -560,7 +709,12 @@
       </div>
     </div>
 
-    <button class="back-to-top" type="button" aria-label="Back to top" data-back-to-top>
+    <button
+      class="back-to-top"
+      type="button"
+      aria-label="Back to top"
+      data-back-to-top
+    >
       <i class="bi bi-arrow-up"></i>
     </button>
 

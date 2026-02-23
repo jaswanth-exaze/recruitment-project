@@ -13,6 +13,7 @@ const API_BASE_URL = String(
 const LOGIN_PATH = "../public/login.html";
 const TOKEN_KEYS = ["token", "accessToken", "authToken", "jwtToken"];
 
+// 1) Base URL + token helpers.
 function getApiUrl(path) {
   const cleanPath = String(path || "").replace(/^\/+/, "");
   return `${API_BASE_URL}/${cleanPath}`;
@@ -38,13 +39,6 @@ function setToken(token) {
   });
 }
 
-// Saves one-time message shown on login page after redirect.
-function saveSessionMessage(message) {
-  if (message) {
-    localStorage.setItem(SESSION_EXPIRED_KEY, message);
-  }
-}
-
 // Clears any previously stored session-expiry message.
 function clearSessionExpiredMessage() {
   localStorage.removeItem(SESSION_EXPIRED_KEY);
@@ -67,11 +61,12 @@ function redirectToLogin(message) {
   if (alreadyRedirected) return;
   alreadyRedirected = true;
 
-  saveSessionMessage(message || "Login session expired. Please log in again.");
+  localStorage.setItem(SESSION_EXPIRED_KEY, message || "Login session expired. Please log in again.");
   clearAuthState();
   window.location.href = LOGIN_PATH;
 }
 
+// 2) Request classification helpers.
 // Checks if URL is an auth endpoint where we should not attach bearer token.
 function isAuthEndpoint(url) {
   return (
@@ -119,6 +114,7 @@ async function getErrorMessage(res) {
   return "Login session expired. Please log in again.";
 }
 
+// 3) Global fetch wrapper with one refresh retry.
 // Installs one global fetch wrapper:
 // - attaches credentials + bearer token
 // - if 401 happens, tries refresh once and retries original request
@@ -182,6 +178,7 @@ function installAuthWrapper() {
 // Enable wrapper as soon as this script loads.
 installAuthWrapper();
 
+// 4) Page-level auth actions.
 // Protects dashboard pages by validating token presence and expected role.
 function protectPage(role) {
   const token = getToken();
@@ -215,6 +212,7 @@ async function logout() {
   window.location.href = LOGIN_PATH;
 }
 
+// 5) Optional navbar bindings.
 function bindDashboardAuthNav() {
   const logoutNav = document.querySelector('[data-auth-nav="logout"]');
   if (logoutNav) {

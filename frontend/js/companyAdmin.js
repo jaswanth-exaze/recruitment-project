@@ -3,6 +3,7 @@
  * Handles section switching, profile updates, and company admin APIs.
  */
 
+// 1) Config and state.
 const COMPANY_ADMIN_CONFIG = {
   useApi: true,
   apiBase: String(window.COMPANY_ADMIN_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(
@@ -177,6 +178,7 @@ const ui = {
   profileLogoutBtn: document.querySelector("[data-company-logout]")
 };
 
+// 2) Shared helpers.
 function firstValue(record, keys, fallback = "") {
   for (let i = 0; i < keys.length; i += 1) {
     const value = record?.[keys[i]];
@@ -252,6 +254,7 @@ function setMessage(element, text, type = "info") {
   element.classList.add("text-secondary");
 }
 
+// 3) Page UI logic.
 function setActiveNav(viewKey) {
   ui.navLinks.forEach((link) => link.classList.remove("active"));
   const target = document.querySelector(`[data-company-nav="${viewKey}"]`);
@@ -440,6 +443,7 @@ async function apiRequest(path, options = {}) {
   throw lastError || new Error("API request failed");
 }
 
+// 4) API layer.
 const authApi = {
   logout() {
     return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.authLogout, {
@@ -664,10 +668,6 @@ function renderProfilePanel() {
   if (ui.profileEditEmail) ui.profileEditEmail.value = firstValue(profile, ["email"], "");
 }
 
-function setProfileStatus(text, type = "info") {
-  setMessage(ui.profileStatus, text, type);
-}
-
 function ensureCompanyAdminRole(profile) {
   const role = String(firstValue(profile || {}, ["role"], "")).trim();
   if (!role) return true;
@@ -810,14 +810,6 @@ async function filterUsersToCurrentCompany(rows) {
   return filtered;
 }
 
-function setUserCreateMessage(text, type) {
-  setMessage(ui.userCreateMsg, text, type);
-}
-
-function setUserEditMessage(text, type) {
-  setMessage(ui.userEditMsg, text, type);
-}
-
 function clearSelectedUser() {
   companyState.selectedUser = null;
   setText(ui.userEditId, "N/A");
@@ -835,7 +827,7 @@ function setSelectedUser(user) {
   if (!user || !belongsToCurrentCompany(user)) {
     clearSelectedUser();
     if (user && !belongsToCurrentCompany(user)) {
-      setUserEditMessage("This user does not belong to your company.", "error");
+      setMessage(ui.userEditMsg, "This user does not belong to your company.", "error");
     }
     return;
   }
@@ -951,20 +943,20 @@ async function loadUsersByRole() {
 async function loadSingleUserById() {
   const userId = String(ui.userLoadIdInput?.value || "").trim();
   if (!userId) {
-    setUserEditMessage("Enter a valid user id.", "error");
+    setMessage(ui.userEditMsg, "Enter a valid user id.", "error");
     return;
   }
 
   try {
     const user = await companyAdminApi.getUserById(userId);
     if (!belongsToCurrentCompany(user)) {
-      setUserEditMessage("This user does not belong to your company.", "error");
+      setMessage(ui.userEditMsg, "This user does not belong to your company.", "error");
       return;
     }
     setSelectedUser(user);
-    setUserEditMessage("User loaded.", "success");
+    setMessage(ui.userEditMsg, "User loaded.", "success");
   } catch (error) {
-    setUserEditMessage(error.message || "Failed to load user.", "error");
+    setMessage(ui.userEditMsg, error.message || "Failed to load user.", "error");
   }
 }
 
@@ -984,28 +976,28 @@ async function submitCreateUser(event) {
   const role = String(formData.get("role") || "HR").trim();
 
   if (!firstName || !lastName || !email || !password || !role) {
-    setUserCreateMessage("All fields are required.", "error");
+    setMessage(ui.userCreateMsg, "All fields are required.", "error");
     return;
   }
 
   if (!COMPANY_ADMIN_CONFIG.managedRoles.includes(role)) {
-    setUserCreateMessage("Role must be HR, HiringManager, or Interviewer.", "error");
+    setMessage(ui.userCreateMsg, "Role must be HR, HiringManager, or Interviewer.", "error");
     return;
   }
 
   if (!isValidEmail(email)) {
-    setUserCreateMessage("Enter a valid email address.", "error");
+    setMessage(ui.userCreateMsg, "Enter a valid email address.", "error");
     return;
   }
 
   const companyId = getCurrentCompanyId();
   if (!companyId) {
-    setUserCreateMessage("Company id not found in profile.", "error");
+    setMessage(ui.userCreateMsg, "Company id not found in profile.", "error");
     return;
   }
 
   try {
-    setUserCreateMessage("Creating user...", "info");
+    setMessage(ui.userCreateMsg, "Creating user...", "info");
     const result = await companyAdminApi.createUser({
       company_id: companyId,
       first_name: firstName,
@@ -1018,7 +1010,7 @@ async function submitCreateUser(event) {
     ui.userCreateForm.reset();
     await loadUsersByRole();
     await loadDashboardKpis();
-    setUserCreateMessage(result?.message || "User created successfully.", "success");
+    setMessage(ui.userCreateMsg, result?.message || "User created successfully.", "success");
 
     const newUserId = firstValue(result, ["id"], "");
     if (newUserId) {
@@ -1030,7 +1022,7 @@ async function submitCreateUser(event) {
       }
     }
   } catch (error) {
-    setUserCreateMessage(error.message || "Failed to create user.", "error");
+    setMessage(ui.userCreateMsg, error.message || "Failed to create user.", "error");
   }
 }
 
@@ -1041,7 +1033,7 @@ async function submitEditUser(event) {
   const selected = companyState.selectedUser;
   const selectedId = firstValue(selected || {}, ["id"], "");
   if (!selectedId) {
-    setUserEditMessage("Select a user first.", "error");
+    setMessage(ui.userEditMsg, "Select a user first.", "error");
     return;
   }
 
@@ -1051,18 +1043,18 @@ async function submitEditUser(event) {
   const role = String(ui.userEditRole?.value || "").trim();
 
   if (!firstName || !lastName || !email || !role) {
-    setUserEditMessage("All fields are required.", "error");
+    setMessage(ui.userEditMsg, "All fields are required.", "error");
     return;
   }
 
   if (!isValidEmail(email)) {
-    setUserEditMessage("Enter a valid email address.", "error");
+    setMessage(ui.userEditMsg, "Enter a valid email address.", "error");
     return;
   }
 
   const companyId = getCurrentCompanyId();
   if (!companyId) {
-    setUserEditMessage("Company id not found in profile.", "error");
+    setMessage(ui.userEditMsg, "Company id not found in profile.", "error");
     return;
   }
 
@@ -1085,9 +1077,9 @@ async function submitEditUser(event) {
     setSelectedUser(refreshed);
     await loadUsersByRole();
     await loadDashboardKpis();
-    setUserEditMessage("User updated successfully.", "success");
+    setMessage(ui.userEditMsg, "User updated successfully.", "success");
   } catch (error) {
-    setUserEditMessage(error.message || "Failed to update user.", "error");
+    setMessage(ui.userEditMsg, error.message || "Failed to update user.", "error");
   } finally {
     if (ui.userSaveBtn) {
       ui.userSaveBtn.disabled = false;
@@ -1102,7 +1094,7 @@ async function toggleSelectedUserActive() {
   const selected = companyState.selectedUser;
   const selectedId = firstValue(selected || {}, ["id"], "");
   if (!selectedId) {
-    setUserEditMessage("Select a user first.", "error");
+    setMessage(ui.userEditMsg, "Select a user first.", "error");
     return;
   }
 
@@ -1120,9 +1112,9 @@ async function toggleSelectedUserActive() {
     setSelectedUser(refreshed);
     await loadUsersByRole();
     await loadDashboardKpis();
-    setUserEditMessage(`User ${actionLabel}d successfully.`, "success");
+    setMessage(ui.userEditMsg, `User ${actionLabel}d successfully.`, "success");
   } catch (error) {
-    setUserEditMessage(error.message || `Failed to ${actionLabel} user.`, "error");
+    setMessage(ui.userEditMsg, error.message || `Failed to ${actionLabel} user.`, "error");
   }
 }
 
@@ -1138,13 +1130,13 @@ async function handleUserTableAction(event) {
     try {
       const user = await companyAdminApi.getUserById(userId);
       if (!belongsToCurrentCompany(user)) {
-        setUserEditMessage("This user does not belong to your company.", "error");
+        setMessage(ui.userEditMsg, "This user does not belong to your company.", "error");
         return;
       }
       setSelectedUser(user);
-      setUserEditMessage("User loaded for edit.", "success");
+      setMessage(ui.userEditMsg, "User loaded for edit.", "success");
     } catch (error) {
-      setUserEditMessage(error.message || "Failed to load user.", "error");
+      setMessage(ui.userEditMsg, error.message || "Failed to load user.", "error");
     }
     return;
   }
@@ -1164,19 +1156,11 @@ async function handleUserTableAction(event) {
         const refreshed = await companyAdminApi.getUserById(userId);
         setSelectedUser(refreshed);
       }
-      setUserEditMessage(`User ${active ? "deactivated" : "activated"} successfully.`, "success");
+      setMessage(ui.userEditMsg, `User ${active ? "deactivated" : "activated"} successfully.`, "success");
     } catch (error) {
-      setUserEditMessage(error.message || "Failed to update user status.", "error");
+      setMessage(ui.userEditMsg, error.message || "Failed to update user status.", "error");
     }
   }
-}
-
-function setJobCreateMessage(text, type) {
-  setMessage(ui.jobCreateMsg, text, type);
-}
-
-function setJobEditMessage(text, type) {
-  setMessage(ui.jobEditMsg, text, type);
 }
 
 function clearSelectedJob() {
@@ -1316,7 +1300,7 @@ async function submitCreateJob(event) {
 
   const payload = parseJobPayload(new FormData(ui.jobCreateForm));
   if (!payload.title) {
-    setJobCreateMessage("Job title is required.", "error");
+    setMessage(ui.jobCreateMsg, "Job title is required.", "error");
     return;
   }
 
@@ -1325,12 +1309,12 @@ async function submitCreateJob(event) {
   payload.created_by = toNumber(firstValue(profile, ["id"], "")) || undefined;
 
   try {
-    setJobCreateMessage("Creating job draft...", "info");
+    setMessage(ui.jobCreateMsg, "Creating job draft...", "info");
     const result = await companyAdminApi.createJobDraft(payload);
     ui.jobCreateForm.reset();
     await loadJobs();
     await loadDashboardKpis();
-    setJobCreateMessage(result?.message || "Job draft created successfully.", "success");
+    setMessage(ui.jobCreateMsg, result?.message || "Job draft created successfully.", "success");
 
     const createdId = firstValue(result, ["id"], "");
     if (createdId) {
@@ -1342,7 +1326,7 @@ async function submitCreateJob(event) {
       }
     }
   } catch (error) {
-    setJobCreateMessage(error.message || "Failed to create job.", "error");
+    setMessage(ui.jobCreateMsg, error.message || "Failed to create job.", "error");
   }
 }
 
@@ -1363,13 +1347,13 @@ async function submitEditJob(event) {
 
   const selectedId = firstValue(companyState.selectedJob || {}, ["id"], "");
   if (!selectedId) {
-    setJobEditMessage("Select a job first.", "error");
+    setMessage(ui.jobEditMsg, "Select a job first.", "error");
     return;
   }
 
   const payload = collectEditJobPayload();
   if (!payload.title) {
-    setJobEditMessage("Job title is required.", "error");
+    setMessage(ui.jobEditMsg, "Job title is required.", "error");
     return;
   }
 
@@ -1385,9 +1369,9 @@ async function submitEditJob(event) {
     setSelectedJob(refreshed);
     await loadJobs();
     await loadDashboardKpis();
-    setJobEditMessage("Job updated successfully.", "success");
+    setMessage(ui.jobEditMsg, "Job updated successfully.", "success");
   } catch (error) {
-    setJobEditMessage(error.message || "Failed to update job.", "error");
+    setMessage(ui.jobEditMsg, error.message || "Failed to update job.", "error");
   } finally {
     if (ui.jobSaveBtn) {
       ui.jobSaveBtn.disabled = false;
@@ -1407,29 +1391,29 @@ function getApproverId() {
 
 async function runJobAction(action, jobId) {
   if (!jobId) {
-    setJobEditMessage("Job id is required.", "error");
+    setMessage(ui.jobEditMsg, "Job id is required.", "error");
     return;
   }
 
   try {
     if (action === "publish") {
       await companyAdminApi.publishJob(jobId);
-      setJobEditMessage("Job published.", "success");
+      setMessage(ui.jobEditMsg, "Job published.", "success");
     }
 
     if (action === "close") {
       await companyAdminApi.closeJob(jobId);
-      setJobEditMessage("Job closed.", "success");
+      setMessage(ui.jobEditMsg, "Job closed.", "success");
     }
 
     if (action === "submit") {
       const approverId = getApproverId();
       if (!approverId) {
-        setJobEditMessage("Approver id is required for submit.", "error");
+        setMessage(ui.jobEditMsg, "Approver id is required for submit.", "error");
         return;
       }
       await companyAdminApi.submitJob(jobId, approverId);
-      setJobEditMessage("Job submitted for approval.", "success");
+      setMessage(ui.jobEditMsg, "Job submitted for approval.", "success");
     }
 
     const refreshed = await companyAdminApi.getJobById(jobId);
@@ -1437,7 +1421,7 @@ async function runJobAction(action, jobId) {
     await loadJobs();
     await loadDashboardKpis();
   } catch (error) {
-    setJobEditMessage(error.message || `Failed to ${action} job.`, "error");
+    setMessage(ui.jobEditMsg, error.message || `Failed to ${action} job.`, "error");
   }
 }
 
@@ -1453,9 +1437,9 @@ async function handleJobTableAction(event) {
     try {
       const job = await companyAdminApi.getJobById(jobId);
       setSelectedJob(job);
-      setJobEditMessage("Job loaded for edit.", "success");
+      setMessage(ui.jobEditMsg, "Job loaded for edit.", "success");
     } catch (error) {
-      setJobEditMessage(error.message || "Failed to load job.", "error");
+      setMessage(ui.jobEditMsg, error.message || "Failed to load job.", "error");
     }
     return;
   }
@@ -1463,10 +1447,6 @@ async function handleJobTableAction(event) {
   if (action === "publish" || action === "submit" || action === "close") {
     await runJobAction(action, jobId);
   }
-}
-
-function setAppMessage(text, type) {
-  setMessage(ui.appMsg, text, type);
 }
 
 function renderApplicationStats(rows) {
@@ -1569,12 +1549,12 @@ async function loadApplicationsAndStats() {
   if (!jobId) {
     showTableMessage(ui.appList, 6, "Enter job id to load applications.");
     renderApplicationStats([]);
-    setAppMessage("Job id is required.", "error");
+    setMessage(ui.appMsg, "Job id is required.", "error");
     return;
   }
 
   try {
-    setAppMessage("Loading applications...", "info");
+    setMessage(ui.appMsg, "Loading applications...", "info");
     const [applicationsPayload, statsPayload] = await Promise.all([
       companyAdminApi.listApplications(jobId),
       companyAdminApi.applicationStats(jobId)
@@ -1586,12 +1566,12 @@ async function loadApplicationsAndStats() {
     companyState.currentApplicationJobId = jobId;
     renderApplicationRows(rows);
     renderApplicationStats(statsRows);
-    setAppMessage(`Loaded ${rows.length} application(s).`, "success");
+    setMessage(ui.appMsg, `Loaded ${rows.length} application(s).`, "success");
   } catch (error) {
     companyState.applicationRows = [];
     renderApplicationRows([]);
     renderApplicationStats([]);
-    setAppMessage(error.message || "Failed to load applications.", "error");
+    setMessage(ui.appMsg, error.message || "Failed to load applications.", "error");
   }
 }
 
@@ -1609,31 +1589,31 @@ async function handleApplicationAction(action, applicationId, currentStatus, cur
         status: status.trim(),
         current_stage_id: stageId
       });
-      setAppMessage("Application stage updated.", "success");
+      setMessage(ui.appMsg, "Application stage updated.", "success");
     }
 
     if (action === "screen") {
       const status = window.prompt("Screen decision status (interview/rejected):", "interview");
       if (!status) return;
       await companyAdminApi.screenDecision(applicationId, status.trim());
-      setAppMessage("Screening decision updated.", "success");
+      setMessage(ui.appMsg, "Screening decision updated.", "success");
     }
 
     if (action === "final") {
       const status = window.prompt("Final decision status (selected/rejected):", "selected");
       if (!status) return;
       await companyAdminApi.finalDecision(applicationId, status.trim());
-      setAppMessage("Final decision updated.", "success");
+      setMessage(ui.appMsg, "Final decision updated.", "success");
     }
 
     if (action === "recommend") {
       await companyAdminApi.recommendOffer(applicationId);
-      setAppMessage("Offer recommendation marked.", "success");
+      setMessage(ui.appMsg, "Offer recommendation marked.", "success");
     }
 
     await loadApplicationsAndStats();
   } catch (error) {
-    setAppMessage(error.message || "Failed to update application.", "error");
+    setMessage(ui.appMsg, error.message || "Failed to update application.", "error");
   }
 }
 
@@ -1647,14 +1627,6 @@ async function handleApplicationTableAction(event) {
   const currentStage = String(button.dataset.applicationStage || "").trim();
 
   await handleApplicationAction(action, applicationId, currentStatus, currentStage);
-}
-
-function setOfferCreateMessage(text, type) {
-  setMessage(ui.offerCreateMsg, text, type);
-}
-
-function setOfferSendMessage(text, type) {
-  setMessage(ui.offerSendMsg, text, type);
 }
 
 function parseOfferDetails(rawText) {
@@ -1728,7 +1700,7 @@ async function loadOffersByApplication() {
   const applicationId = String(ui.offerApplicationIdInput?.value || "").trim();
   if (!applicationId) {
     showTableMessage(ui.offerList, 5, "Enter application id to load offers.");
-    setOfferSendMessage("Application id is required.", "error");
+    setMessage(ui.offerSendMsg, "Application id is required.", "error");
     return;
   }
 
@@ -1737,11 +1709,11 @@ async function loadOffersByApplication() {
     companyState.offerRows = rows;
     companyState.currentOfferApplicationId = applicationId;
     renderOfferRows(rows);
-    setOfferSendMessage(`Loaded ${rows.length} offer(s).`, "success");
+    setMessage(ui.offerSendMsg, `Loaded ${rows.length} offer(s).`, "success");
   } catch (error) {
     companyState.offerRows = [];
     renderOfferRows([]);
-    setOfferSendMessage(error.message || "Failed to load offers.", "error");
+    setMessage(ui.offerSendMsg, error.message || "Failed to load offers.", "error");
   }
 }
 
@@ -1754,11 +1726,11 @@ async function submitCreateOfferDraft(event) {
   const createdBy = toNumber(firstValue(companyState.currentProfile || {}, ["id"], ""));
 
   if (!applicationId) {
-    setOfferCreateMessage("Application id is required.", "error");
+    setMessage(ui.offerCreateMsg, "Application id is required.", "error");
     return;
   }
   if (!createdBy) {
-    setOfferCreateMessage("Profile id not available. Reload profile and retry.", "error");
+    setMessage(ui.offerCreateMsg, "Profile id not available. Reload profile and retry.", "error");
     return;
   }
 
@@ -1766,12 +1738,12 @@ async function submitCreateOfferDraft(event) {
   try {
     offerDetails = parseOfferDetails(formData.get("offer_details"));
   } catch (error) {
-    setOfferCreateMessage(error.message, "error");
+    setMessage(ui.offerCreateMsg, error.message, "error");
     return;
   }
 
   try {
-    setOfferCreateMessage("Creating offer draft...", "info");
+    setMessage(ui.offerCreateMsg, "Creating offer draft...", "info");
     const result = await companyAdminApi.createOfferDraft({
       application_id: applicationId,
       created_by: createdBy,
@@ -1779,20 +1751,20 @@ async function submitCreateOfferDraft(event) {
     });
 
     ui.offerCreateForm.reset();
-    setOfferCreateMessage(result?.message || "Offer draft created.", "success");
+    setMessage(ui.offerCreateMsg, result?.message || "Offer draft created.", "success");
 
     if (ui.offerApplicationIdInput) {
       ui.offerApplicationIdInput.value = String(applicationId);
     }
     await loadOffersByApplication();
   } catch (error) {
-    setOfferCreateMessage(error.message || "Failed to create offer draft.", "error");
+    setMessage(ui.offerCreateMsg, error.message || "Failed to create offer draft.", "error");
   }
 }
 
 function prepareSendOffer(offerId) {
   if (ui.offerSendId) ui.offerSendId.value = String(offerId || "");
-  setOfferSendMessage("Offer selected. Add document and e-sign links, then send.", "info");
+  setMessage(ui.offerSendMsg, "Offer selected. Add document and e-sign links, then send.", "info");
 }
 
 async function submitSendOffer(event) {
@@ -1801,7 +1773,7 @@ async function submitSendOffer(event) {
 
   const offerId = String(ui.offerSendId?.value || "").trim();
   if (!offerId) {
-    setOfferSendMessage("Offer id is required.", "error");
+    setMessage(ui.offerSendMsg, "Offer id is required.", "error");
     return;
   }
 
@@ -1818,12 +1790,12 @@ async function submitSendOffer(event) {
       esign_link: String(ui.offerSendEsign?.value || "").trim()
     });
 
-    setOfferSendMessage("Offer sent successfully.", "success");
+    setMessage(ui.offerSendMsg, "Offer sent successfully.", "success");
     if (companyState.currentOfferApplicationId) {
       await loadOffersByApplication();
     }
   } catch (error) {
-    setOfferSendMessage(error.message || "Failed to send offer.", "error");
+    setMessage(ui.offerSendMsg, error.message || "Failed to send offer.", "error");
   } finally {
     if (sendButton) {
       sendButton.disabled = false;
@@ -1847,16 +1819,16 @@ function handleOfferTableAction(event) {
 
 async function reloadCompanyProfile() {
   if (!COMPANY_ADMIN_CONFIG.useApi) return;
-  setProfileStatus("Loading profile...", "info");
+  setMessage(ui.profileStatus, "Loading profile...", "info");
 
   try {
     const payload = await companyAdminApi.getMyProfile();
     companyState.currentProfile = payload?.profile || payload || null;
     renderProfilePanel();
     showSection(companyState.currentView || "profile");
-    setProfileStatus("Profile loaded from API.", "success");
+    setMessage(ui.profileStatus, "Profile loaded from API.", "success");
   } catch (error) {
-    setProfileStatus(error.message || "Failed to load profile.", "error");
+    setMessage(ui.profileStatus, error.message || "Failed to load profile.", "error");
   }
 }
 
@@ -1869,12 +1841,12 @@ async function submitProfileUpdate(event) {
   const email = String(ui.profileEditEmail?.value || "").trim();
 
   if (!firstName || !lastName || !email) {
-    setProfileStatus("First name, last name and email are required.", "error");
+    setMessage(ui.profileStatus, "First name, last name and email are required.", "error");
     return;
   }
 
   if (!isValidEmail(email)) {
-    setProfileStatus("Enter a valid email address.", "error");
+    setMessage(ui.profileStatus, "Enter a valid email address.", "error");
     return;
   }
 
@@ -1890,7 +1862,7 @@ async function submitProfileUpdate(event) {
     ui.profileSaveBtn.textContent = "Saving...";
   }
 
-  setProfileStatus("Updating profile...", "info");
+  setMessage(ui.profileStatus, "Updating profile...", "info");
 
   try {
     const result = await companyAdminApi.updateMyProfile(payload);
@@ -1902,9 +1874,9 @@ async function submitProfileUpdate(event) {
 
     renderProfilePanel();
     showSection(companyState.currentView || "profile");
-    setProfileStatus(result?.message || "Profile updated successfully.", "success");
+    setMessage(ui.profileStatus, result?.message || "Profile updated successfully.", "success");
   } catch (error) {
-    setProfileStatus(error.message || "Failed to update profile.", "error");
+    setMessage(ui.profileStatus, error.message || "Failed to update profile.", "error");
   } finally {
     if (ui.profileSaveBtn) {
       ui.profileSaveBtn.disabled = false;
@@ -1958,6 +1930,7 @@ async function openProfile() {
   await reloadCompanyProfile();
 }
 
+// 5) Navigation and event bindings.
 async function handleLogoutClick(event) {
   event.preventDefault();
   if (!window.confirm("Do you want to logout?")) return;
@@ -2000,7 +1973,7 @@ function bindActionButtons() {
     ui.userLoadBtn.addEventListener("click", async () => {
       await loadUsersByRole();
       await loadDashboardKpis();
-      setUserCreateMessage("", "info");
+      setMessage(ui.userCreateMsg, "", "info");
     });
   }
 
@@ -2023,7 +1996,7 @@ function bindActionButtons() {
   if (ui.userClearBtn) {
     ui.userClearBtn.addEventListener("click", () => {
       clearSelectedUser();
-      setUserEditMessage("", "info");
+      setMessage(ui.userEditMsg, "", "info");
     });
   }
 
@@ -2078,7 +2051,7 @@ function bindActionButtons() {
   if (ui.jobClearBtn) {
     ui.jobClearBtn.addEventListener("click", () => {
       clearSelectedJob();
-      setJobEditMessage("", "info");
+      setMessage(ui.jobEditMsg, "", "info");
     });
   }
 
@@ -2132,6 +2105,7 @@ function bindActionButtons() {
   }
 }
 
+// 6) Init.
 async function initCompanyAdminDashboard() {
   if (!ui.navLinks.length || !ui.sections.length) return;
 

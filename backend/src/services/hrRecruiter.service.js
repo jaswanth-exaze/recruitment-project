@@ -262,20 +262,81 @@ exports.uploadResume = async (userId, resumeUrl, companyId) => {
   return result.affectedRows;
 };
 
-exports.listApplicationsForJob = async (jobId, companyId) => {
+exports.listApplications = async ({ job_id }, companyId) => {
   if (!companyId) throw new Error("company_id is required");
+
+  const where = ["j.company_id = ?"];
+  const params = [companyId];
+
+  if (job_id) {
+    where.push("a.job_id = ?");
+    params.push(job_id);
+  }
+
   const [rows] = await db.promise().query(
     `
-      SELECT a.*, u.first_name, u.last_name, u.email, cp.resume_url
+      SELECT a.*, j.company_id, j.title AS job_title, u.first_name, u.last_name, u.email, cp.resume_url
       FROM applications a
       JOIN job_requisitions j ON a.job_id = j.id
       JOIN users u ON a.candidate_id = u.id
       LEFT JOIN candidate_profiles cp ON u.id = cp.user_id
-      WHERE a.job_id = ? AND j.company_id = ?
+      WHERE ${where.join(" AND ")}
       ORDER BY a.applied_at DESC
     `,
-    [jobId, companyId],
+    params,
   );
+  return rows;
+};
+
+exports.listCandidates = async ({ job_id }, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
+
+  const where = ["j.company_id = ?"];
+  const params = [companyId];
+
+  if (job_id) {
+    where.push("a.job_id = ?");
+    params.push(job_id);
+  }
+
+  const [rows] = await db.promise().query(
+    `
+      SELECT
+        u.id AS candidate_id,
+        j.company_id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        cp.phone,
+        cp.address,
+        cp.profile_data,
+        cp.resume_url,
+        cp.is_verified,
+        MAX(a.applied_at) AS last_applied_at,
+        COUNT(DISTINCT a.id) AS applications_count
+      FROM applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      JOIN users u ON a.candidate_id = u.id
+      LEFT JOIN candidate_profiles cp ON u.id = cp.user_id
+      WHERE ${where.join(" AND ")}
+      GROUP BY
+        u.id,
+        j.company_id,
+        u.first_name,
+        u.last_name,
+        u.email,
+        cp.phone,
+        cp.address,
+        cp.profile_data,
+        cp.resume_url,
+        cp.is_verified
+      ORDER BY last_applied_at DESC
+    `,
+    params,
+  );
+  rows.forEach((row) => {
+    row.profile_data = parseJsonField(row.profile_data);
+  });
   return rows;
 };
 
@@ -357,40 +418,53 @@ exports.scheduleInterview = async (payload, companyId) => {
 
 exports.getInterviews = async ({ application_id, interviewer_id }, companyId) => {
   if (!companyId) throw new Error("company_id is required");
+
+  const where = ["j.company_id = ?"];
+  const params = [companyId];
+
   if (application_id) {
-    const [rows] = await db.promise().query(
-      `
-        SELECT i.*, u.first_name AS interviewer_first, u.last_name AS interviewer_last
-        FROM interviews i
-        JOIN applications a ON i.application_id = a.id
-        JOIN job_requisitions j ON a.job_id = j.id
-        JOIN users u ON i.interviewer_id = u.id
-        WHERE i.application_id = ? AND j.company_id = ?
-        ORDER BY i.scheduled_at
-      `,
-      [application_id, companyId],
-    );
-    return rows;
+    where.push("i.application_id = ?");
+    params.push(application_id);
   }
 
   if (interviewer_id) {
-    const [rows] = await db.promise().query(
-      `
-        SELECT i.*, a.candidate_id, u.first_name AS candidate_first, u.last_name AS candidate_last, j.title
-        FROM interviews i
-        JOIN applications a ON i.application_id = a.id
-        JOIN users u ON a.candidate_id = u.id
-        JOIN job_requisitions j ON a.job_id = j.id
-        JOIN users interviewer ON i.interviewer_id = interviewer.id
-        WHERE i.interviewer_id = ? AND i.status = 'scheduled' AND j.company_id = ? AND interviewer.company_id = ?
-        ORDER BY i.scheduled_at
-      `,
-      [interviewer_id, companyId, companyId],
-    );
-    return rows;
+    where.push("i.interviewer_id = ?");
+    params.push(interviewer_id);
   }
 
-  throw new Error("application_id or interviewer_id query param is required");
+  const [rows] = await db.promise().query(
+    `
+      SELECT
+        i.*,
+        a.job_id,
+        a.status AS application_status,
+        a.candidate_id,
+        j.title AS job_title,
+        candidate.first_name AS candidate_first,
+        candidate.last_name AS candidate_last,
+        candidate.email AS candidate_email,
+        cp.phone AS candidate_phone,
+        cp.address AS candidate_address,
+        cp.profile_data AS candidate_profile_data,
+        interviewer.first_name AS interviewer_first,
+        interviewer.last_name AS interviewer_last
+      FROM interviews i
+      JOIN applications a ON i.application_id = a.id
+      JOIN job_requisitions j ON a.job_id = j.id
+      JOIN users interviewer ON i.interviewer_id = interviewer.id
+      JOIN users candidate ON a.candidate_id = candidate.id
+      LEFT JOIN candidate_profiles cp ON candidate.id = cp.user_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY i.scheduled_at DESC
+    `,
+    params,
+  );
+
+  rows.forEach((row) => {
+    row.candidate_profile_data = parseJsonField(row.candidate_profile_data);
+  });
+
+  return rows;
 };
 
 exports.updateInterview = async (id, status, notes, companyId) => {

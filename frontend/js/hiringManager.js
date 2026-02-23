@@ -3,6 +3,7 @@
  * Handles approvals, job actions, final candidate decisions, profile, and auth flow.
  */
 
+// 1) Config and state.
 const HM_CONFIG = {
   useApi: true,
   apiBase: String(window.HIRING_MANAGER_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(
@@ -116,6 +117,7 @@ const ui = {
   logoutBtn: document.querySelector("[data-hm-logout]")
 };
 
+// 2) Shared helpers.
 function firstValue(record, keys, fallback = "") {
   for (let i = 0; i < keys.length; i += 1) {
     const value = record?.[keys[i]];
@@ -330,6 +332,7 @@ async function apiRequest(path, options = {}) {
   throw lastError || new Error("API request failed");
 }
 
+// 3) API layer.
 const hmApi = {
   logout() {
     return apiRequest(HM_CONFIG.endpoints.authLogout, {
@@ -396,6 +399,7 @@ const hmApi = {
   }
 };
 
+// 4) Page UI logic.
 function setActiveNav(viewKey) {
   ui.navLinks.forEach((link) => link.classList.remove("active"));
   const target = document.querySelector(`[data-hm-nav="${viewKey}"]`);
@@ -469,10 +473,6 @@ function setSelectedJob(job) {
   setText(ui.jobCompany, firstValue(job || {}, ["company_name"], "N/A"));
   setText(ui.jobLocation, firstValue(job || {}, ["location"], "N/A"));
   setText(ui.jobPositions, firstValue(job || {}, ["positions_count"], "N/A"));
-}
-
-function profileStatus(text, type) {
-  setMessage(ui.profileStatus, text, type);
 }
 
 async function loadAuthProfile() {
@@ -696,16 +696,17 @@ async function loadDashboardKpis() {
   setText(ui.kpiPendingApprovals, hmState.approvalsRows.length);
 }
 
+// 5) Profile and session actions.
 async function reloadProfile() {
-  profileStatus("Loading profile...", "info");
+  setMessage(ui.profileStatus, "Loading profile...", "info");
   try {
     const payload = await hmApi.getMyProfile();
     hmState.currentProfile = payload?.profile || payload || null;
     renderProfilePanel();
     showSection(hmState.currentView || "profile");
-    profileStatus("Profile loaded from API.", "success");
+    setMessage(ui.profileStatus, "Profile loaded from API.", "success");
   } catch (error) {
-    profileStatus(error.message || "Failed to load profile.", "error");
+    setMessage(ui.profileStatus, error.message || "Failed to load profile.", "error");
   }
 }
 
@@ -716,12 +717,12 @@ async function submitProfileUpdate(event) {
   const email = String(ui.profileEditEmail?.value || "").trim();
 
   if (!firstName || !lastName || !email) {
-    profileStatus("first_name, last_name and email are required.", "error");
+    setMessage(ui.profileStatus, "first_name, last_name and email are required.", "error");
     return;
   }
 
   if (!isValidEmail(email)) {
-    profileStatus("Enter a valid email address.", "error");
+    setMessage(ui.profileStatus, "Enter a valid email address.", "error");
     return;
   }
 
@@ -730,7 +731,7 @@ async function submitProfileUpdate(event) {
     ui.profileSaveBtn.disabled = true;
     ui.profileSaveBtn.textContent = "Saving...";
   }
-  profileStatus("Updating profile...", "info");
+  setMessage(ui.profileStatus, "Updating profile...", "info");
 
   try {
     const result = await hmApi.updateMyProfile({
@@ -744,9 +745,9 @@ async function submitProfileUpdate(event) {
       : { ...(hmState.currentProfile || {}), first_name: firstName, last_name: lastName, email };
     renderProfilePanel();
     showSection(hmState.currentView || "profile");
-    profileStatus(result?.message || "Profile updated successfully.", "success");
+    setMessage(ui.profileStatus, result?.message || "Profile updated successfully.", "success");
   } catch (error) {
-    profileStatus(error.message || "Failed to update profile.", "error");
+    setMessage(ui.profileStatus, error.message || "Failed to update profile.", "error");
   } finally {
     if (ui.profileSaveBtn) {
       ui.profileSaveBtn.disabled = false;
@@ -755,6 +756,7 @@ async function submitProfileUpdate(event) {
   }
 }
 
+// 6) Section openers and bindings.
 async function openDashboard() {
   showSection("dashboard");
   await loadDashboardKpis();
@@ -899,6 +901,7 @@ function bindActions() {
   }
 }
 
+// 7) Init.
 async function initHiringManagerDashboard() {
   if (!ui.navLinks.length || !ui.sections.length) return;
 

@@ -1,8 +1,9 @@
-﻿
+
 /**
  * Candidate dashboard script.
  */
 
+// 1) Config and state.
 const CANDIDATE_CONFIG = {
   apiBase: String(window.CANDIDATE_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(/\/+$/, ""),
   tryApiPrefixFallback: false,
@@ -113,15 +114,16 @@ const ui = {
   logoutBtn: document.querySelector("[data-cand-logout]"),
 };
 
-function f(record, keys, fallback = "") {
+// 2) Shared helpers.
+function getValue(source, keys, fallback = "") {
   for (let i = 0; i < keys.length; i += 1) {
-    const value = record?.[keys[i]];
+    const value = source?.[keys[i]];
     if (value !== undefined && value !== null && String(value).trim() !== "") return String(value);
   }
   return fallback;
 }
 
-function arr(payload) {
+function toRows(payload) {
   if (Array.isArray(payload)) return payload;
   if (payload && Array.isArray(payload.data)) return payload.data;
   if (payload && Array.isArray(payload.items)) return payload.items;
@@ -129,14 +131,14 @@ function arr(payload) {
   return [];
 }
 
-function record(payload) {
+function toRecord(payload) {
   if (!payload || typeof payload !== "object") return payload;
   if (payload.profile && typeof payload.profile === "object" && !Array.isArray(payload.profile)) return payload.profile;
   if (payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)) return payload.data;
   return payload;
 }
 
-function build(path, id) {
+function buildPath(path, id) {
   return path.replace(":id", encodeURIComponent(String(id)));
 }
 
@@ -202,10 +204,10 @@ function profileDataObject(profile) {
 }
 
 function candidateField(profile, key, fallback = "N/A") {
-  const direct = f(profile || {}, [key], "");
+  const direct = getValue(profile || {}, [key], "");
   if (direct) return direct;
   const dataObj = profileDataObject(profile);
-  const fromData = f(dataObj || {}, [key], "");
+  const fromData = getValue(dataObj || {}, [key], "");
   return fromData || fallback;
 }
 
@@ -220,10 +222,10 @@ function validEmail(email) {
 }
 
 function fullName(user) {
-  const first = f(user, ["first_name"], "");
-  const last = f(user, ["last_name"], "");
+  const first = getValue(user, ["first_name"], "");
+  const last = getValue(user, ["last_name"], "");
   const name = `${first} ${last}`.trim();
-  return name || f(user, ["name"], "N/A");
+  return name || getValue(user, ["name"], "N/A");
 }
 
 function getStoredToken() {
@@ -332,6 +334,7 @@ async function api(path, options = {}) {
   throw lastError || new Error("API request failed");
 }
 
+// 3) API layer.
 const candApi = {
   logout: () => api(CANDIDATE_CONFIG.endpoints.authLogout, { method: "POST", body: {}, useAuthHeader: false }),
   getMyProfile: () => api(CANDIDATE_CONFIG.endpoints.getMyProfile),
@@ -340,17 +343,18 @@ const candApi = {
   updateCandidateProfile: (body) => api(CANDIDATE_CONFIG.endpoints.updateCandidateProfile, { method: "PUT", body }),
   uploadResume: (resumeUrl) => api(CANDIDATE_CONFIG.endpoints.uploadResume, { method: "POST", body: { resume_url: resumeUrl } }),
   listJobs: (query = {}) => api(CANDIDATE_CONFIG.endpoints.listJobs, { query }),
-  getJobById: (id) => api(build(CANDIDATE_CONFIG.endpoints.getJobById, id)),
+  getJobById: (id) => api(buildPath(CANDIDATE_CONFIG.endpoints.getJobById, id)),
   applyForJob: (jobId) => api(CANDIDATE_CONFIG.endpoints.applyForJob, { method: "POST", body: { job_id: jobId } }),
   listMyApplications: () => api(CANDIDATE_CONFIG.endpoints.listMyApplications),
   listSavedJobs: () => api(CANDIDATE_CONFIG.endpoints.listSavedJobs),
   saveJob: (jobId) => api(CANDIDATE_CONFIG.endpoints.saveJob, { method: "POST", body: { job_id: jobId } }),
   unsaveJob: (jobId) => api(CANDIDATE_CONFIG.endpoints.unsaveJob, { method: "DELETE", body: { job_id: jobId } }),
   getOffers: (applicationId) => api(CANDIDATE_CONFIG.endpoints.getOffers, { query: { application_id: applicationId } }),
-  acceptOffer: (id) => api(build(CANDIDATE_CONFIG.endpoints.acceptOffer, id), { method: "POST", body: {} }),
-  declineOffer: (id) => api(build(CANDIDATE_CONFIG.endpoints.declineOffer, id), { method: "POST", body: {} }),
+  acceptOffer: (id) => api(buildPath(CANDIDATE_CONFIG.endpoints.acceptOffer, id), { method: "POST", body: {} }),
+  declineOffer: (id) => api(buildPath(CANDIDATE_CONFIG.endpoints.declineOffer, id), { method: "POST", body: {} }),
 };
 
+// 4) Page UI logic.
 function setActiveNav(viewKey) {
   ui.navLinks.forEach((link) => link.classList.remove("active"));
   const target = document.querySelector(`[data-cand-nav="${viewKey}"]`);
@@ -361,7 +365,7 @@ function profileSuffix() {
   const p = candState.currentProfile;
   if (!p) return "";
   const name = fullName(p);
-  const role = f(p, ["role"], "");
+  const role = getValue(p, ["role"], "");
   if (name === "N/A" && !role) return "";
   if (name !== "N/A" && role) return ` Signed in as ${name} (${role}).`;
   return ` Signed in as ${name !== "N/A" ? name : role}.`;
@@ -379,7 +383,7 @@ function showSection(viewKey) {
 }
 
 function ensureRole(profile) {
-  const role = String(f(profile || {}, ["role"], "")).trim().toLowerCase();
+  const role = String(getValue(profile || {}, ["role"], "")).trim().toLowerCase();
   if (!role || role === "candidate") return true;
   toLogin("You are not authorized to access Candidate dashboard.");
   return false;
@@ -398,12 +402,12 @@ function renderAccountProfile() {
     return;
   }
   setText(ui.profileName, fullName(p));
-  setText(ui.profileEmail, f(p, ["email"], "N/A"));
-  setText(ui.profileRole, f(p, ["role"], "N/A"));
-  setText(ui.profileLastLogin, fmtDateTime(f(p, ["last_login_at"], "")));
-  if (ui.profileFirstName) ui.profileFirstName.value = f(p, ["first_name"], "");
-  if (ui.profileLastName) ui.profileLastName.value = f(p, ["last_name"], "");
-  if (ui.profileEditEmail) ui.profileEditEmail.value = f(p, ["email"], "");
+  setText(ui.profileEmail, getValue(p, ["email"], "N/A"));
+  setText(ui.profileRole, getValue(p, ["role"], "N/A"));
+  setText(ui.profileLastLogin, fmtDateTime(getValue(p, ["last_login_at"], "")));
+  if (ui.profileFirstName) ui.profileFirstName.value = getValue(p, ["first_name"], "");
+  if (ui.profileLastName) ui.profileLastName.value = getValue(p, ["last_name"], "");
+  if (ui.profileEditEmail) ui.profileEditEmail.value = getValue(p, ["email"], "");
 }
 
 function renderCandidateProfile(profile) {
@@ -422,9 +426,9 @@ function renderCandidateProfile(profile) {
 
   setText(ui.cpPhone, candidateField(profile, "phone", "N/A"));
   setText(ui.cpAddress, candidateField(profile, "address", "N/A"));
-  setText(ui.cpVerified, yesNo(f(profile, ["is_verified"], "0")));
+  setText(ui.cpVerified, yesNo(getValue(profile, ["is_verified"], "0")));
 
-  const resume = f(profile, ["resume_url"], "");
+  const resume = getValue(profile, ["resume_url"], "");
   if (ui.cpResume) {
     ui.cpResume.textContent = "";
     if (!resume) {
@@ -446,22 +450,18 @@ function renderCandidateProfile(profile) {
 
 function setSelectedJob(job) {
   candState.selectedJob = job ? { ...job } : null;
-  setText(ui.selectedJobTitle, f(job || {}, ["title"], "N/A"));
-  setText(ui.selectedJobDescription, f(job || {}, ["description"], "N/A"));
-  setText(ui.selectedJobRequirements, f(job || {}, ["requirements"], "N/A"));
-  setText(ui.selectedJobEmployment, f(job || {}, ["employment_type"], "N/A"));
-}
-
-function profileStatus(text, type) {
-  setMsg(ui.profileStatus, text, type);
+  setText(ui.selectedJobTitle, getValue(job || {}, ["title"], "N/A"));
+  setText(ui.selectedJobDescription, getValue(job || {}, ["description"], "N/A"));
+  setText(ui.selectedJobRequirements, getValue(job || {}, ["requirements"], "N/A"));
+  setText(ui.selectedJobEmployment, getValue(job || {}, ["employment_type"], "N/A"));
 }
 
 async function loadAuthProfile() {
   try {
     const payload = await candApi.getMyProfile();
-    candState.currentProfile = record(payload) || null;
+    candState.currentProfile = toRecord(payload) || null;
     if (!ensureRole(candState.currentProfile)) return false;
-    const role = f(candState.currentProfile, ["role"], "");
+    const role = getValue(candState.currentProfile, ["role"], "");
     if (role) {
       localStorage.setItem("role", role);
       localStorage.setItem("userRole", role);
@@ -479,7 +479,7 @@ async function loadAuthProfile() {
 
 async function loadCandidateSelfProfile() {
   const payload = await candApi.getCandidateProfile();
-  const p = record(payload) || null;
+  const p = toRecord(payload) || null;
   renderCandidateProfile(p);
   return p;
 }
@@ -502,16 +502,16 @@ function renderJobRows(rows) {
 
   rows.forEach((job) => {
     const tr = document.createElement("tr");
-    const id = f(job, ["id"], "");
-    const status = f(job, ["status"], "");
+    const id = getValue(job, ["id"], "");
+    const status = getValue(job, ["status"], "");
     const canApply = String(status).toLowerCase() === "published";
 
     const cells = [
       id || "N/A",
-      f(job, ["title"], "N/A"),
-      f(job, ["company_name"], "N/A"),
+      getValue(job, ["title"], "N/A"),
+      getValue(job, ["company_name"], "N/A"),
       status || "N/A",
-      f(job, ["location"], "N/A"),
+      getValue(job, ["location"], "N/A"),
     ];
 
     cells.forEach((text) => {
@@ -548,7 +548,7 @@ async function loadJobs() {
   if (status && status !== "all") query.status = status;
   try {
     setMsg(ui.jobMsg, "Loading jobs...", "info");
-    const rows = arr(await candApi.listJobs(query));
+    const rows = toRows(await candApi.listJobs(query));
     renderJobRows(rows);
     setMsg(ui.jobMsg, `Loaded ${rows.length} job(s).`, "success");
   } catch (error) {
@@ -601,11 +601,11 @@ function renderApplicationRows(rows) {
   rows.forEach((app) => {
     const tr = document.createElement("tr");
     const cells = [
-      f(app, ["id"], "N/A"),
-      f(app, ["title"], "N/A"),
-      f(app, ["company_name"], "N/A"),
-      f(app, ["status"], "N/A"),
-      fmtDateTime(f(app, ["applied_at"], "")),
+      getValue(app, ["id"], "N/A"),
+      getValue(app, ["title"], "N/A"),
+      getValue(app, ["company_name"], "N/A"),
+      getValue(app, ["status"], "N/A"),
+      fmtDateTime(getValue(app, ["applied_at"], "")),
     ];
     cells.forEach((text) => {
       const td = document.createElement("td");
@@ -619,7 +619,7 @@ function renderApplicationRows(rows) {
 async function loadApplications() {
   try {
     setMsg(ui.appMsg, "Loading applications...", "info");
-    candState.applicationsRows = arr(await candApi.listMyApplications());
+    candState.applicationsRows = toRows(await candApi.listMyApplications());
     renderApplicationRows(candState.applicationsRows);
     setMsg(ui.appMsg, `Loaded ${candState.applicationsRows.length} application(s).`, "success");
   } catch (error) {
@@ -635,8 +635,8 @@ function renderSavedRows(rows) {
   ui.savedList.innerHTML = "";
   rows.forEach((job) => {
     const tr = document.createElement("tr");
-    const id = f(job, ["id"], "");
-    const cells = [id || "N/A", f(job, ["title"], "N/A"), f(job, ["company_name"], "N/A"), f(job, ["status"], "N/A")];
+    const id = getValue(job, ["id"], "");
+    const cells = [id || "N/A", getValue(job, ["title"], "N/A"), getValue(job, ["company_name"], "N/A"), getValue(job, ["status"], "N/A")];
     cells.forEach((text) => {
       const td = document.createElement("td");
       td.textContent = text;
@@ -670,7 +670,7 @@ function renderSavedRows(rows) {
 async function loadSavedJobs() {
   try {
     setMsg(ui.savedMsg, "Loading saved jobs...", "info");
-    candState.savedRows = arr(await candApi.listSavedJobs());
+    candState.savedRows = toRows(await candApi.listSavedJobs());
     renderSavedRows(candState.savedRows);
     setMsg(ui.savedMsg, `Loaded ${candState.savedRows.length} saved job(s).`, "success");
   } catch (error) {
@@ -715,8 +715,8 @@ function renderOfferRows(rows) {
   ui.offerList.innerHTML = "";
   rows.forEach((offer) => {
     const tr = document.createElement("tr");
-    const id = f(offer, ["id"], "");
-    const status = String(f(offer, ["status"], "")).toLowerCase();
+    const id = getValue(offer, ["id"], "");
+    const status = String(getValue(offer, ["status"], "")).toLowerCase();
     const responded = status === "accepted" || status === "declined";
 
     const idTd = document.createElement("td");
@@ -732,7 +732,7 @@ function renderOfferRows(rows) {
     tr.appendChild(detailsTd);
 
     const docTd = document.createElement("td");
-    const docUrl = f(offer, ["document_url"], "");
+    const docUrl = getValue(offer, ["document_url"], "");
     if (!docUrl) {
       docTd.textContent = "N/A";
     } else {
@@ -777,7 +777,7 @@ async function loadOffers() {
   }
   try {
     setMsg(ui.offerMsg, "Loading offers...", "info");
-    candState.offersRows = arr(await candApi.getOffers(applicationId));
+    candState.offersRows = toRows(await candApi.getOffers(applicationId));
     candState.offersLoadedApplicationId = applicationId;
     renderOfferRows(candState.offersRows);
     setMsg(ui.offerMsg, `Loaded ${candState.offersRows.length} offer(s).`, "success");
@@ -814,7 +814,7 @@ function profileCompletion(profile) {
   const fields = [
     candidateField(profile, "phone", ""),
     candidateField(profile, "address", ""),
-    f(profile, ["resume_url"], ""),
+    getValue(profile, ["resume_url"], ""),
     profile.profile_data,
   ];
   const done = fields.filter((v) => {
@@ -833,11 +833,11 @@ function isActiveApplication(status) {
 
 async function loadDashboardKpis() {
   const results = await Promise.allSettled([candApi.listMyApplications(), candApi.listSavedJobs(), candApi.getCandidateProfile()]);
-  if (results[0].status === "fulfilled") candState.applicationsRows = arr(results[0].value);
-  if (results[1].status === "fulfilled") candState.savedRows = arr(results[1].value);
-  if (results[2].status === "fulfilled") renderCandidateProfile(record(results[2].value) || null);
+  if (results[0].status === "fulfilled") candState.applicationsRows = toRows(results[0].value);
+  if (results[1].status === "fulfilled") candState.savedRows = toRows(results[1].value);
+  if (results[2].status === "fulfilled") renderCandidateProfile(toRecord(results[2].value) || null);
 
-  const activeApps = (candState.applicationsRows || []).filter((row) => isActiveApplication(f(row, ["status"], ""))).length;
+  const activeApps = (candState.applicationsRows || []).filter((row) => isActiveApplication(getValue(row, ["status"], ""))).length;
   setText(ui.kpiActiveApps, activeApps);
   setText(ui.kpiSavedJobs, (candState.savedRows || []).length);
   setText(ui.kpiOffers, (candState.offersRows || []).length);
@@ -845,17 +845,17 @@ async function loadDashboardKpis() {
 }
 
 async function reloadProfile() {
-  profileStatus("Loading profile...", "info");
+  setMsg(ui.profileStatus, "Loading profile...", "info");
   try {
     const [account, candidate] = await Promise.all([candApi.getMyProfile(), candApi.getCandidateProfile()]);
-    candState.currentProfile = record(account) || null;
+    candState.currentProfile = toRecord(account) || null;
     renderAccountProfile();
-    renderCandidateProfile(record(candidate) || null);
+    renderCandidateProfile(toRecord(candidate) || null);
     showSection(candState.currentView || "profile");
-    profileStatus("Profile loaded from API.", "success");
+    setMsg(ui.profileStatus, "Profile loaded from API.", "success");
     await loadDashboardKpis();
   } catch (error) {
-    profileStatus(error.message || "Failed to load profile.", "error");
+    setMsg(ui.profileStatus, error.message || "Failed to load profile.", "error");
   }
 }
 
@@ -864,27 +864,27 @@ async function submitProfileUpdate(event) {
   const firstName = String(ui.profileFirstName?.value || "").trim();
   const lastName = String(ui.profileLastName?.value || "").trim();
   const email = String(ui.profileEditEmail?.value || "").trim();
-  if (!firstName || !lastName || !email) return profileStatus("first_name, last_name and email are required.", "error");
-  if (!validEmail(email)) return profileStatus("Enter a valid email address.", "error");
+  if (!firstName || !lastName || !email) return setMsg(ui.profileStatus, "first_name, last_name and email are required.", "error");
+  if (!validEmail(email)) return setMsg(ui.profileStatus, "Enter a valid email address.", "error");
 
   const initialText = ui.profileSaveBtn?.textContent || "Save Account Profile";
   if (ui.profileSaveBtn) {
     ui.profileSaveBtn.disabled = true;
     ui.profileSaveBtn.textContent = "Saving...";
   }
-  profileStatus("Updating account profile...", "info");
+  setMsg(ui.profileStatus, "Updating account profile...", "info");
 
   try {
     const result = await candApi.updateMyProfile({ first_name: firstName, last_name: lastName, email });
-    const updated = record(result);
+    const updated = toRecord(result);
     candState.currentProfile = updated && typeof updated === "object"
       ? { ...(candState.currentProfile || {}), ...updated }
       : { ...(candState.currentProfile || {}), first_name: firstName, last_name: lastName, email };
     renderAccountProfile();
     showSection(candState.currentView || "profile");
-    profileStatus(result?.message || "Account profile updated successfully.", "success");
+    setMsg(ui.profileStatus, result?.message || "Account profile updated successfully.", "success");
   } catch (error) {
-    profileStatus(error.message || "Failed to update account profile.", "error");
+    setMsg(ui.profileStatus, error.message || "Failed to update account profile.", "error");
   } finally {
     if (ui.profileSaveBtn) {
       ui.profileSaveBtn.disabled = false;
@@ -899,37 +899,38 @@ async function submitCandidateProfileUpdate(event) {
   try {
     profileData = parseJsonInput(ui.cpEditData?.value || "");
   } catch (error) {
-    return profileStatus(error.message, "error");
+    return setMsg(ui.profileStatus, error.message, "error");
   }
   try {
-    profileStatus("Updating candidate profile...", "info");
+    setMsg(ui.profileStatus, "Updating candidate profile...", "info");
     const result = await candApi.updateCandidateProfile({
       phone: String(ui.cpEditPhone?.value || "").trim(),
       address: String(ui.cpEditAddress?.value || "").trim(),
       profile_data: profileData,
     });
     await loadCandidateSelfProfile();
-    profileStatus(result?.message || "Candidate profile updated successfully.", "success");
+    setMsg(ui.profileStatus, result?.message || "Candidate profile updated successfully.", "success");
     await loadDashboardKpis();
   } catch (error) {
-    profileStatus(error.message || "Failed to update candidate profile.", "error");
+    setMsg(ui.profileStatus, error.message || "Failed to update candidate profile.", "error");
   }
 }
 
 async function submitResumeUpdate() {
   const resume = String(ui.cpResumeUrl?.value || "").trim();
-  if (!resume) return profileStatus("resume_url is required.", "error");
+  if (!resume) return setMsg(ui.profileStatus, "resume_url is required.", "error");
   try {
-    profileStatus("Updating resume...", "info");
+    setMsg(ui.profileStatus, "Updating resume...", "info");
     const result = await candApi.uploadResume(resume);
     await loadCandidateSelfProfile();
-    profileStatus(result?.message || "Resume updated successfully.", "success");
+    setMsg(ui.profileStatus, result?.message || "Resume updated successfully.", "success");
     await loadDashboardKpis();
   } catch (error) {
-    profileStatus(error.message || "Failed to update resume.", "error");
+    setMsg(ui.profileStatus, error.message || "Failed to update resume.", "error");
   }
 }
 
+// 5) Section openers and bindings.
 async function openDashboard() {
   showSection("dashboard");
   await loadDashboardKpis();
@@ -1067,6 +1068,7 @@ function bindActions() {
   }
 }
 
+// 6) Init.
 async function initCandidateDashboard() {
   if (!ui.navLinks.length || !ui.sections.length) return;
   bindNavigation();
@@ -1084,7 +1086,7 @@ async function initCandidateDashboard() {
   try {
     await loadCandidateSelfProfile();
   } catch (error) {
-    profileStatus(error.message || "Failed to load candidate profile.", "error");
+    setMsg(ui.profileStatus, error.message || "Failed to load candidate profile.", "error");
   }
   await openDashboard();
 }

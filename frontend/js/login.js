@@ -1,4 +1,5 @@
 (function initLogin() {
+  // 1) Collect all elements first.
   const loginForm = document.getElementById("loginForm");
   const emailInput = document.getElementById("email");
   const passwordInput = document.getElementById("password");
@@ -19,6 +20,7 @@
 
   if (!loginForm || !emailInput || !passwordInput || !loginButton || !loginMsg) return;
 
+  // 2) Build API endpoints.
   const API_BASE = String(window.AUTH_API_BASE || window.API_BASE || "http://localhost:3000").replace(/\/+$/, "");
 
   function buildAuthEndpoints(baseUrl, path) {
@@ -42,7 +44,8 @@
   const LOGIN_ENDPOINTS = buildAuthEndpoints(API_BASE, "/auth/login");
   const SIGNUP_ENDPOINTS = buildAuthEndpoints(API_BASE, "/auth/signup");
 
-  function setTypedMessage(element, text, type) {
+  // 3) Small UI helpers.
+  function setMessage(element, text, type) {
     if (!element) return;
     element.textContent = text;
     element.classList.remove("text-secondary", "text-danger", "text-success");
@@ -51,18 +54,10 @@
     element.classList.add("text-secondary");
   }
 
-  function setLoginMessage(text, type) {
-    setTypedMessage(loginMsg, text, type);
-  }
-
-  function setSignupMessage(text, type) {
-    setTypedMessage(signupMsg, text, type);
-  }
-
   function showStoredSessionMessage() {
     const message = String(localStorage.getItem(SESSION_EXPIRED_KEY) || "").trim();
     if (!message) return;
-    setLoginMessage(message, "error");
+    setMessage(loginMsg, message, "error");
     localStorage.removeItem(SESSION_EXPIRED_KEY);
   }
 
@@ -77,6 +72,7 @@
     signupButton.textContent = isLoading ? "Creating..." : "Create Candidate Account";
   }
 
+  // 4) Auth/session helpers.
   function normalizeRole(role) {
     return String(role || "")
       .trim()
@@ -107,6 +103,7 @@
     sessionStorage.setItem("userRole", safeRole);
   }
 
+  // 5) Network helpers.
   async function parseResponse(response, fallbackLabel) {
     let data = null;
     try {
@@ -153,41 +150,34 @@
     throw lastError;
   }
 
-  async function requestLogin(email, password) {
-    return requestWithFallback(LOGIN_ENDPOINTS, { email, password }, "Login");
-  }
-
-  async function requestSignup(payload) {
-    return requestWithFallback(SIGNUP_ENDPOINTS, payload, "Signup");
-  }
-
+  // 6) Event handlers.
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const email = emailInput.value.trim();
     const password = passwordInput.value;
     if (!email || !password) {
-      setLoginMessage("Email and password are required.", "error");
+      setMessage(loginMsg, "Email and password are required.", "error");
       return;
     }
 
     setLoginLoading(true);
-    setLoginMessage("Authenticating...", "info");
+    setMessage(loginMsg, "Authenticating...", "info");
 
     try {
-      const result = await requestLogin(email, password);
+      const result = await requestWithFallback(LOGIN_ENDPOINTS, { email, password }, "Login");
       const token = result.token;
       const role = result.role;
       if (!token) throw new Error("Token missing in login response");
       persistAuth(token, role);
-      setLoginMessage(result.message || "Login successful. Redirecting...", "success");
+      setMessage(loginMsg, result.message || "Login successful. Redirecting...", "success");
       const redirectPath = getRedirectPathByRole(role);
       window.setTimeout(() => {
         window.location.href = redirectPath;
       }, 350);
     } catch (error) {
       console.error("Login error:", error);
-      setLoginMessage(error.message || "Unable to login. Please try again.", "error");
+      setMessage(loginMsg, error.message || "Unable to login. Please try again.", "error");
     } finally {
       setLoginLoading(false);
     }
@@ -205,19 +195,19 @@
       const address = String(signupAddress?.value || "").trim();
 
       if (!firstName || !lastName || !email || !password) {
-        setSignupMessage("first_name, last_name, email, and password are required.", "error");
+        setMessage(signupMsg, "first_name, last_name, email, and password are required.", "error");
         return;
       }
       if (password.length < 8) {
-        setSignupMessage("Password must be at least 8 characters.", "error");
+        setMessage(signupMsg, "Password must be at least 8 characters.", "error");
         return;
       }
 
       setSignupLoading(true);
-      setSignupMessage("Creating candidate account...", "info");
+      setMessage(signupMsg, "Creating candidate account...", "info");
 
       try {
-        const result = await requestSignup({
+        const result = await requestWithFallback(SIGNUP_ENDPOINTS, {
           first_name: firstName,
           last_name: lastName,
           email,
@@ -231,13 +221,13 @@
         if (!token) throw new Error("Token missing in signup response");
 
         persistAuth(token, role);
-        setSignupMessage(result.message || "Signup successful. Redirecting...", "success");
+        setMessage(signupMsg, result.message || "Signup successful. Redirecting...", "success");
         window.setTimeout(() => {
           window.location.href = getRedirectPathByRole(role);
         }, 350);
       } catch (error) {
         console.error("Signup error:", error);
-        setSignupMessage(error.message || "Unable to signup. Please try again.", "error");
+        setMessage(signupMsg, error.message || "Unable to signup. Please try again.", "error");
       } finally {
         setSignupLoading(false);
       }

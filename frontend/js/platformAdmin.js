@@ -359,18 +359,17 @@ function updatePager(metaEl, prevBtn, nextBtn, page, totalPages) {
   if (nextBtn) nextBtn.disabled = page >= totalPages;
 }
 
-function toTitleCaseWord(text) {
-  const str = String(text || "").trim();
-  if (!str) return "";
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-}
-
 function deriveNameFromEmail(email) {
   const localPart = String(email || "").split("@")[0].trim();
   const parts = localPart.split(/[._-]+/).filter(Boolean);
+  const toTitleCase = (text) => {
+    const str = String(text || "").trim();
+    if (!str) return "";
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  };
   return {
-    first_name: toTitleCaseWord(parts[0] || "Company"),
-    last_name: toTitleCaseWord(parts.slice(1).join(" ") || "Admin")
+    first_name: toTitleCase(parts[0] || "Company"),
+    last_name: toTitleCase(parts.slice(1).join(" ") || "Admin")
   };
 }
 

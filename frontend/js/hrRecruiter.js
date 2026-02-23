@@ -3,6 +3,7 @@
  * Covers jobs, applications, candidates, interviews, offers, profile, and session flows.
  */
 
+// 1) Config and state.
 const HR_CONFIG = {
   useApi: true,
   apiBase: String(window.HR_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(/\/+$/, ""),
@@ -22,6 +23,7 @@ const HR_CONFIG = {
     moveApplicationStage: "/hr-recruiter/applications/:id/move-stage",
     recommendOffer: "/hr-recruiter/applications/:id/recommend-offer",
     screenDecision: "/hr-recruiter/applications/:id/screen",
+    listCandidates: "/hr-recruiter/candidates",
     getCandidateProfile: "/hr-recruiter/candidates/:id/profile",
     updateCandidateProfile: "/hr-recruiter/candidates/:id/profile",
     uploadResume: "/hr-recruiter/candidates/:id/resume",
@@ -45,6 +47,8 @@ const hrState = {
   selectedJob: null,
   applicationRows: [],
   currentApplicationJobId: "",
+  candidateRows: [],
+  currentCandidateJobId: "",
   currentCandidateId: "",
   currentCandidate: null,
   interviewsRows: []
@@ -124,6 +128,9 @@ const ui = {
   appList: document.querySelector("[data-hr-app-list]"),
   appMsg: document.querySelector("[data-hr-app-msg]"),
 
+  candidateJobIdInput: document.querySelector("[data-hr-candidate-job-id]"),
+  candidateListLoadBtn: document.querySelector("[data-hr-candidate-list-load]"),
+  candidateList: document.querySelector("[data-hr-candidate-list]"),
   candidateIdInput: document.querySelector("[data-hr-candidate-id]"),
   candidateLoadBtn: document.querySelector("[data-hr-candidate-load]"),
   candidateName: document.querySelector("[data-hr-candidate-name]"),
@@ -172,6 +179,7 @@ const ui = {
   profileLogoutBtn: document.querySelector("[data-hr-logout]")
 };
 
+// 2) Shared helpers.
 function firstValue(record, keys, fallback = "") {
   for (let i = 0; i < keys.length; i += 1) {
     const value = record?.[keys[i]];
@@ -390,6 +398,7 @@ async function apiRequest(path, options = {}) {
   throw lastError || new Error("API request failed");
 }
 
+// 3) API layer.
 const hrApi = {
   logout() {
     return apiRequest(HR_CONFIG.endpoints.authLogout, {
@@ -440,8 +449,18 @@ const hrApi = {
   },
 
   listApplications(jobId) {
+    const query = {};
+    if (jobId) query.job_id = jobId;
     return apiRequest(HR_CONFIG.endpoints.listApplications, {
-      query: { job_id: jobId }
+      query
+    });
+  },
+
+  listCandidates(jobId) {
+    const query = {};
+    if (jobId) query.job_id = jobId;
+    return apiRequest(HR_CONFIG.endpoints.listCandidates, {
+      query
     });
   },
 
@@ -519,6 +538,7 @@ const hrApi = {
   }
 };
 
+// 4) Page UI logic.
 function setActiveNav(viewKey) {
   ui.navLinks.forEach((link) => link.classList.remove("active"));
   const target = document.querySelector(`[data-hr-nav="${viewKey}"]`);
@@ -951,7 +971,7 @@ async function handleJobListClick(event) {
 function renderApplicationRows(rows) {
   if (!ui.appList) return;
   if (!rows.length) {
-    showTableMessage(ui.appList, 6, "No applications found");
+    showTableMessage(ui.appList, 7, "No applications found");
     return;
   }
 
@@ -964,6 +984,10 @@ function renderApplicationRows(rows) {
     const idCell = document.createElement("td");
     idCell.textContent = appId || "N/A";
     tr.appendChild(idCell);
+
+    const jobIdCell = document.createElement("td");
+    jobIdCell.textContent = firstValue(app, ["job_id"], "N/A");
+    tr.appendChild(jobIdCell);
 
     const candidateCell = document.createElement("td");
     const candidateName = `${firstValue(app, ["first_name"], "")} ${firstValue(app, ["last_name"], "")}`.trim();
@@ -1021,11 +1045,6 @@ function renderApplicationRows(rows) {
 
 async function loadApplications() {
   const jobId = String(ui.appJobId?.value || "").trim();
-  if (!jobId) {
-    showTableMessage(ui.appList, 6, "Enter job id to load applications.");
-    setMessage(ui.appMsg, "job_id is required.", "error");
-    return;
-  }
 
   try {
     setMessage(ui.appMsg, "Loading applications...", "info");
@@ -1033,7 +1052,8 @@ async function loadApplications() {
     hrState.applicationRows = rows;
     hrState.currentApplicationJobId = jobId;
     renderApplicationRows(rows);
-    setMessage(ui.appMsg, `Loaded ${rows.length} application(s).`, "success");
+    const filterText = jobId ? ` for job #${jobId}` : "";
+    setMessage(ui.appMsg, `Loaded ${rows.length} application(s)${filterText}.`, "success");
   } catch (error) {
     hrState.applicationRows = [];
     renderApplicationRows([]);
@@ -1083,6 +1103,88 @@ function parseCandidateProfileData(value) {
   } catch (error) {
     throw new Error("Profile Data must be valid JSON");
   }
+}
+
+function renderCandidateRows(rows) {
+  if (!ui.candidateList) return;
+  if (!rows.length) {
+    showTableMessage(ui.candidateList, 7, "No candidates found");
+    return;
+  }
+
+  ui.candidateList.innerHTML = "";
+
+  rows.forEach((candidate) => {
+    const tr = document.createElement("tr");
+    const candidateId = firstValue(candidate, ["candidate_id", "id"], "");
+
+    const idCell = document.createElement("td");
+    idCell.textContent = candidateId || "N/A";
+    tr.appendChild(idCell);
+
+    const nameCell = document.createElement("td");
+    const fullName = `${firstValue(candidate, ["first_name"], "")} ${firstValue(candidate, ["last_name"], "")}`.trim();
+    nameCell.textContent = fullName || "N/A";
+    tr.appendChild(nameCell);
+
+    const emailCell = document.createElement("td");
+    emailCell.textContent = firstValue(candidate, ["email"], "N/A");
+    tr.appendChild(emailCell);
+
+    const phoneCell = document.createElement("td");
+    phoneCell.textContent = candidateValue(candidate, "phone", "-");
+    tr.appendChild(phoneCell);
+
+    const addressCell = document.createElement("td");
+    addressCell.textContent = candidateValue(candidate, "address", "-");
+    tr.appendChild(addressCell);
+
+    const countCell = document.createElement("td");
+    countCell.textContent = firstValue(candidate, ["applications_count"], "0");
+    tr.appendChild(countCell);
+
+    const actionCell = document.createElement("td");
+    const openBtn = document.createElement("button");
+    openBtn.type = "button";
+    openBtn.className = "btn btn-outline-brand btn-sm";
+    openBtn.textContent = "Open";
+    openBtn.dataset.candidateAction = "open";
+    openBtn.dataset.candidateId = candidateId;
+    actionCell.appendChild(openBtn);
+    tr.appendChild(actionCell);
+
+    ui.candidateList.appendChild(tr);
+  });
+}
+
+async function loadCandidates() {
+  const jobId = String(ui.candidateJobIdInput?.value || "").trim();
+
+  try {
+    setMessage(ui.candidateMsg, "Loading candidates...", "info");
+    const rows = normalizeArrayResponse(await hrApi.listCandidates(jobId));
+    hrState.candidateRows = rows;
+    hrState.currentCandidateJobId = jobId;
+    renderCandidateRows(rows);
+    const filterText = jobId ? ` for job #${jobId}` : "";
+    setMessage(ui.candidateMsg, `Loaded ${rows.length} candidate(s)${filterText}.`, "success");
+  } catch (error) {
+    hrState.candidateRows = [];
+    renderCandidateRows([]);
+    setMessage(ui.candidateMsg, error.message || "Failed to load candidates.", "error");
+  }
+}
+
+async function handleCandidateListAction(event) {
+  const button = event.target.closest("button[data-candidate-action]");
+  if (!button) return;
+
+  const action = String(button.dataset.candidateAction || "").trim();
+  const candidateId = String(button.dataset.candidateId || "").trim();
+  if (!candidateId || action !== "open") return;
+
+  if (ui.candidateIdInput) ui.candidateIdInput.value = candidateId;
+  await loadCandidateProfile();
 }
 
 function renderCandidateProfile(profile) {
@@ -1205,7 +1307,7 @@ async function submitResumeUpdate(event) {
 function renderInterviewRows(rows) {
   if (!ui.interviewList) return;
   if (!rows.length) {
-    showTableMessage(ui.interviewList, 6, "No interviews found");
+    showTableMessage(ui.interviewList, 10, "No interviews found");
     return;
   }
 
@@ -1222,6 +1324,32 @@ function renderInterviewRows(rows) {
     const appCell = document.createElement("td");
     appCell.textContent = firstValue(interview, ["application_id"], "N/A");
     tr.appendChild(appCell);
+
+    const jobCell = document.createElement("td");
+    jobCell.textContent = firstValue(interview, ["job_id"], "N/A");
+    tr.appendChild(jobCell);
+
+    const candidateCell = document.createElement("td");
+    const candidateName = `${firstValue(interview, ["candidate_first"], "")} ${firstValue(interview, ["candidate_last"], "")}`.trim();
+    const candidateEmail = firstValue(interview, ["candidate_email"], "");
+    candidateCell.innerHTML = candidateName
+      ? `${candidateName}<br /><small class="text-secondary">${candidateEmail}</small>`
+      : "N/A";
+    tr.appendChild(candidateCell);
+
+    const candidateContactSource = {
+      phone: firstValue(interview, ["candidate_phone"], ""),
+      address: firstValue(interview, ["candidate_address"], ""),
+      profile_data: interview?.candidate_profile_data || null,
+    };
+
+    const phoneCell = document.createElement("td");
+    phoneCell.textContent = candidateValue(candidateContactSource, "phone", "-");
+    tr.appendChild(phoneCell);
+
+    const addressCell = document.createElement("td");
+    addressCell.textContent = candidateValue(candidateContactSource, "address", "-");
+    tr.appendChild(addressCell);
 
     const interviewerCell = document.createElement("td");
     const interviewerName = `${firstValue(interview, ["interviewer_first"], "")} ${firstValue(interview, ["interviewer_last"], "")}`.trim();
@@ -1256,12 +1384,6 @@ async function loadInterviews() {
   const applicationId = String(ui.interviewLoadAppId?.value || "").trim();
   const interviewerId = String(ui.interviewLoadInterviewerId?.value || "").trim();
 
-  if (!applicationId && !interviewerId) {
-    showTableMessage(ui.interviewList, 6, "Provide application_id or interviewer_id.");
-    setMessage(ui.interviewMsg, "application_id or interviewer_id is required.", "error");
-    return;
-  }
-
   const query = {};
   if (applicationId) query.application_id = applicationId;
   if (interviewerId) query.interviewer_id = interviewerId;
@@ -1271,7 +1393,11 @@ async function loadInterviews() {
     const rows = normalizeArrayResponse(await hrApi.getInterviews(query));
     hrState.interviewsRows = rows;
     renderInterviewRows(rows);
-    setMessage(ui.interviewMsg, `Loaded ${rows.length} interview(s).`, "success");
+    const filters = [];
+    if (applicationId) filters.push(`application #${applicationId}`);
+    if (interviewerId) filters.push(`interviewer #${interviewerId}`);
+    const filterText = filters.length ? ` for ${filters.join(", ")}` : "";
+    setMessage(ui.interviewMsg, `Loaded ${rows.length} interview(s)${filterText}.`, "success");
   } catch (error) {
     hrState.interviewsRows = [];
     renderInterviewRows([]);
@@ -1407,6 +1533,7 @@ async function submitSendOffer(event) {
   }
 }
 
+// 5) Profile and session actions.
 async function reloadProfile() {
   setProfileStatus("Loading profile...", "info");
   try {
@@ -1470,6 +1597,7 @@ async function submitProfileUpdate(event) {
   }
 }
 
+// 6) Section openers and bindings.
 async function openDashboard() {
   showSection("dashboard");
   await loadDashboardKpis();
@@ -1485,14 +1613,26 @@ async function openJobs() {
 
 async function openApplications() {
   showSection("applications");
+  if (!hrState.applicationsLoaded) {
+    hrState.applicationsLoaded = true;
+    await loadApplications();
+  }
 }
 
 async function openCandidates() {
   showSection("candidates");
+  if (!hrState.candidatesLoaded) {
+    hrState.candidatesLoaded = true;
+    await loadCandidates();
+  }
 }
 
 async function openInterviews() {
   showSection("interviews");
+  if (!hrState.interviewsLoaded) {
+    hrState.interviewsLoaded = true;
+    await loadInterviews();
+  }
 }
 
 async function openOffers() {
@@ -1568,6 +1708,8 @@ function bindActions() {
     });
   }
 
+  if (ui.candidateListLoadBtn) ui.candidateListLoadBtn.addEventListener("click", loadCandidates);
+  if (ui.candidateList) ui.candidateList.addEventListener("click", handleCandidateListAction);
   if (ui.candidateLoadBtn) ui.candidateLoadBtn.addEventListener("click", loadCandidateProfile);
   if (ui.candidateUpdateForm) ui.candidateUpdateForm.addEventListener("submit", submitCandidateUpdate);
   if (ui.resumeForm) ui.resumeForm.addEventListener("submit", submitResumeUpdate);
@@ -1598,6 +1740,7 @@ function bindActions() {
   }
 }
 
+// 7) Init.
 async function initHrDashboard() {
   if (!ui.navLinks.length || !ui.sections.length) return;
 

@@ -1,6 +1,6 @@
 /**
  * Interviewer dashboard script.
- * Covers interviews, scorecards, profile management, and logout.
+ * Handles dashboard KPIs, interviews, scorecards, profile management, and logout.
  */
 
 const INTERVIEWER_CONFIG = {
@@ -88,6 +88,7 @@ const ui = {
   logoutBtn: document.querySelector("[data-int-logout]")
 };
 
+/* SHARED HELPERS */
 function firstValue(record, keys, fallback = "") {
   for (let i = 0; i < keys.length; i += 1) {
     const value = record?.[keys[i]];
@@ -110,6 +111,11 @@ function buildPathWithId(path, id) {
   return path.replace(":id", encodeURIComponent(String(id)));
 }
 
+function toNumber(value) {
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 function setText(element, value) {
   if (!element) return;
   element.textContent = value === undefined || value === null || value === "" ? "N/A" : String(value);
@@ -119,14 +125,8 @@ function setMessage(element, text, type = "info") {
   if (!element) return;
   element.textContent = text || "";
   element.classList.remove("text-secondary", "text-success", "text-danger");
-  if (type === "success") {
-    element.classList.add("text-success");
-    return;
-  }
-  if (type === "error") {
-    element.classList.add("text-danger");
-    return;
-  }
+  if (type === "success") return element.classList.add("text-success");
+  if (type === "error") return element.classList.add("text-danger");
   element.classList.add("text-secondary");
 }
 
@@ -153,8 +153,10 @@ function fullName(record) {
   return name || firstValue(record, ["name"], "N/A");
 }
 
+/* API + AUTH CORE */
 function getStoredToken() {
   if (window.INTERVIEWER_TOKEN) return String(window.INTERVIEWER_TOKEN);
+
   for (let i = 0; i < INTERVIEWER_CONFIG.tokenKeys.length; i += 1) {
     const key = INTERVIEWER_CONFIG.tokenKeys[i];
     const localToken = localStorage.getItem(key);
@@ -162,6 +164,7 @@ function getStoredToken() {
     const sessionToken = sessionStorage.getItem(key);
     if (sessionToken) return sessionToken;
   }
+
   return "";
 }
 
@@ -175,6 +178,7 @@ function clearAuthStorage() {
     localStorage.removeItem(key);
     sessionStorage.removeItem(key);
   });
+
   localStorage.removeItem("role");
   localStorage.removeItem("userRole");
   sessionStorage.removeItem("role");
@@ -203,6 +207,7 @@ function buildUrlCandidates(path, queryObj) {
 
   const query = params.toString();
   const candidates = [];
+
   const add = (url) => {
     const finalUrl = query ? `${url}?${query}` : url;
     if (!candidates.includes(finalUrl)) candidates.push(finalUrl);
@@ -233,9 +238,7 @@ function preferNon404Error(currentError, incomingError) {
   if (!currentError) return incomingError;
   const currentStatus = Number(currentError.status || 0);
   const incomingStatus = Number(incomingError?.status || 0);
-  if (currentStatus === 404 && incomingStatus && incomingStatus !== 404) {
-    return incomingError;
-  }
+  if (currentStatus === 404 && incomingStatus && incomingStatus !== 404) return incomingError;
   return currentError;
 }
 
@@ -266,6 +269,7 @@ async function apiRequest(path, options = {}) {
     if (payload !== undefined && payload !== null) {
       req.body = JSON.stringify(payload);
     }
+
     return req;
   };
 
@@ -274,10 +278,14 @@ async function apiRequest(path, options = {}) {
 
   for (let i = 0; i < candidates.length; i += 1) {
     const url = candidates[i];
+
     try {
       const response = await fetch(url, requestOptions());
       const data = response.status === 204 ? null : await parseJsonSafely(response);
-      if (response.ok) return data;
+
+      if (response.ok) {
+        return data;
+      }
 
       const error = new Error(data?.message || `${method} ${url} failed with status ${response.status}`);
       error.status = response.status;
@@ -348,31 +356,33 @@ const interviewerApi = {
   }
 };
 
-function setActiveNav(viewKey) {
+/* SECTION TOGGLER */
+function setActiveNav(key) {
   ui.navLinks.forEach((link) => link.classList.remove("active"));
-  const target = document.querySelector(`[data-int-nav="${viewKey}"]`);
+  const target = document.querySelector(`[data-int-nav="${key}"]`);
   if (target) target.classList.add("active");
 }
 
 function profileSuffixText() {
-  const profile = intState.currentProfile;
-  if (!profile) return "";
-  const name = fullName(profile);
-  const role = firstValue(profile, ["role"], "");
+  if (!intState.currentProfile) return "";
+
+  const name = fullName(intState.currentProfile);
+  const role = firstValue(intState.currentProfile, ["role"], "");
+
   if (name === "N/A" && !role) return "";
   if (name !== "N/A" && role) return ` Signed in as ${name} (${role}).`;
   return ` Signed in as ${name !== "N/A" ? name : role}.`;
 }
 
-function showSection(viewKey) {
+function showSection(id) {
   ui.sections.forEach((sec) => {
-    sec.classList.toggle("d-none", sec.dataset.intView !== viewKey);
+    sec.classList.toggle("d-none", sec.dataset.intView !== id);
   });
 
-  intState.currentView = viewKey;
-  setActiveNav(viewKey);
+  intState.currentView = id;
+  setActiveNav(id);
 
-  const meta = intViewMeta[viewKey];
+  const meta = intViewMeta[id];
   if (!meta) return;
 
   if (ui.headerTitle) ui.headerTitle.textContent = meta.title;
@@ -380,78 +390,35 @@ function showSection(viewKey) {
   if (ui.searchInput) ui.searchInput.placeholder = meta.searchPlaceholder;
 }
 
-function ensureRole(profile) {
-  const role = String(firstValue(profile || {}, ["role"], "")).trim();
-  if (!role) return true;
-  if (role.toLowerCase() === "interviewer") return true;
-  redirectToLogin("You are not authorized to access Interviewer dashboard.");
-  return false;
+/* DASHBOARD */
+async function loadDashboardKpis() {
+  const interviews = Array.isArray(intState.interviewsRows) ? intState.interviewsRows : [];
+  const scheduled = interviews.filter((row) => {
+    const status = String(firstValue(row, ["status"], "")).trim().toLowerCase();
+    return status === "scheduled";
+  }).length;
+
+  setText(ui.kpiScheduled, scheduled);
+  setText(ui.kpiCompleted, intState.sessionCompletedCount);
 }
 
-function renderProfilePanel() {
-  const profile = intState.currentProfile;
-  if (!profile) {
-    setText(ui.profileName, "N/A");
-    setText(ui.profileEmail, "N/A");
-    setText(ui.profileRole, "N/A");
-    setText(ui.profileCompany, "N/A");
-    setText(ui.profileLastLogin, "N/A");
-    if (ui.profileFirstName) ui.profileFirstName.value = "";
-    if (ui.profileLastName) ui.profileLastName.value = "";
-    if (ui.profileEditEmail) ui.profileEditEmail.value = "";
-    return;
-  }
-
-  setText(ui.profileName, fullName(profile));
-  setText(ui.profileEmail, firstValue(profile, ["email"], "N/A"));
-  setText(ui.profileRole, firstValue(profile, ["role"], "N/A"));
-  setText(ui.profileCompany, firstValue(profile, ["company_id"], "N/A"));
-  setText(ui.profileLastLogin, formatDateTime(firstValue(profile, ["last_login_at"], "")));
-  if (ui.profileFirstName) ui.profileFirstName.value = firstValue(profile, ["first_name"], "");
-  if (ui.profileLastName) ui.profileLastName.value = firstValue(profile, ["last_name"], "");
-  if (ui.profileEditEmail) ui.profileEditEmail.value = firstValue(profile, ["email"], "");
+async function openDashboard() {
+  showSection("dashboard");
+  await loadDashboardKpis();
 }
 
-function profileStatus(text, type) {
-  setMessage(ui.profileStatus, text, type);
-}
-
-async function loadAuthProfile() {
-  try {
-    const payload = await interviewerApi.getMyProfile();
-    intState.currentProfile = payload?.profile || payload || null;
-
-    if (!ensureRole(intState.currentProfile)) return false;
-
-    const role = firstValue(intState.currentProfile, ["role"], "");
-    if (role) {
-      localStorage.setItem("role", role);
-      localStorage.setItem("userRole", role);
-      sessionStorage.setItem("role", role);
-      sessionStorage.setItem("userRole", role);
-    }
-    renderProfilePanel();
-    return true;
-  } catch (error) {
-    console.error("Interviewer profile load error:", error);
-    redirectToLogin("Login session expired. Please log in again.");
-    return false;
-  }
-}
-
-async function performLogout() {
-  try {
-    await interviewerApi.logout();
-  } catch (error) {
-    console.error("Logout API error:", error);
-  } finally {
-    clearAuthStorage();
-    window.location.href = "../public/login.html";
+/* INTERVIEWS */
+async function openInterviews() {
+  showSection("interviews");
+  if (!intState.interviewsLoaded) {
+    intState.interviewsLoaded = true;
+    await loadInterviews();
   }
 }
 
 function renderInterviewRows(rows) {
   if (!ui.interviewList) return;
+
   if (!rows.length) {
     showTableMessage(ui.interviewList, 7, "No interviews found");
     return;
@@ -498,8 +465,8 @@ function renderInterviewRows(rows) {
     btn.dataset.interviewStatus = firstValue(row, ["status"], "");
     btn.dataset.interviewNotes = firstValue(row, ["notes"], "");
     actionsCell.appendChild(btn);
-    tr.appendChild(actionsCell);
 
+    tr.appendChild(actionsCell);
     ui.interviewList.appendChild(tr);
   });
 }
@@ -522,6 +489,7 @@ async function loadInterviews() {
 async function updateInterviewByPrompt(interviewId, currentStatus, currentNotes) {
   const status = window.prompt("Interview status:", currentStatus || "completed");
   if (!status) return;
+
   const notes = window.prompt("Interview notes:", currentNotes || "") || "";
 
   try {
@@ -536,11 +504,16 @@ async function updateInterviewByPrompt(interviewId, currentStatus, currentNotes)
   }
 }
 
+/* SCORECARDS */
+async function openScorecards() {
+  showSection("scorecards");
+}
+
 function parseRatingsJson(rawText) {
-  const text = String(rawText || "").trim();
-  if (!text) return null;
+  const value = String(rawText || "").trim();
+  if (!value) return null;
   try {
-    return JSON.parse(text);
+    return JSON.parse(value);
   } catch (error) {
     throw new Error("Ratings must be valid JSON");
   }
@@ -548,6 +521,7 @@ function parseRatingsJson(rawText) {
 
 function renderScorecardRows(rows) {
   if (!ui.scorecardList) return;
+
   if (!rows.length) {
     showTableMessage(ui.scorecardList, 5, "No scorecards found");
     return;
@@ -584,8 +558,8 @@ function renderScorecardRows(rows) {
     finalizeBtn.dataset.scorecardId = scorecardId;
     finalizeBtn.disabled = firstValue(row, ["is_final"], "0") === "1";
     actionsCell.appendChild(finalizeBtn);
-    tr.appendChild(actionsCell);
 
+    tr.appendChild(actionsCell);
     ui.scorecardList.appendChild(tr);
   });
 }
@@ -640,6 +614,7 @@ async function submitScorecard(event) {
       comments: String(formData.get("comments") || "").trim(),
       recommendation
     });
+
     ui.scorecardCreateForm.reset();
     setMessage(ui.scorecardCreateMsg, result?.message || "Scorecard submitted successfully.", "success");
     if (ui.scorecardInterviewId) ui.scorecardInterviewId.value = String(interviewId);
@@ -661,38 +636,93 @@ async function finalizeScorecard(scorecardId) {
   }
 }
 
-async function loadDashboardKpis() {
-  const interviews = Array.isArray(intState.interviewsRows) ? intState.interviewsRows : [];
-  const scheduled = interviews.filter((row) => String(firstValue(row, ["status"], "")).toLowerCase() === "scheduled").length;
-  setText(ui.kpiScheduled, scheduled);
-  setText(ui.kpiCompleted, intState.sessionCompletedCount);
+/* PROFILE */
+function ensureRole(profile) {
+  const role = String(firstValue(profile || {}, ["role"], "")).trim();
+  if (!role) return true;
+  if (role.toLowerCase() === "interviewer") return true;
+  redirectToLogin("You are not authorized to access Interviewer dashboard.");
+  return false;
+}
+
+function renderProfilePanel() {
+  const profile = intState.currentProfile;
+
+  if (!profile) {
+    setText(ui.profileName, "N/A");
+    setText(ui.profileEmail, "N/A");
+    setText(ui.profileRole, "N/A");
+    setText(ui.profileCompany, "N/A");
+    setText(ui.profileLastLogin, "N/A");
+    if (ui.profileFirstName) ui.profileFirstName.value = "";
+    if (ui.profileLastName) ui.profileLastName.value = "";
+    if (ui.profileEditEmail) ui.profileEditEmail.value = "";
+    return;
+  }
+
+  setText(ui.profileName, fullName(profile));
+  setText(ui.profileEmail, firstValue(profile, ["email"], "N/A"));
+  setText(ui.profileRole, firstValue(profile, ["role"], "N/A"));
+  setText(ui.profileCompany, firstValue(profile, ["company_id"], "N/A"));
+  setText(ui.profileLastLogin, formatDateTime(firstValue(profile, ["last_login_at"], "")));
+
+  if (ui.profileFirstName) ui.profileFirstName.value = firstValue(profile, ["first_name"], "");
+  if (ui.profileLastName) ui.profileLastName.value = firstValue(profile, ["last_name"], "");
+  if (ui.profileEditEmail) ui.profileEditEmail.value = firstValue(profile, ["email"], "");
+}
+
+async function loadAuthProfile() {
+  try {
+    const payload = await interviewerApi.getMyProfile();
+    intState.currentProfile = payload?.profile || payload || null;
+
+    if (!ensureRole(intState.currentProfile)) return false;
+
+    const role = firstValue(intState.currentProfile, ["role"], "");
+    if (role) {
+      localStorage.setItem("role", role);
+      localStorage.setItem("userRole", role);
+      sessionStorage.setItem("role", role);
+      sessionStorage.setItem("userRole", role);
+    }
+
+    renderProfilePanel();
+    return true;
+  } catch (error) {
+    console.error("Interviewer profile load error:", error);
+    redirectToLogin("Login session expired. Please log in again.");
+    return false;
+  }
 }
 
 async function reloadProfile() {
-  profileStatus("Loading profile...", "info");
+  setMessage(ui.profileStatus, "Loading profile...", "info");
+
   try {
     const payload = await interviewerApi.getMyProfile();
     intState.currentProfile = payload?.profile || payload || null;
     renderProfilePanel();
     showSection(intState.currentView || "profile");
-    profileStatus("Profile loaded from API.", "success");
+    setMessage(ui.profileStatus, "Profile loaded from API.", "success");
   } catch (error) {
-    profileStatus(error.message || "Failed to load profile.", "error");
+    setMessage(ui.profileStatus, error.message || "Failed to load profile.", "error");
   }
 }
 
 async function submitProfileUpdate(event) {
   event.preventDefault();
+
   const firstName = String(ui.profileFirstName?.value || "").trim();
   const lastName = String(ui.profileLastName?.value || "").trim();
   const email = String(ui.profileEditEmail?.value || "").trim();
 
   if (!firstName || !lastName || !email) {
-    profileStatus("first_name, last_name and email are required.", "error");
+    setMessage(ui.profileStatus, "first_name, last_name and email are required.", "error");
     return;
   }
+
   if (!isValidEmail(email)) {
-    profileStatus("Enter a valid email address.", "error");
+    setMessage(ui.profileStatus, "Enter a valid email address.", "error");
     return;
   }
 
@@ -701,7 +731,8 @@ async function submitProfileUpdate(event) {
     ui.profileSaveBtn.disabled = true;
     ui.profileSaveBtn.textContent = "Saving...";
   }
-  profileStatus("Updating profile...", "info");
+
+  setMessage(ui.profileStatus, "Updating profile...", "info");
 
   try {
     const result = await interviewerApi.updateMyProfile({
@@ -717,9 +748,9 @@ async function submitProfileUpdate(event) {
 
     renderProfilePanel();
     showSection(intState.currentView || "profile");
-    profileStatus(result?.message || "Profile updated successfully.", "success");
+    setMessage(ui.profileStatus, result?.message || "Profile updated successfully.", "success");
   } catch (error) {
-    profileStatus(error.message || "Failed to update profile.", "error");
+    setMessage(ui.profileStatus, error.message || "Failed to update profile.", "error");
   } finally {
     if (ui.profileSaveBtn) {
       ui.profileSaveBtn.disabled = false;
@@ -728,21 +759,15 @@ async function submitProfileUpdate(event) {
   }
 }
 
-async function openDashboard() {
-  showSection("dashboard");
-  await loadDashboardKpis();
-}
-
-async function openInterviews() {
-  showSection("interviews");
-  if (!intState.interviewsLoaded) {
-    intState.interviewsLoaded = true;
-    await loadInterviews();
+async function performLogout() {
+  try {
+    await interviewerApi.logout();
+  } catch (error) {
+    console.error("Logout API error:", error);
+  } finally {
+    clearAuthStorage();
+    window.location.href = "../public/login.html";
   }
-}
-
-async function openScorecards() {
-  showSection("scorecards");
 }
 
 async function openProfile() {
@@ -751,6 +776,7 @@ async function openProfile() {
   await reloadProfile();
 }
 
+/* EVENT BINDINGS */
 async function handleLogoutClick(event) {
   event.preventDefault();
   if (!window.confirm("Do you want to logout?")) return;
@@ -783,11 +809,15 @@ function bindNavigation() {
 }
 
 function bindActions() {
-  if (ui.interviewsLoadBtn) ui.interviewsLoadBtn.addEventListener("click", loadInterviews);
+  if (ui.interviewsLoadBtn) {
+    ui.interviewsLoadBtn.addEventListener("click", loadInterviews);
+  }
+
   if (ui.interviewList) {
     ui.interviewList.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-interview-action]");
       if (!button) return;
+
       const interviewId = String(button.dataset.interviewId || "").trim();
       const status = String(button.dataset.interviewStatus || "").trim();
       const notes = String(button.dataset.interviewNotes || "").trim();
@@ -795,20 +825,35 @@ function bindActions() {
     });
   }
 
-  if (ui.scorecardCreateForm) ui.scorecardCreateForm.addEventListener("submit", submitScorecard);
-  if (ui.scorecardsLoadBtn) ui.scorecardsLoadBtn.addEventListener("click", loadScorecards);
+  if (ui.scorecardCreateForm) {
+    ui.scorecardCreateForm.addEventListener("submit", submitScorecard);
+  }
+
+  if (ui.scorecardsLoadBtn) {
+    ui.scorecardsLoadBtn.addEventListener("click", loadScorecards);
+  }
+
   if (ui.scorecardList) {
     ui.scorecardList.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-scorecard-action]");
       if (!button) return;
+
       const action = String(button.dataset.scorecardAction || "").trim();
       const scorecardId = String(button.dataset.scorecardId || "").trim();
-      if (action === "finalize") finalizeScorecard(scorecardId);
+      if (action === "finalize") {
+        finalizeScorecard(scorecardId);
+      }
     });
   }
 
-  if (ui.profileForm) ui.profileForm.addEventListener("submit", submitProfileUpdate);
-  if (ui.reloadProfileBtn) ui.reloadProfileBtn.addEventListener("click", reloadProfile);
+  if (ui.profileForm) {
+    ui.profileForm.addEventListener("submit", submitProfileUpdate);
+  }
+
+  if (ui.reloadProfileBtn) {
+    ui.reloadProfileBtn.addEventListener("click", reloadProfile);
+  }
+
   if (ui.logoutBtn) {
     ui.logoutBtn.addEventListener("click", async () => {
       if (!window.confirm("Do you want to logout?")) return;
@@ -817,6 +862,7 @@ function bindActions() {
   }
 }
 
+/* INIT */
 async function initInterviewerDashboard() {
   if (!ui.navLinks.length || !ui.sections.length) return;
 

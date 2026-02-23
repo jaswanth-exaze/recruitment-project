@@ -106,10 +106,17 @@ exports.uploadResume = async (req, res) => {
   }
 };
 
+exports.listCandidates = async (req, res) => {
+  try {
+    return res.json(await service.listCandidates(req.query, req.user.company_id));
+  } catch (err) {
+    return handleError(res, err);
+  }
+};
+
 exports.listApplications = async (req, res) => {
   try {
-    if (!req.query.job_id) return res.status(400).json({ message: "job_id query param is required" });
-    return res.json(await service.listApplicationsForJob(req.query.job_id, req.user.company_id));
+    return res.json(await service.listApplications(req.query, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }

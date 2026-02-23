@@ -1,4 +1,5 @@
 (function initApp() {
+  // 1) Cache DOM references.
   const body = document.body;
   const navbar = document.querySelector(".app-navbar");
   const backToTop = document.querySelector("[data-back-to-top]");
@@ -10,6 +11,7 @@
   const activeLinks = document.querySelectorAll(".js-scroll-link[href^=\"#\"]");
   const observedSections = document.querySelectorAll("section[id]");
 
+  // 2) Static display data.
   const rolePreviewMap = {
     platform_admin: [
       "Onboard and monitor multiple companies.",
@@ -43,6 +45,7 @@
     ]
   };
 
+  // 3) Shared UI behavior.
   function onScrollEffects() {
     const offsetY = window.scrollY;
 
@@ -55,14 +58,13 @@
     }
   }
 
-  function setupBackToTop() {
-    if (!backToTop) return;
-    backToTop.addEventListener("click", () => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-  }
+  function bindNavigationHelpers() {
+    if (backToTop) {
+      backToTop.addEventListener("click", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
 
-  function setupSmoothHashScroll() {
     activeLinks.forEach((link) => {
       link.addEventListener("click", (event) => {
         const targetId = link.getAttribute("href");
@@ -75,6 +77,7 @@
     });
   }
 
+  // 4) Section effects.
   function setupActiveSectionTracking() {
     if (!("IntersectionObserver" in window) || !activeLinks.length || !observedSections.length) return;
 
@@ -122,6 +125,7 @@
     revealItems.forEach((item) => revealObserver.observe(item));
   }
 
+  // 5) Forms and dashboard shell.
   function setupContactValidation() {
     const form = document.querySelector("[data-contact-form]");
     if (!form) return;
@@ -185,6 +189,7 @@
     updatePreview();
   }
 
+  // 6) Dashboard counters and charts.
   function animateCount(element) {
     const target = Number(element.dataset.counter || 0);
     const duration = 1500;
@@ -297,6 +302,7 @@
     }
   }
 
+  // 7) Final boot sequence.
   window.addEventListener("scroll", onScrollEffects);
   window.addEventListener("resize", () => {
     if (window.innerWidth >= 992) {
@@ -305,8 +311,7 @@
   });
 
   onScrollEffects();
-  setupBackToTop();
-  setupSmoothHashScroll();
+  bindNavigationHelpers();
   setupActiveSectionTracking();
   setupRevealAnimation();
   setupContactValidation();

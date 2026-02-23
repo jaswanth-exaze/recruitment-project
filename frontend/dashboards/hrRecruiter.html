@@ -283,7 +283,7 @@
                     <h2 class="h6 mb-0">Applications</h2>
                     <div class="d-flex align-items-end gap-2">
                       <div>
-                        <label class="form-label small mb-1" for="hrApplicationsJobId">Job ID</label>
+                        <label class="form-label small mb-1" for="hrApplicationsJobId">Job ID (Optional)</label>
                         <input id="hrApplicationsJobId" type="number" min="1" class="form-control form-control-sm" data-hr-app-job-id />
                       </div>
                       <button type="button" class="btn btn-outline-brand btn-sm" data-hr-app-load>Load</button>
@@ -295,6 +295,7 @@
                       <thead>
                         <tr>
                           <th>ID</th>
+                          <th>Job ID</th>
                           <th>Candidate</th>
                           <th>Status</th>
                           <th>Stage</th>
@@ -327,7 +328,33 @@
             <div class="row g-3">
               <div class="col-lg-5">
                 <section class="table-card p-3 h-100">
-                  <h2 class="h6 mb-3">Load Candidate Profile</h2>
+                  <h2 class="h6 mb-3">Candidates</h2>
+                  <div class="d-flex align-items-end gap-2 mb-3">
+                    <div class="flex-grow-1">
+                      <label class="form-label" for="hrCandidateJobId">Job ID (Optional)</label>
+                      <input id="hrCandidateJobId" type="number" min="1" class="form-control" data-hr-candidate-job-id />
+                    </div>
+                    <button type="button" class="btn btn-outline-brand" data-hr-candidate-list-load>Load</button>
+                  </div>
+
+                  <div class="table-responsive mb-3">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Phone</th>
+                          <th>Address</th>
+                          <th>Apps</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody data-hr-candidate-list></tbody>
+                    </table>
+                  </div>
+
+                  <h3 class="h6 mb-3">Load Candidate Profile</h3>
                   <div class="d-flex align-items-end gap-2 mb-3">
                     <div class="flex-grow-1">
                       <label class="form-label" for="hrCandidateId">Candidate ID</label>
@@ -452,11 +479,11 @@
                     <h2 class="h6 mb-0">Interviews</h2>
                     <div class="d-flex flex-wrap align-items-end gap-2">
                       <div>
-                        <label class="form-label small mb-1" for="hrInterviewLoadAppId">Application ID</label>
+                        <label class="form-label small mb-1" for="hrInterviewLoadAppId">Application ID (Optional)</label>
                         <input id="hrInterviewLoadAppId" type="number" min="1" class="form-control form-control-sm" data-hr-interview-load-app-id />
                       </div>
                       <div>
-                        <label class="form-label small mb-1" for="hrInterviewLoadInterviewerId">Interviewer ID</label>
+                        <label class="form-label small mb-1" for="hrInterviewLoadInterviewerId">Interviewer ID (Optional)</label>
                         <input id="hrInterviewLoadInterviewerId" type="number" min="1" class="form-control form-control-sm" data-hr-interview-load-interviewer-id />
                       </div>
                       <button type="button" class="btn btn-outline-brand btn-sm" data-hr-interview-load>Load</button>
@@ -469,6 +496,10 @@
                         <tr>
                           <th>ID</th>
                           <th>Application</th>
+                          <th>Job ID</th>
+                          <th>Candidate</th>
+                          <th>Phone</th>
+                          <th>Address</th>
                           <th>Interviewer</th>
                           <th>Status</th>
                           <th>Scheduled</th>

@@ -14,6 +14,7 @@ router.post("/jobs", verifyToken, checkRole("HR"), controller.createJobDraft);
 router.put("/jobs/:id", verifyToken, checkRole("HR"), controller.updateJob);
 router.post("/jobs/:id/submit", verifyToken, checkRole("HR"), controller.submitJob);
 
+router.get("/candidates", verifyToken, checkRole("HR"), controller.listCandidates);
 router.get("/candidates/:id/profile", verifyToken, checkRole("HR"), controller.getCandidateProfile);
 router.put("/candidates/:id/profile", verifyToken, checkRole("HR"), controller.updateCandidateProfile);
 router.post("/candidates/:id/resume", verifyToken, checkRole("HR"), controller.uploadResume);

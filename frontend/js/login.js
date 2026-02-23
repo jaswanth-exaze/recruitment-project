@@ -18,7 +18,9 @@
 
   const SESSION_EXPIRED_KEY = "sessionExpiredMessage";
 
-  if (!loginForm || !emailInput || !passwordInput || !loginButton || !loginMsg) return;
+  const hasLoginForm = Boolean(loginForm && emailInput && passwordInput && loginButton && loginMsg);
+  const hasSignupForm = Boolean(signupForm && signupFirstName && signupLastName && signupEmail && signupPassword && signupButton && signupMsg);
+  if (!hasLoginForm && !hasSignupForm) return;
 
   // 2) Build API endpoints.
   const API_BASE = String(window.AUTH_API_BASE || window.API_BASE || "http://localhost:3000").replace(/\/+$/, "");
@@ -62,6 +64,7 @@
   }
 
   function setLoginLoading(isLoading) {
+    if (!loginButton) return;
     loginButton.disabled = isLoading;
     loginButton.textContent = isLoading ? "Signing In..." : "Sign In";
   }
@@ -151,39 +154,41 @@
   }
 
   // 6) Event handlers.
-  loginForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  if (hasLoginForm) {
+    loginForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
 
-    const email = emailInput.value.trim();
-    const password = passwordInput.value;
-    if (!email || !password) {
-      setMessage(loginMsg, "Email and password are required.", "error");
-      return;
-    }
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      if (!email || !password) {
+        setMessage(loginMsg, "Email and password are required.", "error");
+        return;
+      }
 
-    setLoginLoading(true);
-    setMessage(loginMsg, "Authenticating...", "info");
+      setLoginLoading(true);
+      setMessage(loginMsg, "Authenticating...", "info");
 
-    try {
-      const result = await requestWithFallback(LOGIN_ENDPOINTS, { email, password }, "Login");
-      const token = result.token;
-      const role = result.role;
-      if (!token) throw new Error("Token missing in login response");
-      persistAuth(token, role);
-      setMessage(loginMsg, result.message || "Login successful. Redirecting...", "success");
-      const redirectPath = getRedirectPathByRole(role);
-      window.setTimeout(() => {
-        window.location.href = redirectPath;
-      }, 350);
-    } catch (error) {
-      console.error("Login error:", error);
-      setMessage(loginMsg, error.message || "Unable to login. Please try again.", "error");
-    } finally {
-      setLoginLoading(false);
-    }
-  });
+      try {
+        const result = await requestWithFallback(LOGIN_ENDPOINTS, { email, password }, "Login");
+        const token = result.token;
+        const role = result.role;
+        if (!token) throw new Error("Token missing in login response");
+        persistAuth(token, role);
+        setMessage(loginMsg, result.message || "Login successful. Redirecting...", "success");
+        const redirectPath = getRedirectPathByRole(role);
+        window.setTimeout(() => {
+          window.location.href = redirectPath;
+        }, 350);
+      } catch (error) {
+        console.error("Login error:", error);
+        setMessage(loginMsg, error.message || "Unable to login. Please try again.", "error");
+      } finally {
+        setLoginLoading(false);
+      }
+    });
+  }
 
-  if (signupForm && signupFirstName && signupLastName && signupEmail && signupPassword && signupButton && signupMsg) {
+  if (hasSignupForm) {
     signupForm.addEventListener("submit", async (event) => {
       event.preventDefault();
 
@@ -234,5 +239,7 @@
     });
   }
 
-  showStoredSessionMessage();
+  if (hasLoginForm) {
+    showStoredSessionMessage();
+  }
 })();

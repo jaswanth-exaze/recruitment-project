@@ -59,6 +59,10 @@
             <i class="bi bi-journal-text"></i>
             <span class="sidebar-label">Activity Log</span>
           </a>
+          <a class="dash-nav-link" href="#" data-admin-nav="contacts">
+            <i class="bi bi-envelope"></i>
+            <span class="sidebar-label">Contact Requests</span>
+          </a>
           <a class="dash-nav-link" href="#" data-admin-nav="profile">
             <i class="bi bi-person-circle"></i>
             <span class="sidebar-label">Profile</span>
@@ -522,41 +526,15 @@
                         <tr>
                           <th>ID</th>
                           <th>Action</th>
+                          <th>Actor</th>
+                          <th>Company</th>
                           <th>Entity</th>
                           <th>Entity ID</th>
+                          <th>Details</th>
                           <th>Time</th>
                         </tr>
                       </thead>
-                      <tbody data-activity-list>
-                        <tr>
-                          <td>1001</td>
-                          <td>UPDATED</td>
-                          <td>users</td>
-                          <td>10</td>
-                          <td>2026-02-20 09:24</td>
-                        </tr>
-                        <tr>
-                          <td>999</td>
-                          <td>CREATED</td>
-                          <td>users</td>
-                          <td>10</td>
-                          <td>2026-02-20 08:58</td>
-                        </tr>
-                        <tr>
-                          <td>995</td>
-                          <td>UPDATED</td>
-                          <td>users</td>
-                          <td>10</td>
-                          <td>2026-02-19 18:40</td>
-                        </tr>
-                        <tr>
-                          <td>992</td>
-                          <td>DEACTIVATED</td>
-                          <td>users</td>
-                          <td>10</td>
-                          <td>2026-02-19 17:12</td>
-                        </tr>
-                      </tbody>
+                      <tbody data-activity-list></tbody>
                     </table>
                   </div>
                   <div
@@ -585,16 +563,107 @@
             </div>
           </section>
 
-          <section data-admin-view="profile" class="d-none">
+          <section data-admin-view="contacts" class="d-none">
             <div class="row g-3">
-              <div class="col-lg-7">
-                <section class="table-card p-3 h-100">
-                  <h2 class="h6 mb-3">My Profile</h2>
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <div
+                    class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3"
+                  >
+                    <h2 class="h6 mb-0">Contact Request History</h2>
+                    <div class="d-flex align-items-end gap-2">
+                      <div>
+                        <label class="form-label small mb-1" for="contactEmailFilter"
+                          >Work Email</label
+                        >
+                        <input
+                          id="contactEmailFilter"
+                          type="email"
+                          class="form-control form-control-sm"
+                          placeholder="name@company.com"
+                          data-contact-email-filter
+                        />
+                      </div>
+                      <div>
+                        <label class="form-label small mb-1" for="contactCompanyFilter"
+                          >Company</label
+                        >
+                        <input
+                          id="contactCompanyFilter"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="Company name"
+                          data-contact-company-filter
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        class="btn btn-outline-brand btn-sm"
+                        data-contact-load
+                      >
+                        Load
+                      </button>
+                    </div>
+                  </div>
                   <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Full Name</th>
+                          <th>Work Email</th>
+                          <th>Company</th>
+                          <th>Role</th>
+                          <th>Message</th>
+                          <th>Agreed</th>
+                          <th>Submitted At</th>
+                        </tr>
+                      </thead>
+                      <tbody data-contact-list></tbody>
+                    </table>
+                  </div>
+                  <div
+                    class="d-flex justify-content-between align-items-center mt-3"
+                  >
+                    <button
+                      type="button"
+                      class="btn btn-outline-brand btn-sm"
+                      data-contact-prev
+                    >
+                      Previous
+                    </button>
+                    <span class="small text-secondary" data-contact-page-meta
+                      >Page 1 / 1</span
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-outline-brand btn-sm"
+                      data-contact-next
+                    >
+                      Next
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
+
+          <section data-admin-view="profile" class="d-none profile-view">
+            <div class="row g-3">
+              <div class="col-xl-8">
+                <section class="table-card p-3 p-md-4 h-100 profile-panel">
+                  <div class="profile-head mb-3">
+                    <p class="profile-kicker mb-1">Account</p>
+                    <h2 class="h5 mb-1">My Profile</h2>
+                    <p class="profile-subtext mb-0">
+                      Review your account details and keep contact information current.
+                    </p>
+                  </div>
+                  <div class="table-responsive profile-facts mb-3">
                     <table class="table align-middle mb-0">
                       <tbody>
                         <tr>
-                          <th style="width: 30%">Name</th>
+                          <th>Name</th>
                           <td data-admin-profile-name>N/A</td>
                         </tr>
                         <tr>
@@ -616,65 +685,68 @@
                       </tbody>
                     </table>
                   </div>
-                  <hr class="my-3" />
-                  <h3 class="h6 mb-3">Edit Profile</h3>
-                  <form class="row g-3" data-admin-profile-form>
-                    <div class="col-md-6">
-                      <label class="form-label" for="adminProfileFirstName"
-                        >First Name</label
-                      >
-                      <input
-                        id="adminProfileFirstName"
-                        type="text"
-                        class="form-control"
-                        data-admin-edit-first-name
-                        required
-                      />
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="adminProfileLastName"
-                        >Last Name</label
-                      >
-                      <input
-                        id="adminProfileLastName"
-                        type="text"
-                        class="form-control"
-                        data-admin-edit-last-name
-                        required
-                      />
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label" for="adminProfileEmail"
-                        >Email</label
-                      >
-                      <input
-                        id="adminProfileEmail"
-                        type="email"
-                        class="form-control"
-                        data-admin-edit-email
-                        required
-                      />
-                    </div>
-                    <div class="col-12">
-                      <button
-                        type="submit"
-                        class="btn btn-brand"
-                        data-admin-profile-save
-                      >
-                        Save Profile
-                      </button>
-                    </div>
-                  </form>
+                  <div class="profile-form-block">
+                    <h3 class="h6 mb-3">Edit Profile</h3>
+                    <form class="row g-3" data-admin-profile-form>
+                      <div class="col-md-6">
+                        <label class="form-label" for="adminProfileFirstName"
+                          >First Name</label
+                        >
+                        <input
+                          id="adminProfileFirstName"
+                          type="text"
+                          class="form-control"
+                          data-admin-edit-first-name
+                          required
+                        />
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="adminProfileLastName"
+                          >Last Name</label
+                        >
+                        <input
+                          id="adminProfileLastName"
+                          type="text"
+                          class="form-control"
+                          data-admin-edit-last-name
+                          required
+                        />
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label" for="adminProfileEmail"
+                          >Email</label
+                        >
+                        <input
+                          id="adminProfileEmail"
+                          type="email"
+                          class="form-control"
+                          data-admin-edit-email
+                          required
+                        />
+                      </div>
+                      <div class="col-12">
+                        <button
+                          type="submit"
+                          class="btn btn-brand"
+                          data-admin-profile-save
+                        >
+                          Save Profile
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </section>
               </div>
-              <div class="col-lg-5">
-                <section class="table-card p-3 h-100">
-                  <h2 class="h6 mb-3">Session Actions</h2>
-                  <p class="small text-secondary">
-                    Refresh session token, reload profile from backend, or
-                    logout securely.
-                  </p>
-                  <div class="d-grid gap-2">
+              <div class="col-xl-4">
+                <section class="table-card p-3 p-md-4 h-100 profile-panel profile-actions-panel">
+                  <div class="profile-head mb-3">
+                    <p class="profile-kicker mb-1">Security</p>
+                    <h2 class="h5 mb-1">Session Actions</h2>
+                    <p class="profile-subtext mb-0">
+                      Refresh tokens, sync profile data, or log out securely.
+                    </p>
+                  </div>
+                  <div class="d-grid gap-2 profile-actions">
                     <button
                       type="button"
                       class="btn btn-outline-brand"
@@ -698,7 +770,7 @@
                     </button>
                   </div>
                   <p
-                    class="small mt-3 mb-0 text-secondary"
+                    class="profile-status-note mt-3 mb-0"
                     data-admin-profile-status
                   ></p>
                 </section>

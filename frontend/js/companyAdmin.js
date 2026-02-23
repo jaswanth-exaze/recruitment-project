@@ -16,6 +16,7 @@ const COMPANY_ADMIN_CONFIG = {
   endpoints: {
     authLogout: "/auth/logout",
     authProfile: "/auth/profile",
+    getAuditTrail: "/company-admin/audit",
     getMyProfile: "/company-admin/profile",
     updateMyProfile: "/company-admin/profile",
     listUsersByRole: "/company-admin/users",
@@ -51,6 +52,7 @@ const companyState = {
   jobsLoaded: false,
   applicationsLoaded: false,
   offersLoaded: false,
+  activityLoaded: false,
   usersRows: [],
   selectedUser: null,
   jobsRows: [],
@@ -59,6 +61,7 @@ const companyState = {
   currentApplicationJobId: "",
   offerRows: [],
   currentOfferApplicationId: "",
+  auditRows: [],
   redirecting: false
 };
 
@@ -80,13 +83,18 @@ const viewMeta = {
   },
   applications: {
     title: "Applications",
-    subtitle: "Move stages and make screening/final decisions.",
+    subtitle: "View all applications first, then filter by job if needed.",
     searchPlaceholder: "Search applications by candidate"
   },
   offers: {
     title: "Offers",
-    subtitle: "Create offer drafts and send selected offers.",
+    subtitle: "View all offers first, then filter by application if needed.",
     searchPlaceholder: "Search offers by application"
+  },
+  activity: {
+    title: "Activity",
+    subtitle: "View logs for your company only. Load all first, then filter by entity and id.",
+    searchPlaceholder: "Search audit actions"
   },
   profile: {
     title: "Profile",
@@ -100,6 +108,7 @@ const ui = {
   sections: document.querySelectorAll("[data-company-view]"),
   headerTitle: document.querySelector("[data-company-header-title]"),
   headerSubtitle: document.querySelector("[data-company-header-subtitle]"),
+  topCompanyName: document.querySelector("[data-company-top-company]"),
   searchInput: document.querySelector("[data-company-search]"),
 
   kpiHr: document.querySelector("[data-company-kpi-hr]"),
@@ -162,6 +171,12 @@ const ui = {
   offerSendDocument: document.querySelector("[data-company-offer-send-document]"),
   offerSendEsign: document.querySelector("[data-company-offer-send-esign]"),
   offerSendMsg: document.querySelector("[data-company-offer-send-msg]"),
+
+  auditEntityInput: document.querySelector("[data-company-audit-entity]"),
+  auditEntityIdInput: document.querySelector("[data-company-audit-id]"),
+  auditLoadBtn: document.querySelector("[data-company-audit-load]"),
+  auditList: document.querySelector("[data-company-audit-list]"),
+  auditMsg: document.querySelector("[data-company-audit-msg]"),
 
   profileName: document.querySelector("[data-company-profile-name]"),
   profileEmail: document.querySelector("[data-company-profile-email]"),
@@ -227,6 +242,34 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+function formatAuditAction(action) {
+  const raw = String(action || "").trim();
+  if (!raw) return "N/A";
+
+  const match = raw.match(/^(POST|PUT|PATCH|DELETE|GET)\s+\/(.+)$/i);
+  if (!match) return raw;
+
+  const method = String(match[1] || "").toUpperCase();
+  const route = String(match[2] || "").split("?")[0];
+  const words = route
+    .split("/")
+    .filter(Boolean)
+    .filter((part) => !/^\d+$/.test(part))
+    .map((part) => part.replace(/[-_]+/g, " "))
+    .slice(-2);
+
+  const label = words.join(" ").trim() || "record";
+  const verbMap = {
+    POST: "Created",
+    PUT: "Updated",
+    PATCH: "Updated",
+    DELETE: "Deleted",
+    GET: "Viewed",
+  };
+
+  return `${verbMap[method] || "Updated"} ${label}`;
+}
+
 function fullName(record) {
   const first = firstValue(record, ["first_name"], "");
   const last = firstValue(record, ["last_name"], "");
@@ -269,6 +312,19 @@ function profileSuffixText() {
   if (name === "N/A" && !role) return "";
   if (name !== "N/A" && role) return ` Signed in as ${name} (${role}).`;
   return ` Signed in as ${name !== "N/A" ? name : role}.`;
+}
+
+function resolveCompanyName(profile) {
+  const companyName = firstValue(profile || {}, ["company_name"], "");
+  if (companyName) return companyName;
+  const companyId = firstValue(profile || {}, ["company_id"], "");
+  if (companyId) return `Company #${companyId}`;
+  return "N/A";
+}
+
+function renderTopCompanyName() {
+  if (!ui.topCompanyName) return;
+  ui.topCompanyName.textContent = `Company: ${resolveCompanyName(companyState.currentProfile)}`;
 }
 
 function showSection(viewKey) {
@@ -470,6 +526,15 @@ const companyAdminApi = {
     });
   },
 
+  getAuditTrail(entity, id) {
+    const query = {};
+    if (entity) query.entity = entity;
+    if (id) query.id = id;
+    return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.getAuditTrail, {
+      query
+    });
+  },
+
   listUsersByRole(role, includeInactive = true) {
     return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.listUsersByRole, {
       query: { role, include_inactive: includeInactive ? "true" : "false" }
@@ -560,8 +625,10 @@ const companyAdminApi = {
   },
 
   listApplications(jobId) {
+    const query = {};
+    if (jobId) query.job_id = jobId;
     return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.listApplications, {
-      query: { job_id: jobId }
+      query
     });
   },
 
@@ -594,14 +661,18 @@ const companyAdminApi = {
   },
 
   applicationStats(jobId) {
+    const query = {};
+    if (jobId) query.job_id = jobId;
     return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.applicationStats, {
-      query: { job_id: jobId }
+      query
     });
   },
 
   getOffers(applicationId) {
+    const query = {};
+    if (applicationId) query.application_id = applicationId;
     return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.getOffers, {
-      query: { application_id: applicationId }
+      query
     });
   },
 
@@ -654,6 +725,7 @@ function renderProfilePanel() {
     if (ui.profileFirstName) ui.profileFirstName.value = "";
     if (ui.profileLastName) ui.profileLastName.value = "";
     if (ui.profileEditEmail) ui.profileEditEmail.value = "";
+    renderTopCompanyName();
     return;
   }
 
@@ -666,6 +738,7 @@ function renderProfilePanel() {
   if (ui.profileFirstName) ui.profileFirstName.value = firstValue(profile, ["first_name"], "");
   if (ui.profileLastName) ui.profileLastName.value = firstValue(profile, ["last_name"], "");
   if (ui.profileEditEmail) ui.profileEditEmail.value = firstValue(profile, ["email"], "");
+  renderTopCompanyName();
 }
 
 function ensureCompanyAdminRole(profile) {
@@ -1472,7 +1545,7 @@ function renderApplicationStats(rows) {
 function renderApplicationRows(rows) {
   if (!ui.appList) return;
   if (!rows.length) {
-    showTableMessage(ui.appList, 6, "No applications found");
+    showTableMessage(ui.appList, 7, "No applications found");
     return;
   }
 
@@ -1486,6 +1559,10 @@ function renderApplicationRows(rows) {
     const idCell = document.createElement("td");
     idCell.textContent = applicationId || "N/A";
     tr.appendChild(idCell);
+
+    const jobIdCell = document.createElement("td");
+    jobIdCell.textContent = firstValue(application, ["job_id"], "N/A");
+    tr.appendChild(jobIdCell);
 
     const candidateCell = document.createElement("td");
     const candidateName = `${firstValue(application, ["first_name"], "")} ${firstValue(application, ["last_name"], "")}`.trim();
@@ -1518,12 +1595,16 @@ function renderApplicationRows(rows) {
     const actionCell = document.createElement("td");
     actionCell.className = "text-nowrap";
 
-    const actionDefs = [
-      { action: "move", label: "Move" },
-      { action: "screen", label: "Screen" },
-      { action: "final", label: "Final" },
-      { action: "recommend", label: "Recommend" }
-    ];
+    const currentStatus = firstValue(application, ["status"], "");
+    const offerRecommended = firstValue(application, ["offer_recommended"], "0");
+    const actionDefs = getCompanyApplicationActions(currentStatus, offerRecommended);
+
+    if (!actionDefs.length) {
+      actionCell.innerHTML = '<span class="small text-secondary">No actions</span>';
+      tr.appendChild(actionCell);
+      ui.appList.appendChild(tr);
+      return;
+    }
 
     actionDefs.forEach((entry, index) => {
       const btn = document.createElement("button");
@@ -1532,8 +1613,9 @@ function renderApplicationRows(rows) {
       btn.textContent = entry.label;
       btn.dataset.appAction = entry.action;
       btn.dataset.applicationId = applicationId;
-      btn.dataset.applicationStatus = firstValue(application, ["status"], "");
+      btn.dataset.applicationStatus = currentStatus;
       btn.dataset.applicationStage = firstValue(application, ["current_stage_id"], "");
+      btn.dataset.applicationOfferRecommended = offerRecommended;
       actionCell.appendChild(btn);
     });
 
@@ -1542,16 +1624,62 @@ function renderApplicationRows(rows) {
   });
 }
 
+function normalizeApplicationStatus(status) {
+  return String(status || "").trim().toLowerCase();
+}
+
+function toBooleanFlag(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function getCompanyApplicationActions(statusValue, offerRecommendedValue) {
+  const status = normalizeApplicationStatus(statusValue);
+  const offerRecommended = toBooleanFlag(offerRecommendedValue);
+
+  if (!status) {
+    return [
+      { action: "move", label: "Move" },
+      { action: "screen", label: "Screen" }
+    ];
+  }
+
+  if (["hired", "rejected", "offer_letter_sent", "offer accecepted"].includes(status)) {
+    return [];
+  }
+
+  if (status === "selected") {
+    return offerRecommended ? [] : [{ action: "recommend", label: "Recommend" }];
+  }
+
+  if (status === "interview score submited") {
+    return [
+      { action: "final", label: "Final" },
+      ...(offerRecommended ? [] : [{ action: "recommend", label: "Recommend" }])
+    ];
+  }
+
+  if (["applied", "screening"].includes(status)) {
+    return [
+      { action: "move", label: "Move" },
+      { action: "screen", label: "Screen" }
+    ];
+  }
+
+  if (status === "interview") {
+    return [
+      { action: "move", label: "Move" },
+      { action: "final", label: "Final" }
+    ];
+  }
+
+  return [{ action: "move", label: "Move" }];
+}
+
 async function loadApplicationsAndStats() {
   if (!COMPANY_ADMIN_CONFIG.useApi) return;
 
   const jobId = String(ui.appJobIdInput?.value || "").trim();
-  if (!jobId) {
-    showTableMessage(ui.appList, 6, "Enter job id to load applications.");
-    renderApplicationStats([]);
-    setMessage(ui.appMsg, "Job id is required.", "error");
-    return;
-  }
 
   try {
     setMessage(ui.appMsg, "Loading applications...", "info");
@@ -1566,7 +1694,8 @@ async function loadApplicationsAndStats() {
     companyState.currentApplicationJobId = jobId;
     renderApplicationRows(rows);
     renderApplicationStats(statsRows);
-    setMessage(ui.appMsg, `Loaded ${rows.length} application(s).`, "success");
+    const filterText = jobId ? ` for job #${jobId}` : "";
+    setMessage(ui.appMsg, `Loaded ${rows.length} application(s)${filterText}.`, "success");
   } catch (error) {
     companyState.applicationRows = [];
     renderApplicationRows([]);
@@ -1575,8 +1704,18 @@ async function loadApplicationsAndStats() {
   }
 }
 
-async function handleApplicationAction(action, applicationId, currentStatus, currentStage) {
+async function handleApplicationAction(action, applicationId, currentStatus, currentStage, offerRecommended) {
   if (!applicationId) return;
+  const allowedActions = getCompanyApplicationActions(currentStatus, offerRecommended)
+    .map((entry) => entry.action);
+  if (!allowedActions.includes(action)) {
+    setMessage(
+      ui.appMsg,
+      `Action "${action}" is not available for status "${currentStatus || "unknown"}".`,
+      "info",
+    );
+    return;
+  }
 
   try {
     if (action === "move") {
@@ -1625,8 +1764,9 @@ async function handleApplicationTableAction(event) {
   const applicationId = String(button.dataset.applicationId || "").trim();
   const currentStatus = String(button.dataset.applicationStatus || "").trim();
   const currentStage = String(button.dataset.applicationStage || "").trim();
+  const offerRecommended = String(button.dataset.applicationOfferRecommended || "").trim();
 
-  await handleApplicationAction(action, applicationId, currentStatus, currentStage);
+  await handleApplicationAction(action, applicationId, currentStatus, currentStage, offerRecommended);
 }
 
 function parseOfferDetails(rawText) {
@@ -1652,7 +1792,7 @@ function summarizeOfferDetails(details) {
 function renderOfferRows(rows) {
   if (!ui.offerList) return;
   if (!rows.length) {
-    showTableMessage(ui.offerList, 5, "No offers found");
+    showTableMessage(ui.offerList, 6, "No offers found");
     return;
   }
 
@@ -1665,6 +1805,10 @@ function renderOfferRows(rows) {
     const idCell = document.createElement("td");
     idCell.textContent = offerId || "N/A";
     tr.appendChild(idCell);
+
+    const applicationCell = document.createElement("td");
+    applicationCell.textContent = firstValue(offer, ["application_id"], "N/A");
+    tr.appendChild(applicationCell);
 
     const statusCell = document.createElement("td");
     statusCell.textContent = firstValue(offer, ["status"], "N/A");
@@ -1698,18 +1842,14 @@ async function loadOffersByApplication() {
   if (!COMPANY_ADMIN_CONFIG.useApi) return;
 
   const applicationId = String(ui.offerApplicationIdInput?.value || "").trim();
-  if (!applicationId) {
-    showTableMessage(ui.offerList, 5, "Enter application id to load offers.");
-    setMessage(ui.offerSendMsg, "Application id is required.", "error");
-    return;
-  }
 
   try {
     const rows = normalizeArrayResponse(await companyAdminApi.getOffers(applicationId));
     companyState.offerRows = rows;
     companyState.currentOfferApplicationId = applicationId;
     renderOfferRows(rows);
-    setMessage(ui.offerSendMsg, `Loaded ${rows.length} offer(s).`, "success");
+    const filterText = applicationId ? ` for application #${applicationId}` : "";
+    setMessage(ui.offerSendMsg, `Loaded ${rows.length} offer(s)${filterText}.`, "success");
   } catch (error) {
     companyState.offerRows = [];
     renderOfferRows([]);
@@ -1817,6 +1957,71 @@ function handleOfferTableAction(event) {
   }
 }
 
+function renderAuditRows(rows) {
+  if (!ui.auditList) return;
+
+  if (!rows.length) {
+    showTableMessage(ui.auditList, 7, "No audit logs found for your company");
+    return;
+  }
+
+  ui.auditList.innerHTML = "";
+
+  rows.forEach((log) => {
+    const tr = document.createElement("tr");
+    const details = log?.new_data && typeof log.new_data === "object" ? log.new_data : {};
+    const actorName = firstValue(log, ["actor_name"], "").trim();
+    const actorEmail = firstValue(log, ["actor_email"], "").trim();
+    const actorText = actorName || actorEmail || firstValue(log, ["user_id"], "System");
+    const routeText = String(details.route || details.path || "").trim();
+    const statusCode = String(details.status_code || "").trim();
+    const detailText = [statusCode ? `HTTP ${statusCode}` : "", routeText].filter(Boolean).join(" | ") || "-";
+
+    const cells = [
+      firstValue(log, ["id"], "N/A"),
+      formatAuditAction(firstValue(log, ["action"], "N/A")),
+      actorText,
+      firstValue(log, ["entity_type"], "N/A"),
+      firstValue(log, ["entity_id"], "N/A"),
+      detailText,
+      formatDateTime(firstValue(log, ["created_at"], "")),
+    ];
+
+    cells.forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+
+    ui.auditList.appendChild(tr);
+  });
+}
+
+async function loadAuditTrail() {
+  if (!COMPANY_ADMIN_CONFIG.useApi) return;
+
+  const entity = String(ui.auditEntityInput?.value || "").trim();
+  const id = String(ui.auditEntityIdInput?.value || "").trim();
+
+  if ((entity && !id) || (!entity && id)) {
+    showTableMessage(ui.auditList, 7, "Enter both entity and entity id to filter");
+    setMessage(ui.auditMsg, "Enter both entity and entity id to filter.", "error");
+    return;
+  }
+
+  try {
+    showTableMessage(ui.auditList, 7, "Loading audit logs...");
+    const rows = normalizeArrayResponse(await companyAdminApi.getAuditTrail(entity || undefined, id || undefined));
+    companyState.auditRows = rows;
+    renderAuditRows(rows);
+    setMessage(ui.auditMsg, `Loaded ${rows.length} audit log(s).`, "success");
+  } catch (error) {
+    companyState.auditRows = [];
+    renderAuditRows([]);
+    setMessage(ui.auditMsg, error.message || "Failed to load audit logs.", "error");
+  }
+}
+
 async function reloadCompanyProfile() {
   if (!COMPANY_ADMIN_CONFIG.useApi) return;
   setMessage(ui.profileStatus, "Loading profile...", "info");
@@ -1908,8 +2113,7 @@ async function openJobs() {
 
 async function openApplications() {
   showSection("applications");
-  const currentJobId = String(ui.appJobIdInput?.value || "").trim();
-  if (currentJobId && !companyState.applicationsLoaded) {
+  if (!companyState.applicationsLoaded) {
     companyState.applicationsLoaded = true;
     await loadApplicationsAndStats();
   }
@@ -1917,10 +2121,17 @@ async function openApplications() {
 
 async function openOffers() {
   showSection("offers");
-  const currentApplicationId = String(ui.offerApplicationIdInput?.value || "").trim();
-  if (currentApplicationId && !companyState.offersLoaded) {
+  if (!companyState.offersLoaded) {
     companyState.offersLoaded = true;
     await loadOffersByApplication();
+  }
+}
+
+async function openActivity() {
+  showSection("activity");
+  if (!companyState.activityLoaded) {
+    companyState.activityLoaded = true;
+    await loadAuditTrail();
   }
 }
 
@@ -1955,6 +2166,7 @@ function bindNavigation() {
       if (section === "jobs") await openJobs();
       if (section === "applications") await openApplications();
       if (section === "offers") await openOffers();
+      if (section === "activity") await openActivity();
       if (section === "profile") await openProfile();
 
       if (window.innerWidth < 992) {
@@ -2079,6 +2291,13 @@ function bindActionButtons() {
     });
   }
 
+  if (ui.auditLoadBtn) {
+    ui.auditLoadBtn.addEventListener("click", async () => {
+      companyState.activityLoaded = true;
+      await loadAuditTrail();
+    });
+  }
+
   if (ui.offerList) {
     ui.offerList.addEventListener("click", handleOfferTableAction);
   }
@@ -2133,11 +2352,13 @@ window.companyAdminApi = {
   openJobs,
   openApplications,
   openOffers,
+  openActivity,
   openProfile,
   loadDashboardKpis,
   loadUsersByRole,
   loadJobs,
   loadApplicationsAndStats,
   loadOffersByApplication,
+  loadAuditTrail,
   performLogout
 };

@@ -26,6 +26,7 @@ router.post("/users/:id/activate", verifyToken, checkRole("PlatformAdmin"), cont
 
 router.post("/audit-logs", verifyToken, checkRole("PlatformAdmin"), controller.insertAuditLog);
 router.get("/audit", verifyToken, checkRole("PlatformAdmin"), controller.getAuditTrail);
+router.get("/contact-requests", verifyToken, checkRole("PlatformAdmin"), controller.listContactRequests);
 
 router.post("/background-jobs", verifyToken, checkRole("PlatformAdmin"), controller.insertBackgroundJob);
 router.get("/background-jobs/pending", verifyToken, checkRole("PlatformAdmin"), controller.getPendingJobs);

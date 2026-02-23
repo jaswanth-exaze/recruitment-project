@@ -84,12 +84,13 @@ CREATE TABLE applications (
   id INT NOT NULL AUTO_INCREMENT,
   job_id INT NOT NULL,
   candidate_id INT NOT NULL,
-  status ENUM('applied','screening','interview','selected','rejected','hired') DEFAULT 'applied',
+  status ENUM('applied','screening','interview','interview score submited','selected','offer_letter_sent','offer accecepted','rejected','hired') DEFAULT 'applied',
   current_stage_id INT DEFAULT NULL,
   applied_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   screening_decision_at TIMESTAMP NULL DEFAULT NULL,
   final_decision_at TIMESTAMP NULL DEFAULT NULL,
   offer_recommended TINYINT(1) DEFAULT 0,
+  application_data JSON DEFAULT NULL,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -208,6 +209,22 @@ CREATE TABLE saved_jobs (
   CONSTRAINT saved_jobs_ibfk_2 FOREIGN KEY (job_id)
     REFERENCES job_requisitions (id)
     ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE contact_requests (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  full_name VARCHAR(150) NOT NULL,
+  work_email VARCHAR(255) NOT NULL,
+  company_name VARCHAR(255) NOT NULL,
+  role VARCHAR(100) NOT NULL,
+  message TEXT NOT NULL,
+  agreed_to_contact TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_contact_created_at (created_at),
+  KEY idx_contact_email (work_email),
+  KEY idx_contact_company (company_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE audit_logs (
@@ -343,6 +360,11 @@ INSERT INTO saved_jobs (id,candidate_id,job_id,saved_at) VALUES
 (2,16,1,'2026-01-29 09:21:11'),
 (3,18,7,'2026-02-03 09:21:11'),
 (4,20,5,'2026-02-08 09:21:11');
+
+INSERT INTO contact_requests
+(id,full_name,work_email,company_name,role,message,agreed_to_contact,created_at,updated_at) VALUES
+(1,'Elena Ruiz','elena.ruiz@corasystems.com','Cora Systems','Recruitment Lead','Need a platform demo for 4 business units and centralized approvals.',1,'2026-02-15 11:20:00','2026-02-15 11:20:00'),
+(2,'Nikhil Sharma','nikhil.sharma@novalynx.com','Novalynx Technologies','Hiring Manager','Looking for interview scorecard templates and role-based access setup.',1,'2026-02-18 14:05:00','2026-02-18 14:05:00');
 
 INSERT INTO audit_logs
 (id,user_id,action,entity_type,entity_id,old_data,new_data,ip_address,created_at) VALUES

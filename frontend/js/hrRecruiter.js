@@ -23,6 +23,7 @@ const HR_CONFIG = {
     moveApplicationStage: "/hr-recruiter/applications/:id/move-stage",
     recommendOffer: "/hr-recruiter/applications/:id/recommend-offer",
     screenDecision: "/hr-recruiter/applications/:id/screen",
+    finalDecision: "/hr-recruiter/applications/:id/final-decision",
     listCandidates: "/hr-recruiter/candidates",
     getCandidateProfile: "/hr-recruiter/candidates/:id/profile",
     updateCandidateProfile: "/hr-recruiter/candidates/:id/profile",
@@ -30,6 +31,8 @@ const HR_CONFIG = {
     getInterviews: "/hr-recruiter/interviews",
     scheduleInterview: "/hr-recruiter/interviews",
     updateInterview: "/hr-recruiter/interviews/:id",
+    listInterviewers: "/hr-recruiter/interviewers",
+    listOfferEligibleApplications: "/hr-recruiter/offers/eligible-applications",
     createOfferDraft: "/hr-recruiter/offers",
     sendOffer: "/hr-recruiter/offers/:id/send"
   }
@@ -42,6 +45,7 @@ const hrState = {
   applicationsLoaded: false,
   candidatesLoaded: false,
   interviewsLoaded: false,
+  interviewersLoaded: false,
   offersLoaded: false,
   jobsRows: [],
   selectedJob: null,
@@ -51,7 +55,9 @@ const hrState = {
   currentCandidateJobId: "",
   currentCandidateId: "",
   currentCandidate: null,
-  interviewsRows: []
+  interviewsRows: [],
+  interviewerRows: [],
+  offerEligibleRows: []
 };
 
 const hrViewMeta = {
@@ -97,6 +103,7 @@ const ui = {
   sections: document.querySelectorAll("[data-hr-view]"),
   headerTitle: document.querySelector("[data-hr-header-title]"),
   headerSubtitle: document.querySelector("[data-hr-header-subtitle]"),
+  topCompanyName: document.querySelector("[data-hr-top-company]"),
   searchInput: document.querySelector("[data-hr-search]"),
 
   kpiOpenJobs: document.querySelector("[data-hr-kpi-open-jobs]"),
@@ -148,6 +155,7 @@ const ui = {
   resumeUrl: document.querySelector("[data-hr-resume-url]"),
 
   interviewCreateForm: document.querySelector("[data-hr-interview-create-form]"),
+  interviewerSelect: document.querySelector("[data-hr-interviewer-select]"),
   interviewCreateMsg: document.querySelector("[data-hr-interview-create-msg]"),
   interviewLoadAppId: document.querySelector("[data-hr-interview-load-app-id]"),
   interviewLoadInterviewerId: document.querySelector("[data-hr-interview-load-interviewer-id]"),
@@ -156,6 +164,10 @@ const ui = {
   interviewMsg: document.querySelector("[data-hr-interview-msg]"),
 
   offerCreateForm: document.querySelector("[data-hr-offer-create-form]"),
+  offerApplicationSelect: document.querySelector("[data-hr-offer-application-select]"),
+  offerEligibleLoadBtn: document.querySelector("[data-hr-offer-eligible-load]"),
+  offerEligibleList: document.querySelector("[data-hr-offer-eligible-list]"),
+  offerEligibleMsg: document.querySelector("[data-hr-offer-eligible-msg]"),
   offerCreateMsg: document.querySelector("[data-hr-offer-create-msg]"),
   offerSendForm: document.querySelector("[data-hr-offer-send-form]"),
   offerSendId: document.querySelector("[data-hr-offer-send-id]"),
@@ -478,6 +490,13 @@ const hrApi = {
     });
   },
 
+  finalDecision(id, status) {
+    return apiRequest(buildPathWithId(HR_CONFIG.endpoints.finalDecision, id), {
+      method: "POST",
+      body: { status }
+    });
+  },
+
   recommendOffer(id) {
     return apiRequest(buildPathWithId(HR_CONFIG.endpoints.recommendOffer, id), {
       method: "POST",
@@ -509,6 +528,10 @@ const hrApi = {
     });
   },
 
+  listInterviewers() {
+    return apiRequest(HR_CONFIG.endpoints.listInterviewers);
+  },
+
   scheduleInterview(payload) {
     return apiRequest(HR_CONFIG.endpoints.scheduleInterview, {
       method: "POST",
@@ -520,6 +543,14 @@ const hrApi = {
     return apiRequest(buildPathWithId(HR_CONFIG.endpoints.updateInterview, id), {
       method: "PUT",
       body: { status, notes }
+    });
+  },
+
+  listOfferEligibleApplications(jobId) {
+    const query = {};
+    if (jobId) query.job_id = jobId;
+    return apiRequest(HR_CONFIG.endpoints.listOfferEligibleApplications, {
+      query
     });
   },
 
@@ -553,6 +584,19 @@ function profileSuffixText() {
   if (name === "N/A" && !role) return "";
   if (name !== "N/A" && role) return ` Signed in as ${name} (${role}).`;
   return ` Signed in as ${name !== "N/A" ? name : role}.`;
+}
+
+function resolveCompanyName(profile) {
+  const companyName = firstValue(profile || {}, ["company_name"], "");
+  if (companyName) return companyName;
+  const companyId = firstValue(profile || {}, ["company_id"], "");
+  if (companyId) return `Company #${companyId}`;
+  return "N/A";
+}
+
+function renderTopCompanyName() {
+  if (!ui.topCompanyName) return;
+  ui.topCompanyName.textContent = `Company: ${resolveCompanyName(hrState.currentProfile)}`;
 }
 
 function showSection(viewKey) {
@@ -590,6 +634,7 @@ function renderProfilePanel() {
     if (ui.profileFirstName) ui.profileFirstName.value = "";
     if (ui.profileLastName) ui.profileLastName.value = "";
     if (ui.profileEditEmail) ui.profileEditEmail.value = "";
+    renderTopCompanyName();
     return;
   }
 
@@ -602,6 +647,7 @@ function renderProfilePanel() {
   if (ui.profileFirstName) ui.profileFirstName.value = firstValue(profile, ["first_name"], "");
   if (ui.profileLastName) ui.profileLastName.value = firstValue(profile, ["last_name"], "");
   if (ui.profileEditEmail) ui.profileEditEmail.value = firstValue(profile, ["email"], "");
+  renderTopCompanyName();
 }
 
 function setProfileStatus(text, type) {
@@ -652,7 +698,14 @@ async function performLogout() {
 function createStatusBadge(status) {
   const normalized = String(status || "").toLowerCase();
   let cls = "text-bg-secondary";
-  if (normalized === "published" || normalized === "active" || normalized === "completed") cls = "text-bg-success";
+  if (
+    normalized === "published" ||
+    normalized === "active" ||
+    normalized === "completed" ||
+    normalized === "interview score submited"
+  ) {
+    cls = "text-bg-success";
+  }
   if (normalized === "pending" || normalized === "scheduled") cls = "text-bg-warning";
   if (normalized === "draft") cls = "text-bg-info";
   if (normalized === "closed" || normalized === "rejected") cls = "text-bg-dark";
@@ -756,7 +809,7 @@ function clearSelectedJob() {
 function renderJobRows(rows) {
   if (!ui.jobList) return;
   if (!rows.length) {
-    showTableMessage(ui.jobList, 5, "No jobs found");
+    showTableMessage(ui.jobList, 6, "No jobs found");
     return;
   }
 
@@ -781,6 +834,10 @@ function renderJobRows(rows) {
     const locationCell = document.createElement("td");
     locationCell.textContent = firstValue(job, ["location"], "-");
     tr.appendChild(locationCell);
+
+    const openingsCell = document.createElement("td");
+    openingsCell.textContent = firstValue(job, ["positions_count"], "N/A");
+    tr.appendChild(openingsCell);
 
     const actionCell = document.createElement("td");
     actionCell.className = "text-nowrap";
@@ -817,7 +874,7 @@ async function loadJobs() {
     renderJobRows(rows);
   } catch (error) {
     hrState.jobsRows = [];
-    showTableMessage(ui.jobList, 5, error.message || "Failed to load jobs");
+    showTableMessage(ui.jobList, 6, error.message || "Failed to load jobs");
   }
 }
 
@@ -971,7 +1028,7 @@ async function handleJobListClick(event) {
 function renderApplicationRows(rows) {
   if (!ui.appList) return;
   if (!rows.length) {
-    showTableMessage(ui.appList, 7, "No applications found");
+    showTableMessage(ui.appList, 8, "No applications found");
     return;
   }
 
@@ -1003,6 +1060,10 @@ function renderApplicationRows(rows) {
     stageCell.textContent = firstValue(app, ["current_stage_id"], "-");
     tr.appendChild(stageCell);
 
+    const openingsCell = document.createElement("td");
+    openingsCell.textContent = firstValue(app, ["openings_left", "positions_count"], "N/A");
+    tr.appendChild(openingsCell);
+
     const resumeCell = document.createElement("td");
     const resumeUrl = firstValue(app, ["resume_url"], "");
     if (resumeUrl) {
@@ -1020,11 +1081,16 @@ function renderApplicationRows(rows) {
     const actionCell = document.createElement("td");
     actionCell.className = "text-nowrap";
 
-    const actions = [
-      { action: "move", label: "Move" },
-      { action: "screen", label: "Screen" },
-      { action: "recommend", label: "Recommend" }
-    ];
+    const currentStatus = firstValue(app, ["status"], "");
+    const offerRecommended = firstValue(app, ["offer_recommended"], "0");
+    const actions = getRecruiterApplicationActions(currentStatus, offerRecommended);
+
+    if (!actions.length) {
+      actionCell.innerHTML = '<span class="small text-secondary">No actions</span>';
+      tr.appendChild(actionCell);
+      ui.appList.appendChild(tr);
+      return;
+    }
 
     actions.forEach((entry, index) => {
       const btn = document.createElement("button");
@@ -1033,14 +1099,57 @@ function renderApplicationRows(rows) {
       btn.textContent = entry.label;
       btn.dataset.appAction = entry.action;
       btn.dataset.appId = appId;
-      btn.dataset.appStatus = firstValue(app, ["status"], "");
+      btn.dataset.appStatus = currentStatus;
       btn.dataset.appStage = firstValue(app, ["current_stage_id"], "");
+      btn.dataset.appOfferRecommended = offerRecommended;
       actionCell.appendChild(btn);
     });
 
     tr.appendChild(actionCell);
     ui.appList.appendChild(tr);
   });
+}
+
+function normalizeApplicationStatus(status) {
+  return String(status || "").trim().toLowerCase();
+}
+
+function toBooleanFlag(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function getRecruiterApplicationActions(statusValue, offerRecommendedValue) {
+  const status = normalizeApplicationStatus(statusValue);
+  const offerRecommended = toBooleanFlag(offerRecommendedValue);
+
+  if (!status) {
+    return [
+      { action: "move", label: "Move" },
+      { action: "screen", label: "Screen" }
+    ];
+  }
+
+  if (["hired", "rejected", "offer_letter_sent", "offer accecepted"].includes(status)) {
+    return [];
+  }
+
+  if (["interview score submited", "selected"].includes(status)) {
+    return offerRecommended ? [] : [{ action: "recommend", label: "Recommend" }];
+  }
+
+  if (["applied", "screening"].includes(status)) {
+    return [
+      { action: "move", label: "Move" },
+      { action: "screen", label: "Screen" }
+    ];
+  }
+
+  if (status === "interview") {
+    return [{ action: "move", label: "Move" }];
+  }
+
+  return [{ action: "move", label: "Move" }];
 }
 
 async function loadApplications() {
@@ -1061,8 +1170,18 @@ async function loadApplications() {
   }
 }
 
-async function handleApplicationAction(action, appId, currentStatus, currentStage) {
+async function handleApplicationAction(action, appId, currentStatus, currentStage, offerRecommended) {
   if (!appId) return;
+  const allowedActions = getRecruiterApplicationActions(currentStatus, offerRecommended)
+    .map((entry) => entry.action);
+  if (!allowedActions.includes(action)) {
+    setMessage(
+      ui.appMsg,
+      `Action "${action}" is not available for status "${currentStatus || "unknown"}".`,
+      "info",
+    );
+    return;
+  }
 
   try {
     if (action === "move") {
@@ -1103,6 +1222,43 @@ function parseCandidateProfileData(value) {
   } catch (error) {
     throw new Error("Profile Data must be valid JSON");
   }
+}
+
+function numericRating(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  if (num < 0) return null;
+  return num;
+}
+
+function scorecardSummary(interview) {
+  const recommendation = firstValue(interview, ["scorecard_recommendation"], "");
+  const ratings = interview?.scorecard_ratings && typeof interview.scorecard_ratings === "object"
+    ? interview.scorecard_ratings
+    : null;
+
+  let averageText = "";
+  if (ratings) {
+    const nums = Object.values(ratings)
+      .map((value) => numericRating(value))
+      .filter((value) => value !== null);
+    if (nums.length) {
+      const avg = nums.reduce((sum, value) => sum + value, 0) / nums.length;
+      averageText = `${avg.toFixed(1)}/5`;
+    }
+  }
+
+  const parts = [];
+  if (recommendation) parts.push(`Rec: ${recommendation}`);
+  if (averageText) parts.push(`Avg: ${averageText}`);
+
+  return parts.length ? parts.join(" | ") : "-";
+}
+
+function canTakeInterviewFinalDecision(interview) {
+  const appStatus = String(firstValue(interview, ["application_status"], "")).toLowerCase();
+  const scoreFinal = String(firstValue(interview, ["scorecard_is_final"], "0")) === "1";
+  return appStatus === "interview score submited" && scoreFinal;
 }
 
 function renderCandidateRows(rows) {
@@ -1307,7 +1463,7 @@ async function submitResumeUpdate(event) {
 function renderInterviewRows(rows) {
   if (!ui.interviewList) return;
   if (!rows.length) {
-    showTableMessage(ui.interviewList, 10, "No interviews found");
+    showTableMessage(ui.interviewList, 11, "No interviews found");
     return;
   }
 
@@ -1316,6 +1472,7 @@ function renderInterviewRows(rows) {
   rows.forEach((interview) => {
     const tr = document.createElement("tr");
     const interviewId = firstValue(interview, ["id"], "");
+    const hasInterviewRecord = Boolean(interviewId);
 
     const idCell = document.createElement("td");
     idCell.textContent = interviewId || "N/A";
@@ -1364,16 +1521,42 @@ function renderInterviewRows(rows) {
     scheduledCell.textContent = formatDateTime(firstValue(interview, ["scheduled_at"], ""));
     tr.appendChild(scheduledCell);
 
+    const scoreCell = document.createElement("td");
+    scoreCell.textContent = scorecardSummary(interview);
+    tr.appendChild(scoreCell);
+
     const actionCell = document.createElement("td");
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "btn btn-outline-brand btn-sm";
-    btn.textContent = "Update";
-    btn.dataset.interviewAction = "update";
-    btn.dataset.interviewId = interviewId;
-    btn.dataset.interviewStatus = firstValue(interview, ["status"], "");
-    btn.dataset.interviewNotes = firstValue(interview, ["notes"], "");
-    actionCell.appendChild(btn);
+    const updateBtn = document.createElement("button");
+    updateBtn.type = "button";
+    updateBtn.className = "btn btn-outline-brand btn-sm me-2";
+    updateBtn.textContent = hasInterviewRecord ? "Update" : "Pending";
+    updateBtn.dataset.interviewAction = "update";
+    updateBtn.dataset.interviewId = interviewId;
+    updateBtn.dataset.interviewStatus = firstValue(interview, ["status"], "");
+    updateBtn.dataset.interviewNotes = firstValue(interview, ["notes"], "");
+    updateBtn.disabled = !hasInterviewRecord;
+    actionCell.appendChild(updateBtn);
+
+    if (canTakeInterviewFinalDecision(interview)) {
+      const applicationId = firstValue(interview, ["application_id"], "");
+
+      const selectBtn = document.createElement("button");
+      selectBtn.type = "button";
+      selectBtn.className = "btn btn-outline-success btn-sm me-2";
+      selectBtn.textContent = "Select";
+      selectBtn.dataset.interviewAction = "final-select";
+      selectBtn.dataset.applicationId = applicationId;
+      actionCell.appendChild(selectBtn);
+
+      const rejectBtn = document.createElement("button");
+      rejectBtn.type = "button";
+      rejectBtn.className = "btn btn-outline-danger btn-sm";
+      rejectBtn.textContent = "Reject";
+      rejectBtn.dataset.interviewAction = "final-reject";
+      rejectBtn.dataset.applicationId = applicationId;
+      actionCell.appendChild(rejectBtn);
+    }
+
     tr.appendChild(actionCell);
 
     ui.interviewList.appendChild(tr);
@@ -1408,6 +1591,60 @@ async function loadInterviews() {
 function toSqlDateTime(localValue) {
   if (!localValue) return "";
   return `${String(localValue).replace("T", " ")}:00`;
+}
+
+function renderInterviewerOptions(rows) {
+  if (!ui.interviewerSelect) return;
+
+  const select = ui.interviewerSelect;
+  const currentValue = String(select.value || "").trim();
+  select.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = rows.length ? "Select interviewer" : "No interviewers available";
+  select.appendChild(placeholder);
+
+  rows.forEach((interviewer) => {
+    const interviewerId = firstValue(interviewer, ["id"], "");
+    if (!interviewerId) return;
+
+    const option = document.createElement("option");
+    option.value = interviewerId;
+
+    const name = `${firstValue(interviewer, ["first_name"], "")} ${firstValue(interviewer, ["last_name"], "")}`.trim();
+    const labelName = name || "Interviewer";
+    option.textContent = `${labelName} (ID: ${interviewerId})`;
+
+    select.appendChild(option);
+  });
+
+  if (currentValue) {
+    const hasCurrent = rows.some((row) => firstValue(row, ["id"], "") === currentValue);
+    if (hasCurrent) {
+      select.value = currentValue;
+    }
+  }
+}
+
+async function loadInterviewerOptions(force = false) {
+  if (!ui.interviewerSelect) return;
+  if (hrState.interviewersLoaded && !force) {
+    renderInterviewerOptions(hrState.interviewerRows || []);
+    return;
+  }
+
+  try {
+    const rows = normalizeArrayResponse(await hrApi.listInterviewers());
+    hrState.interviewerRows = rows;
+    hrState.interviewersLoaded = true;
+    renderInterviewerOptions(rows);
+  } catch (error) {
+    hrState.interviewerRows = [];
+    hrState.interviewersLoaded = false;
+    renderInterviewerOptions([]);
+    setMessage(ui.interviewCreateMsg, error.message || "Failed to load interviewers.", "error");
+  }
 }
 
 async function submitScheduleInterview(event) {
@@ -1458,6 +1695,123 @@ async function updateInterviewByPrompt(interviewId, currentStatus, currentNotes)
   }
 }
 
+async function decideInterviewApplication(applicationId, status) {
+  if (!applicationId || !status) return;
+
+  const label = status === "selected" ? "selected" : "rejected";
+  const confirmed = window.confirm(`Mark application #${applicationId} as ${label}?`);
+  if (!confirmed) return;
+
+  try {
+    await hrApi.finalDecision(applicationId, status);
+    setMessage(ui.interviewMsg, `Application #${applicationId} marked as ${label}.`, "success");
+    await Promise.all([loadInterviews(), loadApplications(), loadOfferEligibleApplications()]);
+  } catch (error) {
+    setMessage(ui.interviewMsg, error.message || "Failed to update final decision.", "error");
+  }
+}
+
+function renderOfferApplicationOptions(rows) {
+  if (!ui.offerApplicationSelect) return;
+  const select = ui.offerApplicationSelect;
+  const currentValue = String(select.value || "").trim();
+  select.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = rows.length
+    ? "Select interview score submited/selected application"
+    : "No offer-ready applications";
+  select.appendChild(placeholder);
+
+  rows.forEach((row) => {
+    const applicationId = firstValue(row, ["application_id", "id"], "");
+    if (!applicationId) return;
+
+    const option = document.createElement("option");
+    option.value = applicationId;
+
+    const jobId = firstValue(row, ["job_id"], "");
+    const jobTitle = firstValue(row, ["job_title"], "");
+    const candidateName = `${firstValue(row, ["candidate_first"], "")} ${firstValue(row, ["candidate_last"], "")}`.trim();
+
+    const labelParts = [`App #${applicationId}`];
+    if (jobId) labelParts.push(`Job #${jobId}`);
+    if (jobTitle) labelParts.push(jobTitle);
+    if (candidateName) labelParts.push(candidateName);
+    option.textContent = labelParts.join(" | ");
+
+    select.appendChild(option);
+  });
+
+  if (currentValue) {
+    const hasCurrent = rows.some((row) => firstValue(row, ["application_id", "id"], "") === currentValue);
+    if (hasCurrent) select.value = currentValue;
+  }
+}
+
+function renderOfferEligibleRows(rows) {
+  if (!ui.offerEligibleList) return;
+  if (!rows.length) {
+    showTableMessage(ui.offerEligibleList, 5, "No offer-ready applications found");
+    return;
+  }
+
+  ui.offerEligibleList.innerHTML = "";
+
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+
+    const appCell = document.createElement("td");
+    appCell.textContent = firstValue(row, ["application_id", "id"], "N/A");
+    tr.appendChild(appCell);
+
+    const jobCell = document.createElement("td");
+    const jobId = firstValue(row, ["job_id"], "");
+    const jobTitle = firstValue(row, ["job_title"], "");
+    jobCell.textContent = jobId && jobTitle ? `#${jobId} - ${jobTitle}` : jobId || jobTitle || "N/A";
+    tr.appendChild(jobCell);
+
+    const candidateCell = document.createElement("td");
+    const candidateName = `${firstValue(row, ["candidate_first"], "")} ${firstValue(row, ["candidate_last"], "")}`.trim();
+    const candidateEmail = firstValue(row, ["candidate_email"], "");
+    candidateCell.innerHTML = candidateName
+      ? `${candidateName}<br /><small class="text-secondary">${candidateEmail}</small>`
+      : candidateEmail || "N/A";
+    tr.appendChild(candidateCell);
+
+    const statusCell = document.createElement("td");
+    statusCell.appendChild(createStatusBadge(firstValue(row, ["status"], "")));
+    tr.appendChild(statusCell);
+
+    const updatedCell = document.createElement("td");
+    updatedCell.textContent = formatDateTime(firstValue(row, ["updated_at"], ""));
+    tr.appendChild(updatedCell);
+
+    ui.offerEligibleList.appendChild(tr);
+  });
+}
+
+async function loadOfferEligibleApplications() {
+  try {
+    setMessage(ui.offerEligibleMsg, "Loading offer-ready applications...", "info");
+    const rows = normalizeArrayResponse(await hrApi.listOfferEligibleApplications());
+    hrState.offerEligibleRows = rows;
+    renderOfferApplicationOptions(rows);
+    renderOfferEligibleRows(rows);
+    if (rows.length) {
+      setMessage(ui.offerEligibleMsg, `Loaded ${rows.length} offer-ready application(s).`, "success");
+    } else {
+      setMessage(ui.offerEligibleMsg, "No offer-ready applications available for offers.", "info");
+    }
+  } catch (error) {
+    hrState.offerEligibleRows = [];
+    renderOfferApplicationOptions([]);
+    renderOfferEligibleRows([]);
+    setMessage(ui.offerEligibleMsg, error.message || "Failed to load offer-ready applications.", "error");
+  }
+}
+
 async function submitCreateOffer(event) {
   event.preventDefault();
   if (!ui.offerCreateForm) return;
@@ -1497,6 +1851,7 @@ async function submitCreateOffer(event) {
 
     const offerId = firstValue(result, ["id"], "");
     if (offerId && ui.offerSendId) ui.offerSendId.value = offerId;
+    await loadOfferEligibleApplications();
   } catch (error) {
     setMessage(ui.offerCreateMsg, error.message || "Failed to create offer draft.", "error");
   }
@@ -1629,6 +1984,7 @@ async function openCandidates() {
 
 async function openInterviews() {
   showSection("interviews");
+  await loadInterviewerOptions();
   if (!hrState.interviewsLoaded) {
     hrState.interviewsLoaded = true;
     await loadInterviews();
@@ -1637,6 +1993,7 @@ async function openInterviews() {
 
 async function openOffers() {
   showSection("offers");
+  await loadOfferEligibleApplications();
 }
 
 async function openProfile() {
@@ -1704,7 +2061,8 @@ function bindActions() {
       const appId = String(button.dataset.appId || "").trim();
       const currentStatus = String(button.dataset.appStatus || "").trim();
       const currentStage = String(button.dataset.appStage || "").trim();
-      handleApplicationAction(action, appId, currentStatus, currentStage);
+      const offerRecommended = String(button.dataset.appOfferRecommended || "").trim();
+      handleApplicationAction(action, appId, currentStatus, currentStage, offerRecommended);
     });
   }
 
@@ -1717,17 +2075,33 @@ function bindActions() {
   if (ui.interviewCreateForm) ui.interviewCreateForm.addEventListener("submit", submitScheduleInterview);
   if (ui.interviewLoadBtn) ui.interviewLoadBtn.addEventListener("click", loadInterviews);
   if (ui.interviewList) {
-    ui.interviewList.addEventListener("click", (event) => {
+    ui.interviewList.addEventListener("click", async (event) => {
       const button = event.target.closest("button[data-interview-action]");
       if (!button) return;
+      const action = String(button.dataset.interviewAction || "").trim();
       const interviewId = String(button.dataset.interviewId || "").trim();
       const status = String(button.dataset.interviewStatus || "").trim();
       const notes = String(button.dataset.interviewNotes || "").trim();
-      updateInterviewByPrompt(interviewId, status, notes);
+      const applicationId = String(button.dataset.applicationId || "").trim();
+
+      if (action === "update") {
+        await updateInterviewByPrompt(interviewId, status, notes);
+        return;
+      }
+
+      if (action === "final-select") {
+        await decideInterviewApplication(applicationId, "selected");
+        return;
+      }
+
+      if (action === "final-reject") {
+        await decideInterviewApplication(applicationId, "rejected");
+      }
     });
   }
 
   if (ui.offerCreateForm) ui.offerCreateForm.addEventListener("submit", submitCreateOffer);
+  if (ui.offerEligibleLoadBtn) ui.offerEligibleLoadBtn.addEventListener("click", loadOfferEligibleApplications);
   if (ui.offerSendForm) ui.offerSendForm.addEventListener("submit", submitSendOffer);
 
   if (ui.profileForm) ui.profileForm.addEventListener("submit", submitProfileUpdate);
@@ -1773,5 +2147,6 @@ window.hrRecruiterApi = {
   loadApplications,
   loadCandidateProfile,
   loadInterviews,
+  loadOfferEligibleApplications,
   performLogout
 };

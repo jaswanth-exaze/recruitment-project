@@ -96,6 +96,29 @@ exports.countUsersByRole = async (req, res) => {
   }
 };
 
+exports.getAuditTrail = async (req, res) => {
+  try {
+    const entity = String(req.query.entity || "").trim();
+    const id = String(req.query.id || "").trim();
+
+    if ((entity && !id) || (!entity && id)) {
+      return res.status(400).json({ message: "entity and id query params must be provided together" });
+    }
+
+    return res.json(
+      await service.getAuditTrail(
+        {
+          entity_type: entity || undefined,
+          entity_id: id || undefined,
+        },
+        req.user.company_id,
+      ),
+    );
+  } catch (err) {
+    return handleError(res, err);
+  }
+};
+
 exports.listJobs = async (req, res) => {
   try {
     const query = { ...req.query, company_id: req.user.company_id };
@@ -168,9 +191,6 @@ exports.closeJob = async (req, res) => {
 
 exports.listApplications = async (req, res) => {
   try {
-    if (!req.query.job_id) {
-      return res.status(400).json({ message: "job_id query param is required" });
-    }
     return res.json(await service.listApplicationsForJob(req.query.job_id, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
@@ -224,7 +244,6 @@ exports.recommendOffer = async (req, res) => {
 
 exports.applicationStats = async (req, res) => {
   try {
-    if (!req.query.job_id) return res.status(400).json({ message: "job_id query param is required" });
     return res.json(await service.applicationStats(req.query.job_id, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
@@ -253,9 +272,6 @@ exports.sendOffer = async (req, res) => {
 
 exports.getOffers = async (req, res) => {
   try {
-    if (!req.query.application_id) {
-      return res.status(400).json({ message: "application_id query param is required" });
-    }
     return res.json(await service.getOffersByApplication(req.query.application_id, req.user.company_id));
   } catch (err) {
     return handleError(res, err);

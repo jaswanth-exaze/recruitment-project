@@ -39,7 +39,9 @@ const candState = {
   jobsLoaded: false,
   applicationsLoaded: false,
   savedLoaded: false,
+  offersLoaded: false,
   offersLoadedApplicationId: "",
+  applyModal: null,
 };
 
 const viewMeta = {
@@ -47,7 +49,7 @@ const viewMeta = {
   jobs: { title: "Jobs", subtitle: "Browse available roles, view details, and apply instantly.", search: "Search jobs by title or location" },
   applications: { title: "My Applications", subtitle: "Track your submitted applications and current status.", search: "Search applications" },
   saved: { title: "Saved Jobs", subtitle: "Manage your saved jobs and remove what you no longer need.", search: "Search saved jobs" },
-  offers: { title: "Offers", subtitle: "Load offers by application and accept or decline.", search: "Search offers by id" },
+  offers: { title: "Offers", subtitle: "View all offers first, then filter by application if needed.", search: "Search offers by id" },
   profile: { title: "Profile", subtitle: "Update account details and candidate profile information.", search: "Search jobs or applications" },
 };
 
@@ -112,6 +114,21 @@ const ui = {
 
   reloadProfileBtn: document.querySelector("[data-cand-reload-profile]"),
   logoutBtn: document.querySelector("[data-cand-logout]"),
+
+  applyModalEl: document.querySelector("[data-cand-apply-modal]"),
+  applyForm: document.querySelector("[data-cand-apply-form]"),
+  applyJobId: document.querySelector("[data-cand-apply-job-id]"),
+  applyJobTitle: document.querySelector("[data-cand-apply-job-title]"),
+  applyPhone: document.querySelector("[data-cand-apply-phone]"),
+  applyAddress: document.querySelector("[data-cand-apply-address]"),
+  applyResumeUrl: document.querySelector("[data-cand-apply-resume-url]"),
+  applySource: document.querySelector("[data-cand-apply-source]"),
+  applyReferralWrap: document.querySelector("[data-cand-apply-referral-wrap]"),
+  applyReferralId: document.querySelector("[data-cand-apply-referral-id]"),
+  applyCoverLetter: document.querySelector("[data-cand-apply-cover-letter]"),
+  applyConfirm: document.querySelector("[data-cand-apply-confirm]"),
+  applyMsg: document.querySelector("[data-cand-apply-msg]"),
+  applySubmitBtn: document.querySelector("[data-cand-apply-submit]"),
 };
 
 // 2) Shared helpers.
@@ -344,12 +361,17 @@ const candApi = {
   uploadResume: (resumeUrl) => api(CANDIDATE_CONFIG.endpoints.uploadResume, { method: "POST", body: { resume_url: resumeUrl } }),
   listJobs: (query = {}) => api(CANDIDATE_CONFIG.endpoints.listJobs, { query }),
   getJobById: (id) => api(buildPath(CANDIDATE_CONFIG.endpoints.getJobById, id)),
-  applyForJob: (jobId) => api(CANDIDATE_CONFIG.endpoints.applyForJob, { method: "POST", body: { job_id: jobId } }),
+  applyForJob: (payloadOrJobId) => {
+    const body = payloadOrJobId && typeof payloadOrJobId === "object"
+      ? payloadOrJobId
+      : { job_id: payloadOrJobId };
+    return api(CANDIDATE_CONFIG.endpoints.applyForJob, { method: "POST", body });
+  },
   listMyApplications: () => api(CANDIDATE_CONFIG.endpoints.listMyApplications),
   listSavedJobs: () => api(CANDIDATE_CONFIG.endpoints.listSavedJobs),
   saveJob: (jobId) => api(CANDIDATE_CONFIG.endpoints.saveJob, { method: "POST", body: { job_id: jobId } }),
   unsaveJob: (jobId) => api(CANDIDATE_CONFIG.endpoints.unsaveJob, { method: "DELETE", body: { job_id: jobId } }),
-  getOffers: (applicationId) => api(CANDIDATE_CONFIG.endpoints.getOffers, { query: { application_id: applicationId } }),
+  getOffers: (query = {}) => api(CANDIDATE_CONFIG.endpoints.getOffers, { query }),
   acceptOffer: (id) => api(buildPath(CANDIDATE_CONFIG.endpoints.acceptOffer, id), { method: "POST", body: {} }),
   declineOffer: (id) => api(buildPath(CANDIDATE_CONFIG.endpoints.declineOffer, id), { method: "POST", body: {} }),
 };
@@ -456,6 +478,71 @@ function setSelectedJob(job) {
   setText(ui.selectedJobEmployment, getValue(job || {}, ["employment_type"], "N/A"));
 }
 
+function applyMsg(text, type = "info") {
+  setMsg(ui.applyMsg, text, type);
+}
+
+function getApplyModal() {
+  if (!ui.applyModalEl || !window.bootstrap?.Modal) return null;
+  if (!candState.applyModal) {
+    candState.applyModal = new window.bootstrap.Modal(ui.applyModalEl, {
+      backdrop: "static",
+      keyboard: false,
+    });
+  }
+  return candState.applyModal;
+}
+
+function toggleReferralInput() {
+  const source = String(ui.applySource?.value || "").trim().toLowerCase();
+  const isReferral = source === "referral";
+  if (ui.applyReferralWrap) ui.applyReferralWrap.classList.toggle("d-none", !isReferral);
+  if (ui.applyReferralId) ui.applyReferralId.required = isReferral;
+}
+
+function prefillApplyForm(job) {
+  if (ui.applyJobId) ui.applyJobId.value = getValue(job || {}, ["id"], "");
+  if (ui.applyJobTitle) ui.applyJobTitle.value = getValue(job || {}, ["title"], "N/A");
+  if (ui.applyPhone) ui.applyPhone.value = candidateField(candState.currentCandidateProfile, "phone", "");
+  if (ui.applyAddress) ui.applyAddress.value = candidateField(candState.currentCandidateProfile, "address", "");
+  if (ui.applyResumeUrl) ui.applyResumeUrl.value = getValue(candState.currentCandidateProfile || {}, ["resume_url"], "");
+  if (ui.applySource) ui.applySource.value = "";
+  if (ui.applyReferralId) ui.applyReferralId.value = "";
+  if (ui.applyCoverLetter) ui.applyCoverLetter.value = "";
+  if (ui.applyConfirm) ui.applyConfirm.checked = false;
+  if (ui.applySubmitBtn) ui.applySubmitBtn.disabled = true;
+  applyMsg("");
+  toggleReferralInput();
+}
+
+async function openApplyForm(jobId) {
+  if (!jobId) return;
+  const modal = getApplyModal();
+  if (!modal) {
+    setMsg(ui.jobMsg, "Apply form is unavailable on this page.", "error");
+    return;
+  }
+
+  let job = candState.selectedJob;
+  if (!job || String(getValue(job, ["id"], "")).trim() !== String(jobId).trim()) {
+    try {
+      job = await candApi.getJobById(jobId);
+    } catch (error) {
+      setMsg(ui.jobMsg, error.message || "Failed to load job details.", "error");
+      return;
+    }
+  }
+
+  if (String(getValue(job, ["status"], "")).trim().toLowerCase() !== "published") {
+    setMsg(ui.jobMsg, "Only published jobs can be applied for.", "error");
+    return;
+  }
+
+  setSelectedJob(job);
+  prefillApplyForm(job);
+  modal.show();
+}
+
 async function loadAuthProfile() {
   try {
     const payload = await candApi.getMyProfile();
@@ -504,7 +591,8 @@ function renderJobRows(rows) {
     const tr = document.createElement("tr");
     const id = getValue(job, ["id"], "");
     const status = getValue(job, ["status"], "");
-    const canApply = String(status).toLowerCase() === "published";
+    const openings = Number(getValue(job, ["positions_count"], "0"));
+    const canApply = String(status).toLowerCase() === "published" && Number.isFinite(openings) && openings > 0;
 
     const cells = [
       id || "N/A",
@@ -568,16 +656,87 @@ async function loadJobById(jobId, silent = false) {
   }
 }
 
-async function applyForJob(jobId) {
+async function applyForJob(payload) {
+  const jobId = payload && typeof payload === "object" ? payload.job_id : payload;
   if (!jobId) return;
+  await candApi.applyForJob(payload && typeof payload === "object" ? payload : (toNum(jobId) || jobId));
+  setMsg(ui.jobMsg, "Application submitted successfully.", "success");
+  candState.applicationsLoaded = true;
+  await loadApplications();
+  await loadDashboardKpis();
+}
+
+async function submitApplyForm(event) {
+  event.preventDefault();
+  const jobId = String(ui.applyJobId?.value || "").trim();
+  const phone = String(ui.applyPhone?.value || "").trim();
+  const address = String(ui.applyAddress?.value || "").trim();
+  const resumeUrl = String(ui.applyResumeUrl?.value || "").trim();
+  const source = String(ui.applySource?.value || "").trim().toLowerCase();
+  const referralId = String(ui.applyReferralId?.value || "").trim();
+  const coverLetter = String(ui.applyCoverLetter?.value || "").trim();
+  const confirmed = Boolean(ui.applyConfirm?.checked);
+
+  if (!jobId) return applyMsg("job id is required.", "error");
+  if (!phone || !address || !resumeUrl || !source || !coverLetter) {
+    return applyMsg("Please fill all required fields.", "error");
+  }
+  if (source === "referral" && !referralId) {
+    return applyMsg("Referral ID is required when source is referral.", "error");
+  }
+  if (!confirmed) {
+    return applyMsg("Please verify and confirm before submitting.", "error");
+  }
+
+  const initialText = ui.applySubmitBtn?.textContent || "Submit Application";
+  if (ui.applySubmitBtn) {
+    ui.applySubmitBtn.disabled = true;
+    ui.applySubmitBtn.textContent = "Submitting...";
+  }
+  applyMsg("Submitting application...", "info");
+
   try {
-    await candApi.applyForJob(toNum(jobId) || jobId);
-    setMsg(ui.jobMsg, "Application submitted successfully.", "success");
-    candState.applicationsLoaded = true;
-    await loadApplications();
-    await loadDashboardKpis();
+    const payload = {
+      job_id: toNum(jobId) || jobId,
+      source,
+      referral_id: source === "referral" ? referralId : null,
+      confirm_apply: true,
+      application_data: {
+        contact_phone: phone,
+        contact_address: address,
+        resume_url: resumeUrl,
+        source,
+        referral_id: source === "referral" ? referralId : null,
+        cover_letter: coverLetter,
+      },
+    };
+
+    await applyForJob(payload);
+
+    try {
+      const existingProfileData = profileDataObject(candState.currentCandidateProfile);
+      await candApi.updateCandidateProfile({
+        phone,
+        address,
+        profile_data: existingProfileData || null,
+      });
+      await candApi.uploadResume(resumeUrl);
+      await loadCandidateSelfProfile();
+    } catch (profileError) {
+      console.warn("Profile sync after apply failed:", profileError?.message || profileError);
+    }
+
+    applyMsg("Application submitted successfully.", "success");
+    const modal = getApplyModal();
+    if (modal) modal.hide();
   } catch (error) {
+    applyMsg(error.message || "Failed to submit application.", "error");
     setMsg(ui.jobMsg, error.message || "Failed to apply for job.", "error");
+  } finally {
+    if (ui.applySubmitBtn) {
+      ui.applySubmitBtn.disabled = false;
+      ui.applySubmitBtn.textContent = initialText;
+    }
   }
 }
 
@@ -610,6 +769,11 @@ function renderApplicationRows(rows) {
     cells.forEach((text) => {
       const td = document.createElement("td");
       td.textContent = text;
+      if (String(text || "").trim().toLowerCase() === "hired") {
+        td.classList.add("fw-semibold", "text-success");
+        td.textContent = "hired - You are hired";
+        tr.classList.add("table-success");
+      }
       tr.appendChild(td);
     });
     ui.appList.appendChild(tr);
@@ -621,7 +785,11 @@ async function loadApplications() {
     setMsg(ui.appMsg, "Loading applications...", "info");
     candState.applicationsRows = toRows(await candApi.listMyApplications());
     renderApplicationRows(candState.applicationsRows);
-    setMsg(ui.appMsg, `Loaded ${candState.applicationsRows.length} application(s).`, "success");
+    const hiredApp = candState.applicationsRows.find(
+      (row) => String(getValue(row, ["status"], "")).trim().toLowerCase() === "hired",
+    );
+    const hiredNote = hiredApp ? ` Congratulations, you are hired (application #${getValue(hiredApp, ["id"], "N/A")}).` : "";
+    setMsg(ui.appMsg, `Loaded ${candState.applicationsRows.length} application(s).${hiredNote}`, "success");
   } catch (error) {
     candState.applicationsRows = [];
     renderApplicationRows([]);
@@ -711,17 +879,27 @@ function offerDetailsText(value) {
 
 function renderOfferRows(rows) {
   if (!ui.offerList) return;
-  if (!rows.length) return tableMsg(ui.offerList, 5, "No offers found");
+  if (!rows.length) return tableMsg(ui.offerList, 7, "No offers found");
   ui.offerList.innerHTML = "";
   rows.forEach((offer) => {
     const tr = document.createElement("tr");
     const id = getValue(offer, ["id"], "");
+    const applicationId = getValue(offer, ["application_id"], "");
+    const jobLabel = getValue(offer, ["job_title"], "N/A");
     const status = String(getValue(offer, ["status"], "")).toLowerCase();
     const responded = status === "accepted" || status === "declined";
 
     const idTd = document.createElement("td");
     idTd.textContent = id || "N/A";
     tr.appendChild(idTd);
+
+    const applicationTd = document.createElement("td");
+    applicationTd.textContent = applicationId || "N/A";
+    tr.appendChild(applicationTd);
+
+    const jobTd = document.createElement("td");
+    jobTd.textContent = jobLabel || "N/A";
+    tr.appendChild(jobTd);
 
     const statusTd = document.createElement("td");
     statusTd.textContent = status || "N/A";
@@ -771,16 +949,16 @@ function renderOfferRows(rows) {
 
 async function loadOffers() {
   const applicationId = String(ui.offerApplicationId?.value || "").trim();
-  if (!applicationId) {
-    tableMsg(ui.offerList, 5, "Enter application_id to load offers.");
-    return setMsg(ui.offerMsg, "application_id is required.", "error");
-  }
+  const query = {};
+  if (applicationId) query.application_id = applicationId;
   try {
     setMsg(ui.offerMsg, "Loading offers...", "info");
-    candState.offersRows = toRows(await candApi.getOffers(applicationId));
+    candState.offersRows = toRows(await candApi.getOffers(query));
+    candState.offersLoaded = true;
     candState.offersLoadedApplicationId = applicationId;
     renderOfferRows(candState.offersRows);
-    setMsg(ui.offerMsg, `Loaded ${candState.offersRows.length} offer(s).`, "success");
+    const suffix = applicationId ? ` for application #${applicationId}` : "";
+    setMsg(ui.offerMsg, `Loaded ${candState.offersRows.length} offer(s)${suffix}.`, "success");
     await loadDashboardKpis();
   } catch (error) {
     candState.offersRows = [];
@@ -800,7 +978,7 @@ async function handleOfferAction(action, offerId) {
       await candApi.declineOffer(offerId);
       setMsg(ui.offerMsg, "Offer declined successfully.", "success");
     }
-    if (candState.offersLoadedApplicationId) await loadOffers();
+    if (candState.offersLoaded) await loadOffers();
     candState.applicationsLoaded = true;
     await loadApplications();
     await loadDashboardKpis();
@@ -958,6 +1136,9 @@ async function openSaved() {
 }
 async function openOffers() {
   showSection("offers");
+  if (!candState.offersLoaded) {
+    await loadOffers();
+  }
 }
 async function openProfile() {
   showSection("profile");
@@ -1007,8 +1188,31 @@ function bindActions() {
       const jobId = String(button.dataset.jobId || "").trim();
       if (!jobId) return;
       if (action === "view") await loadJobById(jobId);
-      if (action === "apply") await applyForJob(jobId);
+      if (action === "apply") await openApplyForm(jobId);
       if (action === "save") await saveJob(jobId, ui.jobMsg);
+    });
+  }
+
+  if (ui.applySource) {
+    ui.applySource.addEventListener("change", toggleReferralInput);
+  }
+
+  if (ui.applyConfirm) {
+    ui.applyConfirm.addEventListener("change", () => {
+      if (ui.applySubmitBtn) ui.applySubmitBtn.disabled = !ui.applyConfirm.checked;
+    });
+  }
+
+  if (ui.applyForm) {
+    ui.applyForm.addEventListener("submit", submitApplyForm);
+  }
+
+  if (ui.applyModalEl) {
+    ui.applyModalEl.addEventListener("hidden.bs.modal", () => {
+      if (ui.applyForm) ui.applyForm.reset();
+      toggleReferralInput();
+      if (ui.applySubmitBtn) ui.applySubmitBtn.disabled = true;
+      applyMsg("");
     });
   }
 
@@ -1076,10 +1280,12 @@ async function initCandidateDashboard() {
   setSelectedJob(null);
   renderAccountProfile();
   renderCandidateProfile(null);
+  toggleReferralInput();
+  applyMsg("");
   tableMsg(ui.jobList, 6, "Load jobs to see records");
   tableMsg(ui.appList, 5, "Load applications to see records");
   tableMsg(ui.savedList, 5, "Load saved jobs to see records");
-  tableMsg(ui.offerList, 5, "Enter application_id and load offers");
+  tableMsg(ui.offerList, 7, "Load offers to see records");
 
   const ready = await loadAuthProfile();
   if (!ready) return;

@@ -18,16 +18,19 @@ router.get("/candidates", verifyToken, checkRole("HR"), controller.listCandidate
 router.get("/candidates/:id/profile", verifyToken, checkRole("HR"), controller.getCandidateProfile);
 router.put("/candidates/:id/profile", verifyToken, checkRole("HR"), controller.updateCandidateProfile);
 router.post("/candidates/:id/resume", verifyToken, checkRole("HR"), controller.uploadResume);
+router.get("/interviewers", verifyToken, checkRole("HR"), controller.listInterviewers);
 
 router.get("/applications", verifyToken, checkRole("HR"), controller.listApplications);
 router.put("/applications/:id/move-stage", verifyToken, checkRole("HR"), controller.moveApplicationStage);
 router.post("/applications/:id/screen", verifyToken, checkRole("HR"), controller.screenDecision);
+router.post("/applications/:id/final-decision", verifyToken, checkRole("HR"), controller.finalDecision);
 router.post("/applications/:id/recommend-offer", verifyToken, checkRole("HR"), controller.recommendOffer);
 
 router.post("/interviews", verifyToken, checkRole("HR"), controller.scheduleInterview);
 router.get("/interviews", verifyToken, checkRole("HR"), controller.getInterviews);
 router.put("/interviews/:id", verifyToken, checkRole("HR"), controller.updateInterview);
 
+router.get("/offers/eligible-applications", verifyToken, checkRole("HR"), controller.listOfferEligibleApplications);
 router.post("/offers", verifyToken, checkRole("HR"), controller.createOfferDraft);
 router.put("/offers/:id/send", verifyToken, checkRole("HR"), controller.sendOffer);
 

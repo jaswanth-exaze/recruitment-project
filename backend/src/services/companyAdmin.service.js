@@ -1,5 +1,10 @@
 const db = require("../config/db");
 const { hashPassword } = require("../utils/password.util");
+const { notifyApplicationStatusChange } = require("./applicationStatusNotification.service");
+const {
+  sendJobApprovalRequestEmail,
+  sendTeamMemberCredentialsEmail,
+} = require("./recruitmentEmail.service");
 
 const MANAGED_ROLES = new Set(["HR", "HiringManager", "Interviewer"]);
 
@@ -15,6 +20,36 @@ function parseJsonField(value) {
   return value;
 }
 
+function parsePositiveInt(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  if (parsed <= 0) return null;
+  return Math.trunc(parsed);
+}
+
+const AUDIT_LOG_SELECT_SQL = `
+  SELECT
+    al.id,
+    al.user_id,
+    CONCAT_WS(' ', actor.first_name, actor.last_name) AS actor_name,
+    actor.email AS actor_email,
+    actor.role AS actor_role,
+    COALESCE(
+      NULLIF(JSON_UNQUOTE(JSON_EXTRACT(al.new_data, '$.company_id')), ''),
+      NULLIF(JSON_UNQUOTE(JSON_EXTRACT(al.old_data, '$.company_id')), ''),
+      CAST(actor.company_id AS CHAR)
+    ) AS company_id,
+    al.action,
+    al.entity_type,
+    al.entity_id,
+    al.old_data,
+    al.new_data,
+    al.ip_address,
+    al.created_at
+  FROM audit_logs al
+  LEFT JOIN users actor ON al.user_id = actor.id
+`;
+
 function normalizeRole(role) {
   return String(role || "").trim();
 }
@@ -29,7 +64,24 @@ function assertManagedRole(role) {
 
 async function getUserProfileById(userId) {
   const [rows] = await db.promise().query(
-    `SELECT id, company_id, email, first_name, last_name, role, is_active, last_login_at, created_at, updated_at FROM users WHERE id = ? LIMIT 1`,
+    `
+      SELECT
+        u.id,
+        u.company_id,
+        c.name AS company_name,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.role,
+        u.is_active,
+        u.last_login_at,
+        u.created_at,
+        u.updated_at
+      FROM users u
+      LEFT JOIN companies c ON u.company_id = c.id
+      WHERE u.id = ?
+      LIMIT 1
+    `,
     [userId],
   );
   return rows[0] || null;
@@ -85,6 +137,16 @@ exports.createUser = async (payload, companyId) => {
     `INSERT INTO users (company_id, email, password_hash, first_name, last_name, role, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
     [resolvedCompanyId, email, passwordHash, first_name, last_name, validRole],
   );
+
+  await sendTeamMemberCredentialsEmail({
+    email,
+    firstName: first_name,
+    lastName: last_name,
+    role: validRole,
+    password,
+    companyId: resolvedCompanyId,
+  });
+
   return { id: result.insertId };
 };
 
@@ -227,6 +289,7 @@ exports.submitJob = async (jobId, approverId, companyId) => {
       [jobId, approverId],
     );
     await connection.commit();
+    await sendJobApprovalRequestEmail({ jobId, approverId, companyId });
     return 1;
   } catch (err) {
     await connection.rollback();
@@ -256,9 +319,25 @@ exports.closeJob = async (id, companyId) => {
 
 exports.listApplicationsForJob = async (jobId, companyId) => {
   if (!companyId) throw new Error("company_id is required");
+
+  const where = ["j.company_id = ?"];
+  const params = [companyId];
+  if (jobId) {
+    where.push("a.job_id = ?");
+    params.push(jobId);
+  }
+
   const [rows] = await db.promise().query(
-    `SELECT a.*, u.first_name, u.last_name, u.email, cp.resume_url FROM applications a JOIN job_requisitions j ON a.job_id = j.id JOIN users u ON a.candidate_id = u.id LEFT JOIN candidate_profiles cp ON u.id = cp.user_id WHERE a.job_id = ? AND j.company_id = ? ORDER BY a.applied_at DESC`,
-    [jobId, companyId],
+    `
+      SELECT a.*, u.first_name, u.last_name, u.email, cp.resume_url
+      FROM applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      JOIN users u ON a.candidate_id = u.id
+      LEFT JOIN candidate_profiles cp ON u.id = cp.user_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY a.applied_at DESC
+    `,
+    params,
   );
   return rows;
 };
@@ -269,6 +348,14 @@ exports.moveApplicationStage = async (id, status, current_stage_id, companyId) =
     `UPDATE applications a JOIN job_requisitions j ON a.job_id = j.id SET a.status = ?, a.current_stage_id = ?, a.updated_at = NOW() WHERE a.id = ? AND j.company_id = ?`,
     [status, current_stage_id || null, id, companyId],
   );
+  if (result.affectedRows) {
+    await notifyApplicationStatusChange({
+      applicationId: id,
+      companyId,
+      status,
+      triggeredBy: "Company Admin",
+    });
+  }
   return result.affectedRows;
 };
 
@@ -279,6 +366,14 @@ exports.screenDecision = async (id, status, companyId) => {
     `UPDATE applications a JOIN job_requisitions j ON a.job_id = j.id SET a.status = ?, a.screening_decision_at = NOW(), a.updated_at = NOW() WHERE a.id = ? AND j.company_id = ?`,
     [status, id, companyId],
   );
+  if (result.affectedRows) {
+    await notifyApplicationStatusChange({
+      applicationId: id,
+      companyId,
+      status,
+      triggeredBy: "Company Admin",
+    });
+  }
   return result.affectedRows;
 };
 
@@ -289,6 +384,14 @@ exports.finalDecision = async (id, status, companyId) => {
     `UPDATE applications a JOIN job_requisitions j ON a.job_id = j.id SET a.status = ?, a.final_decision_at = NOW(), a.updated_at = NOW() WHERE a.id = ? AND j.company_id = ?`,
     [status, id, companyId],
   );
+  if (result.affectedRows) {
+    await notifyApplicationStatusChange({
+      applicationId: id,
+      companyId,
+      status,
+      triggeredBy: "Company Admin",
+    });
+  }
   return result.affectedRows;
 };
 
@@ -303,9 +406,23 @@ exports.recommendOffer = async (id, companyId) => {
 
 exports.applicationStats = async (jobId, companyId) => {
   if (!companyId) throw new Error("company_id is required");
+
+  const where = ["j.company_id = ?"];
+  const params = [companyId];
+  if (jobId) {
+    where.push("a.job_id = ?");
+    params.push(jobId);
+  }
+
   const [rows] = await db.promise().query(
-    `SELECT a.status, COUNT(*) AS count FROM applications a JOIN job_requisitions j ON a.job_id = j.id WHERE a.job_id = ? AND j.company_id = ? GROUP BY a.status`,
-    [jobId, companyId],
+    `
+      SELECT a.status, COUNT(*) AS count
+      FROM applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      WHERE ${where.join(" AND ")}
+      GROUP BY a.status
+    `,
+    params,
   );
   return rows;
 };
@@ -335,25 +452,104 @@ exports.sendOffer = async (id, payload, companyId) => {
     `UPDATE offers o
      JOIN applications a ON o.application_id = a.id
      JOIN job_requisitions j ON a.job_id = j.id
-     SET o.status = 'sent', o.document_url = ?, o.esign_link = ?, o.sent_at = NOW(), o.updated_at = NOW()
+     SET
+       o.status = 'sent',
+       o.document_url = ?,
+       o.esign_link = ?,
+       o.sent_at = NOW(),
+       o.updated_at = NOW(),
+       a.status = 'offer_letter_sent',
+       a.updated_at = NOW()
      WHERE o.id = ? AND j.company_id = ?`,
     [document_url || null, esign_link || null, id, companyId],
   );
+
+  if (result.affectedRows) {
+    const [rows] = await db.promise().query(
+      `SELECT a.id AS application_id
+       FROM offers o
+       JOIN applications a ON o.application_id = a.id
+       JOIN job_requisitions j ON a.job_id = j.id
+       WHERE o.id = ? AND j.company_id = ?
+       LIMIT 1`,
+      [id, companyId],
+    );
+    const applicationId = rows[0]?.application_id;
+    if (applicationId) {
+      await notifyApplicationStatusChange({
+        applicationId,
+        companyId,
+        status: "offer_letter_sent",
+        triggeredBy: "Company Admin",
+      });
+    }
+  }
+
   return result.affectedRows;
 };
 
 exports.getOffersByApplication = async (applicationId, companyId) => {
   if (!companyId) throw new Error("company_id is required");
+
+  const where = ["j.company_id = ?"];
+  const params = [companyId];
+  if (applicationId) {
+    where.push("o.application_id = ?");
+    params.push(applicationId);
+  }
+
   const [rows] = await db.promise().query(
-    `SELECT o.* FROM offers o
-     JOIN applications a ON o.application_id = a.id
-     JOIN job_requisitions j ON a.job_id = j.id
-     WHERE o.application_id = ? AND j.company_id = ?
-     ORDER BY o.created_at DESC`,
-    [applicationId, companyId],
+    `
+      SELECT o.*
+      FROM offers o
+      JOIN applications a ON o.application_id = a.id
+      JOIN job_requisitions j ON a.job_id = j.id
+      WHERE ${where.join(" AND ")}
+      ORDER BY o.created_at DESC
+    `,
+    params,
   );
   rows.forEach((row) => {
     row.offer_details = parseJsonField(row.offer_details);
   });
+  return rows;
+};
+
+exports.getAuditTrail = async ({ entity_type, entity_id } = {}, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
+
+  const where = [
+    `(
+      actor.company_id = ?
+      OR JSON_UNQUOTE(JSON_EXTRACT(al.new_data, '$.company_id')) = ?
+      OR JSON_UNQUOTE(JSON_EXTRACT(al.old_data, '$.company_id')) = ?
+    )`,
+  ];
+  const params = [companyId, String(companyId), String(companyId)];
+
+  if (entity_type) {
+    where.push("al.entity_type = ?");
+    params.push(entity_type);
+  }
+  if (entity_id) {
+    where.push("al.entity_id = ?");
+    params.push(entity_id);
+  }
+
+  const [rows] = await db.promise().query(
+    `
+      ${AUDIT_LOG_SELECT_SQL}
+      WHERE ${where.join(" AND ")}
+      ORDER BY al.created_at DESC
+    `,
+    params,
+  );
+
+  rows.forEach((row) => {
+    row.company_id = parsePositiveInt(row.company_id);
+    row.old_data = parseJsonField(row.old_data);
+    row.new_data = parseJsonField(row.new_data);
+  });
+
   return rows;
 };

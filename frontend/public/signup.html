@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Login | HireFlow</title>
+    <title>Sign Up | HireFlow</title>
     <meta
       name="description"
-      content="Sign in to HireFlow and continue with your role-based recruitment workflow."
+      content="Create your HireFlow candidate account and start applying to jobs."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -38,19 +38,19 @@
           class="navbar-toggler"
           type="button"
           data-bs-toggle="collapse"
-          data-bs-target="#loginNav"
-          aria-controls="loginNav"
+          data-bs-target="#signupNav"
+          aria-controls="signupNav"
           aria-expanded="false"
           aria-label="Toggle navigation"
         >
           <span class="navbar-toggler-icon"></span>
         </button>
-        <div class="collapse navbar-collapse" id="loginNav">
+        <div class="collapse navbar-collapse" id="signupNav">
           <ul class="navbar-nav ms-auto me-lg-3">
             <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
             <li class="nav-item"><a class="nav-link" href="about.html">About</a></li>
-            <li class="nav-item"><a class="nav-link active" href="login.html">Login</a></li>
-            <li class="nav-item"><a class="nav-link" href="signup.html">Sign Up</a></li>
+            <li class="nav-item"><a class="nav-link" href="login.html">Login</a></li>
+            <li class="nav-item"><a class="nav-link active" href="signup.html">Sign Up</a></li>
           </ul>
           <a href="index.html#contact" class="btn btn-outline-brand">Contact</a>
         </div>
@@ -62,67 +62,67 @@
         <div class="container">
           <div class="row g-4 align-items-stretch">
             <div class="col-lg-6 reveal">
-              <span class="pill"><i class="bi bi-shield-lock"></i> Secure Sign In</span>
-              <h1 class="hero-title mt-3">Welcome back to HireFlow.</h1>
+              <span class="pill"><i class="bi bi-person-plus"></i> Candidate Account</span>
+              <h1 class="hero-title mt-3">Create your HireFlow profile.</h1>
               <p class="hero-text">
-                Sign in with your account and continue in your role-specific dashboard for
-                platform admin, company admin, HR, hiring manager, interviewer, or candidate.
+                Sign up as a candidate to apply for jobs, track your applications, and manage offers.
               </p>
               <div class="highlight-panel mt-4">
-                <h5 class="mb-3">Role-Based Access</h5>
+                <h5 class="mb-3">What you get</h5>
                 <ul class="role-list text-light mb-0">
-                  <li>Platform Admin: governance, companies, and global audit</li>
-                  <li>Company Admin + HR Recruiter: execution and coordination</li>
-                  <li>Hiring Manager + Interviewer + Candidate: decisions and outcomes</li>
+                  <li>Access to published roles</li>
+                  <li>Live application status tracking</li>
+                  <li>Offer acceptance and rejection workflow</li>
+                  <li>Automated update emails for key actions</li>
                 </ul>
               </div>
             </div>
 
             <div class="col-lg-6 reveal">
               <div class="contact-wrapper h-100">
-                <h2 class="h4 mb-2">Login</h2>
-                <p class="text-secondary mb-4">Use your registered email and password.</p>
+                <h2 class="h4 mb-2">Candidate Sign Up</h2>
+                <p class="text-secondary small mb-3">Role is set to Candidate by default.</p>
 
-                <form id="loginForm" class="row g-3" novalidate>
-                  <div class="col-12">
-                    <label class="form-label" for="email">Email</label>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      class="form-control"
-                      placeholder="admin@company.com"
-                      required
-                    />
+                <form id="signupForm" class="row g-3" novalidate>
+                  <div class="col-md-6">
+                    <label class="form-label" for="signupFirstName">First Name</label>
+                    <input id="signupFirstName" name="first_name" type="text" class="form-control" required />
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="signupLastName">Last Name</label>
+                    <input id="signupLastName" name="last_name" type="text" class="form-control" required />
                   </div>
                   <div class="col-12">
-                    <label class="form-label" for="password">Password</label>
-                    <input
-                      id="password"
-                      name="password"
-                      type="password"
-                      class="form-control"
-                      placeholder="Enter your password"
-                      required
-                    />
+                    <label class="form-label" for="signupEmail">Email</label>
+                    <input id="signupEmail" name="email" type="email" class="form-control" required />
                   </div>
                   <div class="col-12">
-                    <button id="loginButton" class="btn btn-brand w-100" type="submit">
-                      <i class="bi bi-box-arrow-in-right"></i> Sign In
+                    <label class="form-label" for="signupPassword">Password</label>
+                    <input id="signupPassword" name="password" type="password" class="form-control" required />
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="signupPhone">Phone (optional)</label>
+                    <input id="signupPhone" name="phone" type="text" class="form-control" />
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="signupAddress">Address (optional)</label>
+                    <input id="signupAddress" name="address" type="text" class="form-control" />
+                  </div>
+                  <div class="col-12">
+                    <button id="signupButton" class="btn btn-brand w-100" type="submit">
+                      <i class="bi bi-person-check"></i> Create Candidate Account
                     </button>
                   </div>
                   <div class="col-12">
-                    <p id="loginMsg" class="mb-0 small text-secondary"></p>
+                    <p id="signupMsg" class="mb-0 small text-secondary"></p>
                   </div>
                 </form>
 
                 <hr class="my-4" />
-
-                <h3 class="h5 mb-2">New Candidate?</h3>
-                <p class="text-secondary small mb-3">Create your account from the dedicated signup page.</p>
-                <a href="signup.html" class="btn btn-outline-brand w-100">
-                  <i class="bi bi-person-plus"></i> Go to Sign Up
-                </a>
+                <p class="small mb-0">
+                  Already have an account?
+                  <a href="login.html" class="fw-semibold">Sign in</a>
+                </p>
               </div>
             </div>
           </div>
@@ -154,4 +154,3 @@
     <script src="../js/login.js"></script>
   </body>
 </html>
-

@@ -14,6 +14,12 @@ router.get("/interviews", verifyToken, checkRole("Interviewer"), (req, res, next
 });
 router.put("/interviews/:id", verifyToken, checkRole("Interviewer"), controller.updateInterview);
 
+router.get(
+  "/scorecards/pending-interviews",
+  verifyToken,
+  checkRole("Interviewer"),
+  controller.getPendingScorecardInterviews,
+);
 router.post("/scorecards", verifyToken, checkRole("Interviewer"), (req, res, next) => {
   req.body.interviewer_id = req.user.user_id;
   return controller.submitScorecard(req, res, next);

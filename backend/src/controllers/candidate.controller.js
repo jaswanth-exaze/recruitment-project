@@ -105,6 +105,10 @@ exports.applyForJob = async (req, res) => {
       await service.applyForJob({
         job_id: req.body.job_id,
         candidate_id: req.user.user_id,
+        source: req.body.source,
+        referral_id: req.body.referral_id,
+        application_data: req.body.application_data,
+        confirm_apply: req.body.confirm_apply,
       }),
     );
   } catch (err) {
@@ -153,7 +157,9 @@ exports.acceptOffer = async (req, res) => {
   try {
     const affected = await service.acceptOffer(req.params.id);
     if (!affected) return res.status(404).json({ message: "Offer not found" });
-    return res.json({ message: "Offer accepted and application moved to hired" });
+    return res.json({
+      message: "Offer accepted. Application moved to offer accecepted and sent to Hiring Manager for final approval",
+    });
   } catch (err) {
     return handleError(res, err);
   }
@@ -171,10 +177,11 @@ exports.declineOffer = async (req, res) => {
 
 exports.getOffers = async (req, res) => {
   try {
-    if (!req.query.application_id) {
-      return res.status(400).json({ message: "application_id query param is required" });
-    }
-    return res.json(await service.getOffersByApplication(req.query.application_id));
+    return res.json(
+      await service.getOffersForCandidate(req.user.user_id, {
+        application_id: req.query.application_id,
+      }),
+    );
   } catch (err) {
     return handleError(res, err);
   }

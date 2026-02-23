@@ -114,6 +114,14 @@ exports.listCandidates = async (req, res) => {
   }
 };
 
+exports.listInterviewers = async (req, res) => {
+  try {
+    return res.json(await service.listInterviewers(req.user.company_id));
+  } catch (err) {
+    return handleError(res, err);
+  }
+};
+
 exports.listApplications = async (req, res) => {
   try {
     return res.json(await service.listApplications(req.query, req.user.company_id));
@@ -142,6 +150,18 @@ exports.screenDecision = async (req, res) => {
     const affected = await service.screenDecision(req.params.id, req.body.status, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Application not found" });
     return res.json({ message: "Screening decision updated" });
+  } catch (err) {
+    return handleError(res, err);
+  }
+};
+
+exports.finalDecision = async (req, res) => {
+  try {
+    const affected = await service.finalDecision(req.params.id, req.body.status, req.user.company_id);
+    if (!affected) {
+      return res.status(404).json({ message: "Application not found or not interview score submited" });
+    }
+    return res.json({ message: "Final decision updated" });
   } catch (err) {
     return handleError(res, err);
   }
@@ -178,6 +198,14 @@ exports.updateInterview = async (req, res) => {
     const affected = await service.updateInterview(req.params.id, req.body.status, req.body.notes, req.user.company_id);
     if (!affected) return res.status(404).json({ message: "Interview not found" });
     return res.json({ message: "Interview updated" });
+  } catch (err) {
+    return handleError(res, err);
+  }
+};
+
+exports.listOfferEligibleApplications = async (req, res) => {
+  try {
+    return res.json(await service.listOfferEligibleApplications(req.query, req.user.company_id));
   } catch (err) {
     return handleError(res, err);
   }

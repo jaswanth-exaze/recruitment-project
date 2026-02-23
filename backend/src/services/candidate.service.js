@@ -1,4 +1,6 @@
 const db = require("../config/db");
+const { notifyApplicationStatusChange, notifyApplicationSubmitted } = require("./applicationStatusNotification.service");
+const { sendOfferAcceptedToHiringManagersEmail } = require("./recruitmentEmail.service");
 
 function parseJsonField(value) {
   if (value === null || value === undefined) return null;
@@ -10,6 +12,51 @@ function parseJsonField(value) {
     }
   }
   return value;
+}
+
+function parseBoolean(value) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function parseApplicationData(raw) {
+  if (raw === null || raw === undefined || raw === "") return {};
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (err) {
+      throw new Error("application_data must be valid JSON");
+    }
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) return raw;
+  throw new Error("application_data must be valid JSON");
+}
+
+function cleanApplicationData(data) {
+  const output = {};
+  Object.keys(data || {}).forEach((key) => {
+    const value = data[key];
+    if (value === null || value === undefined) return;
+    if (typeof value === "string" && value.trim() === "") return;
+    output[key] = value;
+  });
+  return output;
+}
+
+let applicationsHasDataColumnCache = null;
+
+async function hasApplicationDataColumn() {
+  if (applicationsHasDataColumnCache !== null) return applicationsHasDataColumnCache;
+  try {
+    const [rows] = await db.promise().query(`SHOW COLUMNS FROM applications LIKE 'application_data'`);
+    applicationsHasDataColumnCache = rows.length > 0;
+  } catch (err) {
+    applicationsHasDataColumnCache = false;
+  }
+  return applicationsHasDataColumnCache;
 }
 
 async function getUserProfileById(userId) {
@@ -97,20 +144,111 @@ exports.getJobById = async (id) => {
   return rows[0] || null;
 };
 
-exports.applyForJob = async ({ job_id, candidate_id }) => {
+exports.applyForJob = async ({ job_id, candidate_id, source, referral_id, application_data, confirm_apply }) => {
   if (!job_id || !candidate_id) throw new Error("job_id and candidate_id are required");
-  const [result] = await db.promise().query(
-    `INSERT INTO applications (job_id, candidate_id, status, applied_at, created_at, updated_at) VALUES (?, ?, 'applied', NOW(), NOW(), NOW())`,
-    [job_id, candidate_id],
-  );
-  return { id: result.insertId };
+
+  const isConfirmed = confirm_apply === undefined ? true : parseBoolean(confirm_apply);
+  if (!isConfirmed) {
+    throw new Error("Please confirm application submission");
+  }
+
+  const normalizedSource = String(source || "").trim().toLowerCase();
+  const normalizedReferralId = String(referral_id || "").trim();
+  if (normalizedSource === "referral" && !normalizedReferralId) {
+    throw new Error("referral_id is required when source is referral");
+  }
+
+  const baseData = parseApplicationData(application_data);
+  const mergedData = cleanApplicationData({
+    ...baseData,
+    source: normalizedSource || baseData.source || undefined,
+    referral_id: normalizedSource === "referral" ? (normalizedReferralId || baseData.referral_id || undefined) : undefined,
+    confirm_apply: isConfirmed,
+  });
+  if (!mergedData.submitted_at) {
+    mergedData.submitted_at = new Date().toISOString();
+  }
+
+  const canStoreApplicationData = await hasApplicationDataColumn();
+  const connection = await db.promise().getConnection();
+  let txActive = false;
+  try {
+    await connection.beginTransaction();
+    txActive = true;
+
+    const [jobRows] = await connection.query(
+      `SELECT id, status, positions_count
+       FROM job_requisitions
+       WHERE id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [job_id],
+    );
+
+    if (!jobRows.length) {
+      throw new Error("Job not found");
+    }
+
+    const job = jobRows[0];
+    const jobStatus = String(job.status || "").trim().toLowerCase();
+    const openings = Number(job.positions_count || 0);
+
+    if (openings <= 0) {
+      await connection.rollback();
+      txActive = false;
+      await db.promise().query(
+        `UPDATE job_requisitions
+         SET status = 'closed',
+             closed_at = COALESCE(closed_at, NOW()),
+             updated_at = NOW()
+         WHERE id = ? AND status <> 'closed'`,
+        [job_id],
+      );
+      throw new Error("This job has no openings left and is now closed");
+    }
+
+    if (jobStatus !== "published") {
+      throw new Error("This job is not open for applications");
+    }
+
+    let result;
+    if (canStoreApplicationData) {
+      [result] = await connection.query(
+        `INSERT INTO applications (job_id, candidate_id, status, applied_at, application_data, created_at, updated_at) VALUES (?, ?, 'applied', NOW(), ?, NOW(), NOW())`,
+        [job_id, candidate_id, Object.keys(mergedData).length ? JSON.stringify(mergedData) : null],
+      );
+    } else {
+      [result] = await connection.query(
+        `INSERT INTO applications (job_id, candidate_id, status, applied_at, created_at, updated_at) VALUES (?, ?, 'applied', NOW(), NOW(), NOW())`,
+        [job_id, candidate_id],
+      );
+    }
+
+    await connection.commit();
+    txActive = false;
+
+    await notifyApplicationSubmitted({ applicationId: result.insertId });
+    return { id: result.insertId };
+  } catch (err) {
+    if (txActive) {
+      await connection.rollback();
+    }
+    throw err;
+  } finally {
+    connection.release();
+  }
 };
 
 exports.listApplicationsByCandidate = async (candidateId) => {
+  const canStoreApplicationData = await hasApplicationDataColumn();
+  const applicationDataSelect = canStoreApplicationData ? "" : ", NULL AS application_data";
   const [rows] = await db.promise().query(
-    `SELECT a.*, j.title, j.company_id, c.name AS company_name FROM applications a JOIN job_requisitions j ON a.job_id = j.id JOIN companies c ON j.company_id = c.id WHERE a.candidate_id = ? ORDER BY a.applied_at DESC`,
+    `SELECT a.*${applicationDataSelect}, j.title, j.company_id, c.name AS company_name FROM applications a JOIN job_requisitions j ON a.job_id = j.id JOIN companies c ON j.company_id = c.id WHERE a.candidate_id = ? ORDER BY a.applied_at DESC`,
     [candidateId],
   );
+  rows.forEach((row) => {
+    row.application_data = parseJsonField(row.application_data);
+  });
   return rows;
 };
 
@@ -151,8 +289,33 @@ exports.acceptOffer = async (id) => {
       `UPDATE offers SET status = 'accepted', responded_at = NOW(), updated_at = NOW() WHERE id = ?`,
       [id],
     );
-    await connection.query(`UPDATE applications SET status = 'hired', updated_at = NOW() WHERE id = ?`, [offerRows[0].application_id]);
+    const applicationId = offerRows[0].application_id;
+    const [applicationResult] = await connection.query(
+      `UPDATE applications SET status = 'offer accecepted', updated_at = NOW() WHERE id = ? AND status = 'offer_letter_sent'`,
+      [applicationId],
+    );
+    if (!applicationResult.affectedRows) {
+      await connection.rollback();
+      throw new Error("Application is not ready for offer acceptance");
+    }
     await connection.commit();
+    await notifyApplicationStatusChange({
+      applicationId,
+      status: "offer accecepted",
+      triggeredBy: "Candidate",
+    });
+    const [companyRows] = await db.promise().query(
+      `SELECT j.company_id
+       FROM applications a
+       JOIN job_requisitions j ON a.job_id = j.id
+       WHERE a.id = ?
+       LIMIT 1`,
+      [applicationId],
+    );
+    const companyId = companyRows[0]?.company_id;
+    if (companyId) {
+      await sendOfferAcceptedToHiringManagersEmail({ applicationId, companyId });
+    }
     return offerResult.affectedRows;
   } catch (err) {
     await connection.rollback();
@@ -175,8 +338,21 @@ exports.declineOffer = async (id) => {
       `UPDATE offers SET status = 'declined', responded_at = NOW(), updated_at = NOW() WHERE id = ?`,
       [id],
     );
-    await connection.query(`UPDATE applications SET status = 'rejected', updated_at = NOW() WHERE id = ?`, [offerRows[0].application_id]);
+    const applicationId = offerRows[0].application_id;
+    const [applicationResult] = await connection.query(
+      `UPDATE applications SET status = 'rejected', updated_at = NOW() WHERE id = ? AND status IN ('offer_letter_sent', 'offer accecepted')`,
+      [applicationId],
+    );
+    if (!applicationResult.affectedRows) {
+      await connection.rollback();
+      throw new Error("Application is not ready for offer rejection");
+    }
     await connection.commit();
+    await notifyApplicationStatusChange({
+      applicationId,
+      status: "rejected",
+      triggeredBy: "Candidate",
+    });
     return offerResult.affectedRows;
   } catch (err) {
     await connection.rollback();
@@ -186,10 +362,33 @@ exports.declineOffer = async (id) => {
   }
 };
 
-exports.getOffersByApplication = async (applicationId) => {
+exports.getOffersForCandidate = async (candidateId, { application_id } = {}) => {
+  if (!candidateId) throw new Error("candidate_id is required");
+
+  const where = ["a.candidate_id = ?"];
+  const params = [candidateId];
+  if (application_id) {
+    where.push("o.application_id = ?");
+    params.push(application_id);
+  }
+
   const [rows] = await db.promise().query(
-    `SELECT * FROM offers WHERE application_id = ? ORDER BY created_at DESC`,
-    [applicationId],
+    `
+      SELECT
+        o.*,
+        a.id AS application_id,
+        a.job_id,
+        a.status AS application_status,
+        j.title AS job_title,
+        c.name AS company_name
+      FROM offers o
+      JOIN applications a ON o.application_id = a.id
+      JOIN job_requisitions j ON a.job_id = j.id
+      JOIN companies c ON j.company_id = c.id
+      WHERE ${where.join(" AND ")}
+      ORDER BY o.created_at DESC
+    `,
+    params,
   );
   rows.forEach((row) => {
     row.offer_details = parseJsonField(row.offer_details);

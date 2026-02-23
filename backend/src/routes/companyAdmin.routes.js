@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.get("/profile", verifyToken, checkRole("CompanyAdmin"), controller.getMyProfile);
 router.put("/profile", verifyToken, checkRole("CompanyAdmin"), controller.updateMyProfile);
+router.get("/audit", verifyToken, checkRole("CompanyAdmin"), controller.getAuditTrail);
 
 router.get("/users", verifyToken, checkRole("CompanyAdmin"), controller.listUsersByRole);
 router.get("/users/count", verifyToken, checkRole("CompanyAdmin"), controller.countUsersByRole);

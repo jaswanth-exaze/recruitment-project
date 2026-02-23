@@ -52,6 +52,10 @@
             <i class="bi bi-file-earmark-check"></i>
             <span class="sidebar-label">Offers</span>
           </a>
+          <a class="dash-nav-link" href="#" data-company-nav="activity">
+            <i class="bi bi-clock-history"></i>
+            <span class="sidebar-label">Activity</span>
+          </a>
           <a class="dash-nav-link" href="#" data-company-nav="profile">
             <i class="bi bi-person-circle"></i>
             <span class="sidebar-label">Profile</span>
@@ -79,6 +83,7 @@
                 <p class="mb-0 text-secondary small" data-company-header-subtitle>
                   Manage team access, jobs, and recruitment progress.
                 </p>
+                <p class="dash-company-name mb-0" data-company-top-company>Company: N/A</p>
               </div>
             </div>
             <div class="search-box">
@@ -191,7 +196,7 @@
                   <ul class="role-list mb-3">
                     <li>Profile can be edited from the Profile section.</li>
                     <li>Use Users section to activate or deactivate members.</li>
-                    <li>Applications and offers are action-driven by IDs.</li>
+                    <li>Applications and offers can be loaded fully, then filtered by IDs.</li>
                   </ul>
                   <p class="small text-secondary mb-1">Team Coverage</p>
                   <div class="progress mb-3"><div class="progress-bar progress-value-88"></div></div>
@@ -557,16 +562,16 @@
               <div class="col-lg-8">
                 <section class="table-card p-3 h-100">
                   <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
-                    <h2 class="h6 mb-0">Applications by Job</h2>
+                    <h2 class="h6 mb-0">Applications</h2>
                     <div class="d-flex flex-wrap align-items-end gap-2">
                       <div>
-                        <label class="form-label small mb-1" for="companyAppJobId">Job ID</label>
+                        <label class="form-label small mb-1" for="companyAppJobId">Job ID (optional)</label>
                         <input
                           id="companyAppJobId"
                           type="number"
                           min="1"
                           class="form-control form-control-sm"
-                          placeholder="Required"
+                          placeholder="Optional"
                           data-company-app-job-id
                         />
                       </div>
@@ -581,6 +586,7 @@
                       <thead>
                         <tr>
                           <th>ID</th>
+                          <th>Job ID</th>
                           <th>Candidate</th>
                           <th>Status</th>
                           <th>Stage</th>
@@ -597,9 +603,9 @@
               <div class="col-lg-4">
                 <section class="table-card p-3 h-100">
                   <h2 class="h6 mb-3">Application Stats</h2>
-                  <div class="small text-secondary mb-2">Status counts for selected job.</div>
+                  <div class="small text-secondary mb-2">Status counts for current filter.</div>
                   <ul class="list-group list-group-flush" data-company-app-stats>
-                    <li class="list-group-item px-0 text-secondary">Load a job to see stats.</li>
+                    <li class="list-group-item px-0 text-secondary">Load applications to see stats.</li>
                   </ul>
                   <hr class="my-3" />
                   <p class="small text-secondary mb-2">Action shortcuts</p>
@@ -651,16 +657,16 @@
               <div class="col-lg-7">
                 <section class="table-card p-3 h-100">
                   <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
-                    <h2 class="h6 mb-0">Offers by Application</h2>
+                    <h2 class="h6 mb-0">Offers</h2>
                     <div class="d-flex flex-wrap align-items-end gap-2">
                       <div>
-                        <label class="form-label small mb-1" for="companyOfferFilterApplicationId">Application ID</label>
+                        <label class="form-label small mb-1" for="companyOfferFilterApplicationId">Application ID (optional)</label>
                         <input
                           id="companyOfferFilterApplicationId"
                           type="number"
                           min="1"
                           class="form-control form-control-sm"
-                          placeholder="Required"
+                          placeholder="Optional"
                           data-company-offer-application-id
                         />
                       </div>
@@ -675,6 +681,7 @@
                       <thead>
                         <tr>
                           <th>ID</th>
+                          <th>Application ID</th>
                           <th>Status</th>
                           <th>Details</th>
                           <th>Sent At</th>
@@ -731,16 +738,77 @@
               </div>
             </div>
           </section>
-          <section data-company-view="profile" class="d-none">
+          <section data-company-view="activity" class="d-none">
             <div class="row g-3">
-              <div class="col-lg-7">
-                <section class="table-card p-3 h-100">
-                  <h2 class="h6 mb-3">My Profile</h2>
+              <div class="col-12">
+                <section class="table-card p-3">
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">Company Audit Logs</h2>
+                    <div class="d-flex flex-wrap align-items-end gap-2">
+                      <div>
+                        <label class="form-label small mb-1" for="companyAuditEntity">Entity</label>
+                        <input
+                          id="companyAuditEntity"
+                          type="text"
+                          class="form-control form-control-sm"
+                          placeholder="applications"
+                          data-company-audit-entity
+                        />
+                      </div>
+                      <div>
+                        <label class="form-label small mb-1" for="companyAuditEntityId">Entity ID</label>
+                        <input
+                          id="companyAuditEntityId"
+                          type="number"
+                          min="1"
+                          class="form-control form-control-sm"
+                          placeholder="Optional with entity"
+                          data-company-audit-id
+                        />
+                      </div>
+                      <button type="button" class="btn btn-outline-brand btn-sm" data-company-audit-load>
+                        Load
+                      </button>
+                    </div>
+                  </div>
+
                   <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Action</th>
+                          <th>Actor</th>
+                          <th>Entity</th>
+                          <th>Entity ID</th>
+                          <th>Details</th>
+                          <th>Time</th>
+                        </tr>
+                      </thead>
+                      <tbody data-company-audit-list></tbody>
+                    </table>
+                  </div>
+                  <p class="small mb-0 mt-3 text-secondary" data-company-audit-msg></p>
+                </section>
+              </div>
+            </div>
+          </section>
+          <section data-company-view="profile" class="d-none profile-view">
+            <div class="row g-3">
+              <div class="col-xl-8">
+                <section class="table-card p-3 p-md-4 h-100 profile-panel">
+                  <div class="profile-head mb-3">
+                    <p class="profile-kicker mb-1">Account</p>
+                    <h2 class="h5 mb-1">My Profile</h2>
+                    <p class="profile-subtext mb-0">
+                      Review your account details and keep contact information current.
+                    </p>
+                  </div>
+                  <div class="table-responsive profile-facts mb-3">
                     <table class="table align-middle mb-0">
                       <tbody>
                         <tr>
-                          <th style="width: 30%">Name</th>
+                          <th>Name</th>
                           <td data-company-profile-name>N/A</td>
                         </tr>
                         <tr>
@@ -762,54 +830,58 @@
                       </tbody>
                     </table>
                   </div>
-                  <hr class="my-3" />
-                  <h3 class="h6 mb-3">Edit Profile</h3>
-                  <form class="row g-3" data-company-profile-form>
-                    <div class="col-md-6">
-                      <label class="form-label" for="companyProfileFirstName">First Name</label>
-                      <input
-                        id="companyProfileFirstName"
-                        type="text"
-                        class="form-control"
-                        data-company-edit-first-name
-                        required
-                      />
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="companyProfileLastName">Last Name</label>
-                      <input
-                        id="companyProfileLastName"
-                        type="text"
-                        class="form-control"
-                        data-company-edit-last-name
-                        required
-                      />
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label" for="companyProfileEmail">Email</label>
-                      <input
-                        id="companyProfileEmail"
-                        type="email"
-                        class="form-control"
-                        data-company-edit-email
-                        required
-                      />
-                    </div>
-                    <div class="col-12">
-                      <button type="submit" class="btn btn-brand" data-company-profile-save>
-                        Save Profile
-                      </button>
-                    </div>
-                  </form>
+                  <div class="profile-form-block">
+                    <h3 class="h6 mb-3">Edit Profile</h3>
+                    <form class="row g-3" data-company-profile-form>
+                      <div class="col-md-6">
+                        <label class="form-label" for="companyProfileFirstName">First Name</label>
+                        <input
+                          id="companyProfileFirstName"
+                          type="text"
+                          class="form-control"
+                          data-company-edit-first-name
+                          required
+                        />
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="companyProfileLastName">Last Name</label>
+                        <input
+                          id="companyProfileLastName"
+                          type="text"
+                          class="form-control"
+                          data-company-edit-last-name
+                          required
+                        />
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label" for="companyProfileEmail">Email</label>
+                        <input
+                          id="companyProfileEmail"
+                          type="email"
+                          class="form-control"
+                          data-company-edit-email
+                          required
+                        />
+                      </div>
+                      <div class="col-12">
+                        <button type="submit" class="btn btn-brand" data-company-profile-save>
+                          Save Profile
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </section>
               </div>
-              <div class="col-lg-5">
-                <section class="table-card p-3 h-100">
-                  <h2 class="h6 mb-3">Session Actions</h2>
-                  <p class="small text-secondary">
-                    Reload profile from backend or logout securely.
-                  </p>
-                  <div class="d-grid gap-2">
+              <div class="col-xl-4">
+                <section class="table-card p-3 p-md-4 h-100 profile-panel profile-actions-panel">
+                  <div class="profile-head mb-3">
+                    <p class="profile-kicker mb-1">Security</p>
+                    <h2 class="h5 mb-1">Session Actions</h2>
+                    <p class="profile-subtext mb-0">
+                      Sync profile details from backend or log out securely.
+                    </p>
+                  </div>
+                  <div class="d-grid gap-2 profile-actions">
                     <button type="button" class="btn btn-outline-brand" data-company-reload-profile>
                       Reload Profile
                     </button>
@@ -817,7 +889,7 @@
                       Logout
                     </button>
                   </div>
-                  <p class="small mt-3 mb-0 text-secondary" data-company-profile-status></p>
+                  <p class="profile-status-note mt-3 mb-0" data-company-profile-status></p>
                 </section>
               </div>
             </div>

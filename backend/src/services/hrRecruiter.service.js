@@ -1,4 +1,9 @@
 const db = require("../config/db");
+const { notifyApplicationStatusChange } = require("./applicationStatusNotification.service");
+const {
+  sendInterviewAssignedEmail,
+  sendJobApprovalRequestEmail,
+} = require("./recruitmentEmail.service");
 
 function parseJsonField(value) {
   if (value === null || value === undefined) return null;
@@ -15,9 +20,21 @@ function parseJsonField(value) {
 async function getUserProfileById(userId) {
   const [rows] = await db.promise().query(
     `
-      SELECT id, company_id, email, first_name, last_name, role, is_active, last_login_at, created_at, updated_at
-      FROM users
-      WHERE id = ?
+      SELECT
+        u.id,
+        u.company_id,
+        c.name AS company_name,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.role,
+        u.is_active,
+        u.last_login_at,
+        u.created_at,
+        u.updated_at
+      FROM users u
+      LEFT JOIN companies c ON u.company_id = c.id
+      WHERE u.id = ?
       LIMIT 1
     `,
     [userId],
@@ -187,6 +204,7 @@ exports.submitJob = async (jobId, approverId, companyId) => {
       [jobId, approverId],
     );
     await connection.commit();
+    await sendJobApprovalRequestEmail({ jobId, approverId, companyId });
     return 1;
   } catch (err) {
     await connection.rollback();
@@ -275,7 +293,7 @@ exports.listApplications = async ({ job_id }, companyId) => {
 
   const [rows] = await db.promise().query(
     `
-      SELECT a.*, j.company_id, j.title AS job_title, u.first_name, u.last_name, u.email, cp.resume_url
+      SELECT a.*, j.company_id, j.title AS job_title, j.positions_count AS openings_left, u.first_name, u.last_name, u.email, cp.resume_url
       FROM applications a
       JOIN job_requisitions j ON a.job_id = j.id
       JOIN users u ON a.candidate_id = u.id
@@ -340,6 +358,20 @@ exports.listCandidates = async ({ job_id }, companyId) => {
   return rows;
 };
 
+exports.listInterviewers = async (companyId) => {
+  if (!companyId) throw new Error("company_id is required");
+  const [rows] = await db.promise().query(
+    `
+      SELECT id, company_id, first_name, last_name, email
+      FROM users
+      WHERE role = 'Interviewer' AND company_id = ? AND is_active = 1
+      ORDER BY last_name, first_name
+    `,
+    [companyId],
+  );
+  return rows;
+};
+
 exports.moveApplicationStage = async (id, status, current_stage_id, companyId) => {
   if (!companyId) throw new Error("company_id is required");
   const [result] = await db.promise().query(
@@ -351,6 +383,14 @@ exports.moveApplicationStage = async (id, status, current_stage_id, companyId) =
     `,
     [status, current_stage_id || null, id, companyId],
   );
+  if (result.affectedRows) {
+    await notifyApplicationStatusChange({
+      applicationId: id,
+      companyId,
+      status,
+      triggeredBy: "HR Recruiter",
+    });
+  }
   return result.affectedRows;
 };
 
@@ -368,6 +408,14 @@ exports.screenDecision = async (id, status, companyId) => {
     `,
     [status, id, companyId],
   );
+  if (result.affectedRows) {
+    await notifyApplicationStatusChange({
+      applicationId: id,
+      companyId,
+      status,
+      triggeredBy: "HR Recruiter",
+    });
+  }
   return result.affectedRows;
 };
 
@@ -413,55 +461,128 @@ exports.scheduleInterview = async (payload, companyId) => {
   if (!result.affectedRows) {
     throw new Error("application_id is not part of your company");
   }
+  await sendInterviewAssignedEmail({ interviewId: result.insertId, companyId });
   return { id: result.insertId };
 };
 
 exports.getInterviews = async ({ application_id, interviewer_id }, companyId) => {
   if (!companyId) throw new Error("company_id is required");
 
-  const where = ["j.company_id = ?"];
-  const params = [companyId];
+  let rows = [];
 
-  if (application_id) {
-    where.push("i.application_id = ?");
-    params.push(application_id);
+  if (application_id || interviewer_id) {
+    const where = ["j.company_id = ?"];
+    const params = [companyId];
+
+    if (application_id) {
+      where.push("i.application_id = ?");
+      params.push(application_id);
+    }
+
+    if (interviewer_id) {
+      where.push("i.interviewer_id = ?");
+      params.push(interviewer_id);
+    }
+
+    const [interviewRows] = await db.promise().query(
+      `
+        SELECT
+          i.*,
+          a.job_id,
+          a.status AS application_status,
+          a.candidate_id,
+          j.title AS job_title,
+          candidate.first_name AS candidate_first,
+          candidate.last_name AS candidate_last,
+          candidate.email AS candidate_email,
+          cp.phone AS candidate_phone,
+          cp.address AS candidate_address,
+          cp.profile_data AS candidate_profile_data,
+          s.id AS scorecard_id,
+          s.recommendation AS scorecard_recommendation,
+          s.ratings AS scorecard_ratings,
+          s.comments AS scorecard_comments,
+          s.is_final AS scorecard_is_final,
+          s.submitted_at AS scorecard_submitted_at,
+          interviewer.first_name AS interviewer_first,
+          interviewer.last_name AS interviewer_last
+        FROM interviews i
+        JOIN applications a ON i.application_id = a.id
+        JOIN job_requisitions j ON a.job_id = j.id
+        JOIN users interviewer ON i.interviewer_id = interviewer.id
+        JOIN users candidate ON a.candidate_id = candidate.id
+        LEFT JOIN candidate_profiles cp ON candidate.id = cp.user_id
+        LEFT JOIN scorecards s ON s.id = (
+          SELECT s2.id
+          FROM scorecards s2
+          WHERE s2.interview_id = i.id AND s2.is_final = 1
+          ORDER BY COALESCE(s2.submitted_at, s2.updated_at, s2.created_at) DESC, s2.id DESC
+          LIMIT 1
+        )
+        WHERE ${where.join(" AND ")}
+        ORDER BY i.scheduled_at DESC
+      `,
+      params,
+    );
+    rows = interviewRows;
+  } else {
+    const [upcomingRows] = await db.promise().query(
+      `
+        SELECT
+          i.id,
+          a.id AS application_id,
+          i.interviewer_id,
+          i.scheduled_at,
+          COALESCE(i.status, a.status) AS status,
+          i.notes,
+          a.job_id,
+          a.status AS application_status,
+          a.candidate_id,
+          j.title AS job_title,
+          candidate.first_name AS candidate_first,
+          candidate.last_name AS candidate_last,
+          candidate.email AS candidate_email,
+          cp.phone AS candidate_phone,
+          cp.address AS candidate_address,
+          cp.profile_data AS candidate_profile_data,
+          s.id AS scorecard_id,
+          s.recommendation AS scorecard_recommendation,
+          s.ratings AS scorecard_ratings,
+          s.comments AS scorecard_comments,
+          s.is_final AS scorecard_is_final,
+          s.submitted_at AS scorecard_submitted_at,
+          interviewer.first_name AS interviewer_first,
+          interviewer.last_name AS interviewer_last
+        FROM applications a
+        JOIN job_requisitions j ON a.job_id = j.id
+        JOIN users candidate ON a.candidate_id = candidate.id
+        LEFT JOIN interviews i ON i.id = (
+          SELECT i2.id
+          FROM interviews i2
+          WHERE i2.application_id = a.id
+          ORDER BY i2.created_at DESC
+          LIMIT 1
+        )
+        LEFT JOIN users interviewer ON i.interviewer_id = interviewer.id
+        LEFT JOIN candidate_profiles cp ON candidate.id = cp.user_id
+        LEFT JOIN scorecards s ON s.id = (
+          SELECT s2.id
+          FROM scorecards s2
+          WHERE s2.interview_id = i.id AND s2.is_final = 1
+          ORDER BY COALESCE(s2.submitted_at, s2.updated_at, s2.created_at) DESC, s2.id DESC
+          LIMIT 1
+        )
+        WHERE j.company_id = ? AND a.status IN ('interview', 'interview score submited')
+        ORDER BY COALESCE(i.scheduled_at, a.updated_at) DESC
+      `,
+      [companyId],
+    );
+    rows = upcomingRows;
   }
-
-  if (interviewer_id) {
-    where.push("i.interviewer_id = ?");
-    params.push(interviewer_id);
-  }
-
-  const [rows] = await db.promise().query(
-    `
-      SELECT
-        i.*,
-        a.job_id,
-        a.status AS application_status,
-        a.candidate_id,
-        j.title AS job_title,
-        candidate.first_name AS candidate_first,
-        candidate.last_name AS candidate_last,
-        candidate.email AS candidate_email,
-        cp.phone AS candidate_phone,
-        cp.address AS candidate_address,
-        cp.profile_data AS candidate_profile_data,
-        interviewer.first_name AS interviewer_first,
-        interviewer.last_name AS interviewer_last
-      FROM interviews i
-      JOIN applications a ON i.application_id = a.id
-      JOIN job_requisitions j ON a.job_id = j.id
-      JOIN users interviewer ON i.interviewer_id = interviewer.id
-      JOIN users candidate ON a.candidate_id = candidate.id
-      LEFT JOIN candidate_profiles cp ON candidate.id = cp.user_id
-      WHERE ${where.join(" AND ")}
-      ORDER BY i.scheduled_at DESC
-    `,
-    params,
-  );
 
   rows.forEach((row) => {
     row.candidate_profile_data = parseJsonField(row.candidate_profile_data);
+    row.scorecard_ratings = parseJsonField(row.scorecard_ratings);
   });
 
   return rows;
@@ -482,6 +603,69 @@ exports.updateInterview = async (id, status, notes, companyId) => {
   return result.affectedRows;
 };
 
+exports.finalDecision = async (id, status, companyId) => {
+  if (!["selected", "rejected"].includes(status)) {
+    throw new Error("status must be selected or rejected");
+  }
+  if (!companyId) throw new Error("company_id is required");
+
+  const [result] = await db.promise().query(
+    `
+      UPDATE applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      SET a.status = ?, a.final_decision_at = NOW(), a.updated_at = NOW()
+      WHERE a.id = ? AND j.company_id = ? AND a.status = 'interview score submited'
+    `,
+    [status, id, companyId],
+  );
+
+  if (result.affectedRows) {
+    await notifyApplicationStatusChange({
+      applicationId: id,
+      companyId,
+      status,
+      triggeredBy: "HR Recruiter",
+    });
+  }
+
+  return result.affectedRows;
+};
+
+exports.listOfferEligibleApplications = async ({ job_id }, companyId) => {
+  if (!companyId) throw new Error("company_id is required");
+
+  const where = ["j.company_id = ?", "a.status IN ('interview score submited', 'selected')"];
+  const params = [companyId];
+
+  if (job_id) {
+    where.push("a.job_id = ?");
+    params.push(job_id);
+  }
+
+  const [rows] = await db.promise().query(
+    `
+      SELECT
+        a.id AS application_id,
+        a.job_id,
+        a.status,
+        a.updated_at,
+        j.title AS job_title,
+        u.id AS candidate_id,
+        u.first_name AS candidate_first,
+        u.last_name AS candidate_last,
+        u.email AS candidate_email
+      FROM applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      JOIN users u ON a.candidate_id = u.id
+      WHERE ${where.join(" AND ")}
+      ORDER BY a.updated_at DESC
+    `,
+    params,
+  );
+
+  return rows;
+};
+
 exports.createOfferDraft = async (payload, companyId) => {
   const { application_id, created_by, offer_details } = payload;
   if (!application_id || !created_by) {
@@ -494,12 +678,12 @@ exports.createOfferDraft = async (payload, companyId) => {
       SELECT a.id, ?, 'draft', ?, NOW(), NOW()
       FROM applications a
       JOIN job_requisitions j ON a.job_id = j.id
-      WHERE a.id = ? AND j.company_id = ?
+      WHERE a.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')
     `,
     [created_by, offer_details ? JSON.stringify(offer_details) : null, application_id, companyId],
   );
   if (!result.affectedRows) {
-    throw new Error("application_id is not part of your company");
+    throw new Error("Only interview score submited/selected applications from your company can receive offers");
   }
   return { id: result.insertId };
 };
@@ -512,10 +696,41 @@ exports.sendOffer = async (id, payload, companyId) => {
       UPDATE offers o
       JOIN applications a ON o.application_id = a.id
       JOIN job_requisitions j ON a.job_id = j.id
-      SET o.status = 'sent', o.document_url = ?, o.esign_link = ?, o.sent_at = NOW(), o.updated_at = NOW()
-      WHERE o.id = ? AND j.company_id = ?
+      SET
+        o.status = 'sent',
+        o.document_url = ?,
+        o.esign_link = ?,
+        o.sent_at = NOW(),
+        o.updated_at = NOW(),
+        a.status = 'offer_letter_sent',
+        a.updated_at = NOW()
+      WHERE o.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')
     `,
     [document_url || null, esign_link || null, id, companyId],
   );
+
+  if (result.affectedRows) {
+    const [rows] = await db.promise().query(
+      `
+        SELECT a.id AS application_id
+        FROM offers o
+        JOIN applications a ON o.application_id = a.id
+        JOIN job_requisitions j ON a.job_id = j.id
+        WHERE o.id = ? AND j.company_id = ?
+        LIMIT 1
+      `,
+      [id, companyId],
+    );
+    const applicationId = rows[0]?.application_id;
+    if (applicationId) {
+      await notifyApplicationStatusChange({
+        applicationId,
+        companyId,
+        status: "offer_letter_sent",
+        triggeredBy: "HR Recruiter",
+      });
+    }
+  }
+
   return result.affectedRows;
 };

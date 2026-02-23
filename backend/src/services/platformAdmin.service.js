@@ -1,5 +1,9 @@
 const db = require("../config/db");
 const { hashPassword } = require("../utils/password.util");
+const {
+  sendCompanyAdminOnboardingEmail,
+  sendTeamMemberCredentialsEmail,
+} = require("./recruitmentEmail.service");
 
 function parseJsonField(value) {
   if (value === null || value === undefined) return null;
@@ -12,6 +16,36 @@ function parseJsonField(value) {
   }
   return value;
 }
+
+function parsePositiveInt(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  if (parsed <= 0) return null;
+  return Math.trunc(parsed);
+}
+
+const AUDIT_LOG_SELECT_SQL = `
+  SELECT
+    al.id,
+    al.user_id,
+    CONCAT_WS(' ', actor.first_name, actor.last_name) AS actor_name,
+    actor.email AS actor_email,
+    actor.role AS actor_role,
+    COALESCE(
+      NULLIF(JSON_UNQUOTE(JSON_EXTRACT(al.new_data, '$.company_id')), ''),
+      NULLIF(JSON_UNQUOTE(JSON_EXTRACT(al.old_data, '$.company_id')), ''),
+      CAST(actor.company_id AS CHAR)
+    ) AS company_id,
+    al.action,
+    al.entity_type,
+    al.entity_id,
+    al.old_data,
+    al.new_data,
+    al.ip_address,
+    al.created_at
+  FROM audit_logs al
+  LEFT JOIN users actor ON al.user_id = actor.id
+`;
 
 async function getUserProfileById(userId) {
   const [rows] = await db.promise().query(
@@ -120,6 +154,26 @@ exports.createUser = async (payload) => {
     `INSERT INTO users (company_id, email, password_hash, first_name, last_name, role, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
     [company_id || null, email, passwordHash, first_name, last_name, role],
   );
+
+  if (role === "CompanyAdmin") {
+    await sendCompanyAdminOnboardingEmail({
+      email,
+      firstName: first_name,
+      lastName: last_name,
+      password,
+      companyId: company_id || null,
+    });
+  } else if (["HR", "HiringManager", "Interviewer"].includes(role)) {
+    await sendTeamMemberCredentialsEmail({
+      email,
+      firstName: first_name,
+      lastName: last_name,
+      role,
+      password,
+      companyId: company_id || null,
+    });
+  }
+
   return { id: result.insertId };
 };
 
@@ -181,10 +235,15 @@ exports.insertAuditLog = async (payload) => {
 
 exports.getAuditTrail = async (entityType, entityId) => {
   const [rows] = await db.promise().query(
-    `SELECT * FROM audit_logs WHERE entity_type = ? AND entity_id = ? ORDER BY created_at DESC`,
+    `
+      ${AUDIT_LOG_SELECT_SQL}
+      WHERE al.entity_type = ? AND al.entity_id = ?
+      ORDER BY al.created_at DESC
+    `,
     [entityType, entityId],
   );
   rows.forEach((row) => {
+    row.company_id = parsePositiveInt(row.company_id);
     row.old_data = parseJsonField(row.old_data);
     row.new_data = parseJsonField(row.new_data);
   });
@@ -193,12 +252,51 @@ exports.getAuditTrail = async (entityType, entityId) => {
 
 exports.getAllAuditLogs = async () => {
   const [rows] = await db.promise().query(
-    `SELECT * FROM audit_logs ORDER BY created_at DESC`,
+    `
+      ${AUDIT_LOG_SELECT_SQL}
+      ORDER BY al.created_at DESC
+    `,
   );
   rows.forEach((row) => {
+    row.company_id = parsePositiveInt(row.company_id);
     row.old_data = parseJsonField(row.old_data);
     row.new_data = parseJsonField(row.new_data);
   });
+  return rows;
+};
+
+exports.listContactRequests = async ({ work_email, company_name } = {}) => {
+  const where = [];
+  const params = [];
+
+  if (work_email) {
+    where.push("work_email LIKE ?");
+    params.push(`%${String(work_email).trim()}%`);
+  }
+  if (company_name) {
+    where.push("company_name LIKE ?");
+    params.push(`%${String(company_name).trim()}%`);
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const [rows] = await db.promise().query(
+    `
+      SELECT
+        id,
+        full_name,
+        work_email,
+        company_name,
+        role,
+        message,
+        agreed_to_contact,
+        created_at
+      FROM contact_requests
+      ${whereSql}
+      ORDER BY created_at DESC
+    `,
+    params,
+  );
+
   return rows;
 };
 

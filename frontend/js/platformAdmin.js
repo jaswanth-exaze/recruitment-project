@@ -25,6 +25,7 @@ const PLATFORM_ADMIN_CONFIG = {
     authLogout: "/auth/logout",
     authProfile: "/auth/profile",
     getAuditTrail: "/platform-admin/audit",
+    listContactRequests: "/platform-admin/contact-requests",
     insertAuditLog: "/platform-admin/audit-logs",
     insertBackgroundJob: "/platform-admin/background-jobs",
     completeBackgroundJob: "/platform-admin/background-jobs/:id/complete",
@@ -54,12 +55,15 @@ const adminState = {
   companiesLoaded: false,
   usersLoaded: false,
   activityLoaded: false,
+  contactsLoaded: false,
   companyMsgTimer: null,
   currentProfile: null,
   usersRows: [],
   usersPage: 1,
   auditRows: [],
-  auditPage: 1
+  auditPage: 1,
+  contactRows: [],
+  contactPage: 1
 };
 
 const viewMeta = {
@@ -82,6 +86,11 @@ const viewMeta = {
     title: "Activity Log",
     subtitle: "View all logs first, then filter by entity and entity id.",
     searchPlaceholder: "Search activity actions"
+  },
+  contacts: {
+    title: "Contact Requests",
+    subtitle: "View website contact submissions and filter by email/company.",
+    searchPlaceholder: "Search contact requests"
   },
   profile: {
     title: "My Profile",
@@ -119,6 +128,14 @@ const ui = {
   auditPrevBtn: document.querySelector("[data-audit-prev]"),
   auditNextBtn: document.querySelector("[data-audit-next]"),
   auditPageMeta: document.querySelector("[data-audit-page-meta]"),
+
+  contactList: document.querySelector("[data-contact-list]"),
+  contactEmailFilter: document.querySelector("[data-contact-email-filter]"),
+  contactCompanyFilter: document.querySelector("[data-contact-company-filter]"),
+  contactLoadBtn: document.querySelector("[data-contact-load]"),
+  contactPrevBtn: document.querySelector("[data-contact-prev]"),
+  contactNextBtn: document.querySelector("[data-contact-next]"),
+  contactPageMeta: document.querySelector("[data-contact-page-meta]"),
 
   profileName: document.querySelector("[data-admin-profile-name]"),
   profileEmail: document.querySelector("[data-admin-profile-email]"),
@@ -270,6 +287,34 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
+}
+
+function formatAuditAction(action) {
+  const raw = String(action || "").trim();
+  if (!raw) return "N/A";
+
+  const match = raw.match(/^(POST|PUT|PATCH|DELETE|GET)\s+\/(.+)$/i);
+  if (!match) return raw;
+
+  const method = String(match[1] || "").toUpperCase();
+  const route = String(match[2] || "").split("?")[0];
+  const words = route
+    .split("/")
+    .filter(Boolean)
+    .filter((part) => !/^\d+$/.test(part))
+    .map((part) => part.replace(/[-_]+/g, " "))
+    .slice(-2);
+
+  const label = words.join(" ").trim() || "record";
+  const verbMap = {
+    POST: "Created",
+    PUT: "Updated",
+    PATCH: "Updated",
+    DELETE: "Deleted",
+    GET: "Viewed",
+  };
+
+  return `${verbMap[method] || "Updated"} ${label}`;
 }
 
 function fullName(record) {
@@ -660,6 +705,12 @@ const platformAdminApi = {
     return apiRequest(PLATFORM_ADMIN_CONFIG.endpoints.countUsersByRole, {
       query: { role }
     });
+  },
+
+  listContactRequests(query = {}) {
+    return apiRequest(PLATFORM_ADMIN_CONFIG.endpoints.listContactRequests, {
+      query
+    });
   }
 };
 
@@ -1006,7 +1057,7 @@ function renderAuditCurrentPage() {
   adminState.auditPage = page;
 
   if (!pagedRows.length) {
-    showTableMessage(ui.activityList, 5, "No audit logs found");
+    showTableMessage(ui.activityList, 8, "No audit logs found");
     updatePager(ui.auditPageMeta, ui.auditPrevBtn, ui.auditNextBtn, page, totalPages);
     return;
   }
@@ -1014,6 +1065,14 @@ function renderAuditCurrentPage() {
   ui.activityList.innerHTML = "";
 
   pagedRows.forEach((log) => {
+    const details = log?.new_data && typeof log.new_data === "object" ? log.new_data : {};
+    const actorName = firstValue(log, ["actor_name"], "").trim();
+    const actorEmail = firstValue(log, ["actor_email"], "").trim();
+    const actorText = actorName || actorEmail || firstValue(log, ["user_id"], "System");
+    const routeText = String(details.route || details.path || "").trim();
+    const statusCode = String(details.status_code || "").trim();
+    const detailText = [statusCode ? `HTTP ${statusCode}` : "", routeText].filter(Boolean).join(" | ") || "-";
+
     const tr = document.createElement("tr");
 
     const idCell = document.createElement("td");
@@ -1021,8 +1080,16 @@ function renderAuditCurrentPage() {
     tr.appendChild(idCell);
 
     const actionCell = document.createElement("td");
-    actionCell.textContent = firstValue(log, ["action"], "N/A");
+    actionCell.textContent = formatAuditAction(firstValue(log, ["action"], "N/A"));
     tr.appendChild(actionCell);
+
+    const actorCell = document.createElement("td");
+    actorCell.textContent = actorText;
+    tr.appendChild(actorCell);
+
+    const companyCell = document.createElement("td");
+    companyCell.textContent = firstValue(log, ["company_id"], "-");
+    tr.appendChild(companyCell);
 
     const entityCell = document.createElement("td");
     entityCell.textContent = firstValue(log, ["entity_type"], "N/A");
@@ -1031,6 +1098,10 @@ function renderAuditCurrentPage() {
     const entityIdCell = document.createElement("td");
     entityIdCell.textContent = firstValue(log, ["entity_id"], "N/A");
     tr.appendChild(entityIdCell);
+
+    const detailsCell = document.createElement("td");
+    detailsCell.textContent = detailText;
+    tr.appendChild(detailsCell);
 
     const timeCell = document.createElement("td");
     timeCell.textContent = formatDateTime(firstValue(log, ["created_at"], ""));
@@ -1052,13 +1123,13 @@ async function loadAuditTrail() {
   if ((entity && !id) || (!entity && id)) {
     adminState.auditRows = [];
     adminState.auditPage = 1;
-    showTableMessage(ui.activityList, 5, "Enter both entity and entity id to filter");
+    showTableMessage(ui.activityList, 8, "Enter both entity and entity id to filter");
     updatePager(ui.auditPageMeta, ui.auditPrevBtn, ui.auditNextBtn, 1, 1);
     return;
   }
 
   try {
-    showTableMessage(ui.activityList, 5, "Loading audit logs...");
+    showTableMessage(ui.activityList, 8, "Loading audit logs...");
     const payload = await platformAdminApi.getAuditTrail(entity || undefined, id || undefined);
     adminState.auditRows = normalizeArrayResponse(payload);
     adminState.auditPage = 1;
@@ -1073,8 +1144,80 @@ async function loadAuditTrail() {
     const message = hasNoFilter && Number(error?.status || 0) === 400
       ? backendNeedsRestartMsg
       : (error.message || fallbackMsg);
-    showTableMessage(ui.activityList, 5, message);
+    showTableMessage(ui.activityList, 8, message);
     updatePager(ui.auditPageMeta, ui.auditPrevBtn, ui.auditNextBtn, 1, 1);
+  }
+}
+
+/* =========================================================
+   CONTACT REQUESTS SECTION
+   ========================================================= */
+
+function renderContactCurrentPage() {
+  if (!ui.contactList) return;
+
+  const { page, totalPages, pagedRows } = paginateRows(
+    adminState.contactRows,
+    adminState.contactPage,
+    PLATFORM_ADMIN_CONFIG.pageSize,
+  );
+  adminState.contactPage = page;
+
+  if (!pagedRows.length) {
+    showTableMessage(ui.contactList, 8, "No contact requests found");
+    updatePager(ui.contactPageMeta, ui.contactPrevBtn, ui.contactNextBtn, page, totalPages);
+    return;
+  }
+
+  ui.contactList.innerHTML = "";
+
+  pagedRows.forEach((request) => {
+    const tr = document.createElement("tr");
+
+    const cells = [
+      firstValue(request, ["id"], "N/A"),
+      firstValue(request, ["full_name"], "N/A"),
+      firstValue(request, ["work_email"], "N/A"),
+      firstValue(request, ["company_name"], "N/A"),
+      firstValue(request, ["role"], "N/A"),
+      firstValue(request, ["message"], "N/A"),
+      isActive(firstValue(request, ["agreed_to_contact"], 0)) ? "Yes" : "No",
+      formatDateTime(firstValue(request, ["created_at"], "")),
+    ];
+
+    cells.forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+
+    ui.contactList.appendChild(tr);
+  });
+
+  updatePager(ui.contactPageMeta, ui.contactPrevBtn, ui.contactNextBtn, page, totalPages);
+}
+
+async function loadContactRequests() {
+  if (!PLATFORM_ADMIN_CONFIG.useApi) return;
+
+  const workEmail = String(ui.contactEmailFilter?.value || "").trim();
+  const companyName = String(ui.contactCompanyFilter?.value || "").trim();
+  const query = {};
+  if (workEmail) query.work_email = workEmail;
+  if (companyName) query.company_name = companyName;
+
+  try {
+    showTableMessage(ui.contactList, 8, "Loading contact requests...");
+    const payload = await platformAdminApi.listContactRequests(query);
+    adminState.contactRows = normalizeArrayResponse(payload);
+    adminState.contactPage = 1;
+    renderContactCurrentPage();
+  } catch (error) {
+    console.error("Contact requests load error:", error);
+    adminState.contactRows = [];
+    adminState.contactPage = 1;
+    showTableMessage(ui.contactList, 8, error.message || "Failed to load contact requests");
+    updatePager(ui.contactPageMeta, ui.contactPrevBtn, ui.contactNextBtn, 1, 1);
   }
 }
 
@@ -1108,6 +1251,14 @@ async function openActivity() {
   if (PLATFORM_ADMIN_CONFIG.useApi && !adminState.activityLoaded) {
     adminState.activityLoaded = true;
     await loadAuditTrail();
+  }
+}
+
+async function openContacts() {
+  showSection("contacts");
+  if (PLATFORM_ADMIN_CONFIG.useApi && !adminState.contactsLoaded) {
+    adminState.contactsLoaded = true;
+    await loadContactRequests();
   }
 }
 
@@ -1223,6 +1374,7 @@ function bindNavigation() {
       if (section === "companies") await openCompanies();
       if (section === "users") await openUsers();
       if (section === "activity") await openActivity();
+      if (section === "contacts") await openContacts();
       if (section === "profile") await openProfile();
 
       if (window.innerWidth < 992) {
@@ -1260,6 +1412,20 @@ function bindPaginationButtons() {
       renderAuditCurrentPage();
     });
   }
+
+  if (ui.contactPrevBtn) {
+    ui.contactPrevBtn.addEventListener("click", () => {
+      adminState.contactPage = Math.max(1, adminState.contactPage - 1);
+      renderContactCurrentPage();
+    });
+  }
+
+  if (ui.contactNextBtn) {
+    ui.contactNextBtn.addEventListener("click", () => {
+      adminState.contactPage += 1;
+      renderContactCurrentPage();
+    });
+  }
 }
 
 function bindActionButtons() {
@@ -1281,6 +1447,13 @@ function bindActionButtons() {
   if (ui.auditLoadBtn) {
     ui.auditLoadBtn.addEventListener("click", async () => {
       await loadAuditTrail();
+    });
+  }
+
+  if (ui.contactLoadBtn) {
+    ui.contactLoadBtn.addEventListener("click", async () => {
+      adminState.contactsLoaded = true;
+      await loadContactRequests();
     });
   }
 
@@ -1328,10 +1501,12 @@ window.platformAdminApi = {
   openCompanies,
   openUsers,
   openActivity,
+  openContacts,
   openProfile,
   loadDashboardKpis,
   loadCompanies,
   loadUsersByRole,
   loadAuditTrail,
+  loadContactRequests,
   performLogout
 };

@@ -53,7 +53,10 @@
             <li class="nav-item"><a class="nav-link js-scroll-link" href="#roles">Roles</a></li>
             <li class="nav-item"><a class="nav-link js-scroll-link" href="#contact">Contact</a></li>
           </ul>
-          <a href="./login.html" class="btn btn-brand">Login</a>
+          <div class="d-flex gap-2">
+            <a href="./login.html" class="btn btn-brand">Login</a>
+            <a href="./signup.html" class="btn btn-outline-brand">Sign Up</a>
+          </div>
         </div>
       </div>
     </nav>
@@ -63,16 +66,30 @@
         <div class="container">
           <div class="row align-items-center g-4">
             <div class="col-lg-6 reveal">
-              <span class="pill"><i class="bi bi-stars"></i> Modern hiring operations</span>
-              <h1 class="hero-title mt-3">Recruit smarter with one unified hiring platform.</h1>
+              <span class="pill"><i class="bi bi-stars"></i> Role-aligned recruiting operating system</span>
+              <h1 class="hero-title mt-3">One workflow. Six roles. Faster and clearer hiring decisions.</h1>
               <p class="hero-text">
-                HireFlow centralizes job management, candidate tracking, interviews, and analytics
-                into one secure workflow for every recruitment role.
+                HireFlow maps responsibilities across Platform Admin, Company Admin, HR Recruiter,
+                Hiring Manager, Interviewer, and Candidate so each status change has a clear owner.
               </p>
-              <div class="d-flex flex-wrap gap-2 mt-4">
-                <a href="dashboard.html" class="btn btn-brand">Get Started</a>
-                <a href="#roles" class="btn btn-outline-brand js-scroll-link">Explore Roles</a>
-                <a href="about.html" class="btn btn-outline-brand">Company Page</a>
+              <div class="hero-cta d-flex flex-wrap gap-2 mt-4">
+                <a href="login.html" class="btn btn-brand"><i class="bi bi-box-arrow-in-right"></i> Login</a>
+                <a href="signup.html" class="btn btn-outline-brand"><i class="bi bi-person-plus"></i> Candidate Sign Up</a>
+                <a href="#features" class="btn btn-outline-brand js-scroll-link"><i class="bi bi-grid"></i> See Features</a>
+              </div>
+              <div class="hero-kpi-strip mt-4">
+                <div class="hero-kpi-item">
+                  <strong>6</strong>
+                  <span>Role dashboards</span>
+                </div>
+                <div class="hero-kpi-item">
+                  <strong>100%</strong>
+                  <span>Audit traceability</span>
+                </div>
+                <div class="hero-kpi-item">
+                  <strong>10+</strong>
+                  <span>Automated email triggers</span>
+                </div>
               </div>
             </div>
             <div class="col-lg-6 reveal">
@@ -88,35 +105,38 @@
         <div class="container">
           <div class="row g-4 align-items-center">
             <div class="col-lg-6 reveal">
-              <h2 class="section-title">Built for recruitment teams at every scale</h2>
+              <h2 class="section-title">Built around ownership, approvals, and accountability</h2>
               <p class="section-subtitle mb-3">
-                From startup hiring pods to enterprise talent functions, HireFlow standardizes your
-                process without slowing teams down.
+                From job drafting to final hire decision, every handoff is role-defined and visible.
+                Teams move faster because responsibility is explicit at each stage.
               </p>
               <div class="row g-3">
                 <div class="col-sm-6">
                   <div class="glass-card p-3 h-100">
-                    <h3 class="h6">Enterprise-ready security</h3>
-                    <p class="mb-0 text-secondary">Role-level permissions and audit-first workflows.</p>
+                    <h3 class="h6">Governance by design</h3>
+                    <p class="mb-0 text-secondary">Role-level permissions, scoped actions, and complete audit logs.</p>
                   </div>
                 </div>
                 <div class="col-sm-6">
                   <div class="glass-card p-3 h-100">
-                    <h3 class="h6">Actionable visibility</h3>
-                    <p class="mb-0 text-secondary">Pipeline health across all teams and job lines.</p>
+                    <h3 class="h6">Operational clarity</h3>
+                    <p class="mb-0 text-secondary">Live visibility into pending approvals, interviews, offers, and hires.</p>
                   </div>
                 </div>
               </div>
-              <a href="about.html" class="btn btn-outline-brand mt-4">Read full company story</a>
+              <a href="about.html" class="btn btn-outline-brand mt-4"><i class="bi bi-info-circle"></i> Read Company Story</a>
             </div>
             <div class="col-lg-6 reveal">
               <div class="highlight-panel">
-                <h5 class="mb-3">Recruitment lifecycle coverage</h5>
-                <p class="mb-2">Intake -> Posting -> Screening -> Interview -> Offer -> Onboarding</p>
-                <p class="mb-0">
-                  Aligns with your backend role model for Platform Admin, Company Admin, HR, Hiring
-                  Manager, Interviewer, and Candidate.
-                </p>
+                <h5 class="mb-3">Role handoff model</h5>
+                <ul class="role-list text-light mb-0">
+                  <li>HR Recruiter/Company Admin creates requisition</li>
+                  <li>Hiring Manager approves and publishes</li>
+                  <li>HR Recruiter screens and schedules interviews</li>
+                  <li>Interviewer submits scorecard and finalizes</li>
+                  <li>HR Recruiter selects/rejects and sends offer</li>
+                  <li>Hiring Manager confirms final hire after acceptance</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -133,43 +153,43 @@
             <div class="col-md-6 col-lg-4 reveal">
               <article class="feature-card">
                 <span class="card-icon"><i class="bi bi-briefcase"></i></span>
-                <h3 class="h5">Job Management</h3>
-                <p class="mb-0">Create, approve, and publish jobs with structured role templates.</p>
+                <h3 class="h5">Requisition and Approval Flow</h3>
+                <p class="mb-0">Draft jobs, submit for manager approval, publish, and close with tracked ownership.</p>
               </article>
             </div>
             <div class="col-md-6 col-lg-4 reveal">
               <article class="feature-card">
                 <span class="card-icon"><i class="bi bi-people"></i></span>
-                <h3 class="h5">Candidate Tracking</h3>
-                <p class="mb-0">Track application status, resume versions, and profile progress.</p>
+                <h3 class="h5">Application Stage Pipeline</h3>
+                <p class="mb-0">Track stages from applied to screening, interview, selected/rejected, offer, and hired.</p>
               </article>
             </div>
             <div class="col-md-6 col-lg-4 reveal">
               <article class="feature-card">
                 <span class="card-icon"><i class="bi bi-calendar-check"></i></span>
-                <h3 class="h5">Interview Scheduling</h3>
-                <p class="mb-0">Coordinate interviewer slots and automate interview workflow updates.</p>
+                <h3 class="h5">Interview Assignment and Scheduling</h3>
+                <p class="mb-0">Assign interviewer, schedule interviews, and track upcoming/completed interview states.</p>
               </article>
             </div>
             <div class="col-md-6 col-lg-4 reveal">
               <article class="feature-card">
-                <span class="card-icon"><i class="bi bi-graph-up-arrow"></i></span>
-                <h3 class="h5">Analytics Dashboard</h3>
-                <p class="mb-0">Measure source performance, funnel conversion, and hire velocity.</p>
+                <span class="card-icon"><i class="bi bi-clipboard-data"></i></span>
+                <h3 class="h5">Structured Scorecards</h3>
+                <p class="mb-0">Capture technical/communication evaluations and finalize scorecards for HR decisions.</p>
               </article>
             </div>
             <div class="col-md-6 col-lg-4 reveal">
               <article class="feature-card">
-                <span class="card-icon"><i class="bi bi-person-lock"></i></span>
-                <h3 class="h5">Role-Based Access</h3>
-                <p class="mb-0">Permission-driven screens for each stakeholder in the hiring journey.</p>
+                <span class="card-icon"><i class="bi bi-file-earmark-check"></i></span>
+                <h3 class="h5">Offer and Hire Workflow</h3>
+                <p class="mb-0">Send offers, collect candidate response, and route accepted offers to manager final hire.</p>
               </article>
             </div>
             <div class="col-md-6 col-lg-4 reveal">
               <article class="feature-card">
                 <span class="card-icon"><i class="bi bi-envelope-paper"></i></span>
-                <h3 class="h5">Email Notifications</h3>
-                <p class="mb-0">Keep teams and applicants updated at every milestone automatically.</p>
+                <h3 class="h5">Automated Communications</h3>
+                <p class="mb-0">Trigger role and candidate emails for signup, apply, approvals, interviews, offers, and hiring.</p>
               </article>
             </div>
           </div>
@@ -188,11 +208,11 @@
                 <span class="card-icon"><i class="bi bi-building-gear"></i></span>
                 <h3 class="h5">Platform Admin</h3>
                 <ul class="role-list">
-                  <li>Manage companies</li>
-                  <li>Manage subscriptions</li>
-                  <li>Monitor activity</li>
-                  <li>Global analytics</li>
-                  <li>Role permissions</li>
+                  <li>Create and manage companies</li>
+                  <li>Provision company admins</li>
+                  <li>Monitor global audit logs</li>
+                  <li>Review contact submissions</li>
+                  <li>Govern access and lifecycle</li>
                 </ul>
               </article>
             </div>
@@ -201,22 +221,22 @@
                 <span class="card-icon"><i class="bi bi-diagram-3"></i></span>
                 <h3 class="h5">Company Admin</h3>
                 <ul class="role-list">
-                  <li>Manage HR and Managers</li>
-                  <li>Approve job postings</li>
-                  <li>Company analytics</li>
-                  <li>Access control</li>
+                  <li>Create HR, Manager, Interviewer users</li>
+                  <li>Manage company jobs and offers</li>
+                  <li>Track applications by job</li>
+                  <li>Review company-scoped activity logs</li>
                 </ul>
               </article>
             </div>
             <div class="col-md-6 col-xl-4 reveal">
               <article class="role-card">
                 <span class="card-icon"><i class="bi bi-person-workspace"></i></span>
-                <h3 class="h5">HR</h3>
+                <h3 class="h5">HR Recruiter</h3>
                 <ul class="role-list">
-                  <li>Create job postings</li>
-                  <li>Shortlist candidates</li>
-                  <li>Schedule interviews</li>
-                  <li>Communicate with applicants</li>
+                  <li>Create drafts and submit jobs</li>
+                  <li>Screen applications and candidates</li>
+                  <li>Assign/schedule interviewers</li>
+                  <li>Send offers and update decisions</li>
                 </ul>
               </article>
             </div>
@@ -225,10 +245,10 @@
                 <span class="card-icon"><i class="bi bi-person-vcard"></i></span>
                 <h3 class="h5">Hiring Manager</h3>
                 <ul class="role-list">
-                  <li>Review shortlisted profiles</li>
-                  <li>Approve/reject candidates</li>
-                  <li>Provide interview feedback</li>
-                  <li>Track hiring pipeline</li>
+                  <li>Approve/reject job requests</li>
+                  <li>Publish and close approved jobs</li>
+                  <li>Review accepted offers</li>
+                  <li>Make final hired/rejected decision</li>
                 </ul>
               </article>
             </div>
@@ -238,8 +258,9 @@
                 <h3 class="h5">Interviewer</h3>
                 <ul class="role-list">
                   <li>View assigned interviews</li>
-                  <li>Submit evaluation</li>
-                  <li>Rate candidates</li>
+                  <li>Submit detailed scorecards</li>
+                  <li>Finalize score and mark completion</li>
+                  <li>Send score outcome to HR</li>
                 </ul>
               </article>
             </div>
@@ -248,12 +269,12 @@
                 <span class="card-icon"><i class="bi bi-person-badge"></i></span>
                 <h3 class="h5">Candidate</h3>
                 <ul class="role-list">
-                  <li>Sign up / Login</li>
+                  <li>Create candidate account</li>
                   <li>Browse jobs</li>
                   <li>Apply for jobs</li>
-                  <li>Track application status</li>
-                  <li>Update profile</li>
-                  <li>Upload resume</li>
+                  <li>Track live application status</li>
+                  <li>Manage profile and resume</li>
+                  <li>Accept or decline offers</li>
                 </ul>
               </article>
             </div>
@@ -262,13 +283,13 @@
           <div class="row g-4 mt-2">
             <div class="col-lg-6 reveal">
               <div class="contact-wrapper h-100">
-                <h3 class="h5 mb-3">Role Switch Preview</h3>
-                <p class="text-secondary mb-3">See a quick capability snapshot by role.</p>
+                <h3 class="h5 mb-3">Role Responsibility Preview</h3>
+                <p class="text-secondary mb-3">Check what each role can own in the workflow.</p>
                 <label for="roleSelect" class="form-label">Select role</label>
                 <select id="roleSelect" class="form-select" data-role-select>
                   <option value="platform_admin">Platform Admin</option>
                   <option value="company_admin">Company Admin</option>
-                  <option value="hr">HR</option>
+                  <option value="hr">HR Recruiter</option>
                   <option value="hiring_manager">Hiring Manager</option>
                   <option value="interviewer">Interviewer</option>
                   <option value="candidate">Candidate</option>
@@ -381,7 +402,7 @@
                     </div>
                   </div>
                   <div class="col-12 d-flex align-items-center gap-3">
-                    <button type="submit" class="btn btn-brand">Send Message</button>
+                    <button type="submit" class="btn btn-brand"><i class="bi bi-send"></i> Send Message</button>
                     <span class="text-success fw-semibold d-none" data-form-success>
                       Message submitted successfully.
                     </span>

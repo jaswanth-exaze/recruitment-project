@@ -6,6 +6,7 @@ const {
   generateRefreshToken,
   verifyRefreshToken,
 } = require("../utils/jwt.util");
+const { sendCandidateSignupWelcomeEmail } = require("./recruitmentEmail.service");
 
 function hashRefreshToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -133,6 +134,12 @@ exports.signupCandidate = async (payload) => {
 
     await connection.commit();
 
+    await sendCandidateSignupWelcomeEmail({
+      email,
+      firstName: first_name,
+      lastName: last_name,
+    });
+
     return {
       message: "Signup successful",
       token,
@@ -150,9 +157,21 @@ exports.signupCandidate = async (payload) => {
 exports.getProfile = async (userId) => {
   const [rows] = await db.promise().query(
     `
-      SELECT id, company_id, email, first_name, last_name, role, is_active, last_login_at, created_at, updated_at
-      FROM users
-      WHERE id = ?
+      SELECT
+        u.id,
+        u.company_id,
+        c.name AS company_name,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.role,
+        u.is_active,
+        u.last_login_at,
+        u.created_at,
+        u.updated_at
+      FROM users u
+      LEFT JOIN companies c ON u.company_id = c.id
+      WHERE u.id = ?
       LIMIT 1
     `,
     [userId],

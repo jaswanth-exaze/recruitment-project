@@ -1,6 +1,6 @@
 /**
  * Hiring Manager dashboard script.
- * Handles approvals, job actions, final candidate decisions, profile, and auth flow.
+ * Handles approvals, jobs, final candidate decisions, profile, and auth flow.
  */
 
 // 1) Config and state.
@@ -17,10 +17,10 @@ const HM_CONFIG = {
     getMyProfile: "/hiring-manager/profile",
     updateMyProfile: "/hiring-manager/profile",
     listPendingApprovals: "/hiring-manager/job-approvals",
+    listJobs: "/hiring-manager/jobs",
+    listApplications: "/hiring-manager/applications",
     approveJob: "/hiring-manager/jobs/:id/approve",
     rejectJob: "/hiring-manager/jobs/:id/reject",
-    publishJob: "/hiring-manager/jobs/:id/publish",
-    closeJob: "/hiring-manager/jobs/:id/close",
     getJobById: "/hiring-manager/jobs/:id",
     finalDecision: "/hiring-manager/applications/:id/final-decision"
   }
@@ -32,8 +32,10 @@ const hmState = {
   selectedJob: null,
   approvalsRows: [],
   approvalsLoaded: false,
-  sessionPublishedCount: 0,
-  sessionClosedCount: 0
+  jobsRows: [],
+  jobsLoaded: false,
+  decisionsRows: [],
+  decisionsLoaded: false
 };
 
 const hmViewMeta = {
@@ -49,12 +51,12 @@ const hmViewMeta = {
   },
   jobs: {
     title: "Jobs",
-    subtitle: "View job details and perform publish/close actions.",
-    searchPlaceholder: "Search jobs by id"
+    subtitle: "View all jobs in your company and open details without entering job id.",
+    searchPlaceholder: "Search jobs"
   },
   decisions: {
     title: "Final Decisions",
-    subtitle: "Set final selected/rejected decisions for applications.",
+    subtitle: "Approve offer-accepted applications to hired or rejected.",
     searchPlaceholder: "Search applications by id"
   },
   profile: {
@@ -69,34 +71,31 @@ const ui = {
   sections: document.querySelectorAll("[data-hm-view]"),
   headerTitle: document.querySelector("[data-hm-header-title]"),
   headerSubtitle: document.querySelector("[data-hm-header-subtitle]"),
+  topCompanyName: document.querySelector("[data-hm-top-company]"),
   searchInput: document.querySelector("[data-hm-search]"),
 
   kpiPendingApprovals: document.querySelector("[data-hm-kpi-pending-approvals]"),
   kpiPublished: document.querySelector("[data-hm-kpi-published]"),
   kpiClosed: document.querySelector("[data-hm-kpi-closed]"),
 
-  approverIdInput: document.querySelector("[data-hm-approver-id]"),
   approvalLoadBtn: document.querySelector("[data-hm-approval-load]"),
   approvalList: document.querySelector("[data-hm-approval-list]"),
   approvalMsg: document.querySelector("[data-hm-approval-msg]"),
 
-  jobIdInput: document.querySelector("[data-hm-job-id-input]"),
-  jobLoadBtn: document.querySelector("[data-hm-job-load]"),
+  jobsLoadBtn: document.querySelector("[data-hm-jobs-load]"),
+  jobList: document.querySelector("[data-hm-job-list]"),
   jobTitle: document.querySelector("[data-hm-job-title]"),
   jobStatus: document.querySelector("[data-hm-job-status]"),
   jobCompany: document.querySelector("[data-hm-job-company]"),
   jobLocation: document.querySelector("[data-hm-job-location]"),
   jobPositions: document.querySelector("[data-hm-job-positions]"),
   selectedJobId: document.querySelector("[data-hm-selected-job-id]"),
-  jobPublishBtn: document.querySelector("[data-hm-job-publish]"),
-  jobCloseBtn: document.querySelector("[data-hm-job-close]"),
-  approvalComments: document.querySelector("[data-hm-approval-comments]"),
-  jobApproveBtn: document.querySelector("[data-hm-job-approve]"),
-  jobRejectBtn: document.querySelector("[data-hm-job-reject]"),
   jobMsg: document.querySelector("[data-hm-job-msg]"),
-  jobActionMsg: document.querySelector("[data-hm-job-action-msg]"),
 
   finalDecisionForm: document.querySelector("[data-hm-final-decision-form]"),
+  decisionJobId: document.querySelector("[data-hm-decision-job-id]"),
+  decisionLoadBtn: document.querySelector("[data-hm-decision-load]"),
+  decisionList: document.querySelector("[data-hm-decision-list]"),
   applicationId: document.querySelector("[data-hm-application-id]"),
   decisionStatus: document.querySelector("[data-hm-decision-status]"),
   finalDecisionBtn: document.querySelector("[data-hm-final-decision-btn]"),
@@ -138,11 +137,6 @@ function normalizeArrayResponse(payload) {
 
 function buildPathWithId(path, id) {
   return path.replace(":id", encodeURIComponent(String(id)));
-}
-
-function toNumber(value) {
-  const n = Number(value);
-  return Number.isNaN(n) ? null : n;
 }
 
 function setText(element, value) {
@@ -353,10 +347,16 @@ const hmApi = {
     });
   },
 
-  listPendingApprovals(approverId) {
-    return apiRequest(HM_CONFIG.endpoints.listPendingApprovals, {
-      query: approverId ? { approver_id: approverId } : {}
-    });
+  listPendingApprovals() {
+    return apiRequest(HM_CONFIG.endpoints.listPendingApprovals);
+  },
+
+  listJobs(query = {}) {
+    return apiRequest(HM_CONFIG.endpoints.listJobs, { query });
+  },
+
+  listApplications(query = {}) {
+    return apiRequest(HM_CONFIG.endpoints.listApplications, { query });
   },
 
   approveJob(jobId, payload) {
@@ -370,20 +370,6 @@ const hmApi = {
     return apiRequest(buildPathWithId(HM_CONFIG.endpoints.rejectJob, jobId), {
       method: "POST",
       body: payload
-    });
-  },
-
-  publishJob(jobId) {
-    return apiRequest(buildPathWithId(HM_CONFIG.endpoints.publishJob, jobId), {
-      method: "POST",
-      body: {}
-    });
-  },
-
-  closeJob(jobId) {
-    return apiRequest(buildPathWithId(HM_CONFIG.endpoints.closeJob, jobId), {
-      method: "POST",
-      body: {}
     });
   },
 
@@ -414,6 +400,19 @@ function profileSuffixText() {
   if (name === "N/A" && !role) return "";
   if (name !== "N/A" && role) return ` Signed in as ${name} (${role}).`;
   return ` Signed in as ${name !== "N/A" ? name : role}.`;
+}
+
+function resolveCompanyName(profile) {
+  const companyName = firstValue(profile || {}, ["company_name"], "");
+  if (companyName) return companyName;
+  const companyId = firstValue(profile || {}, ["company_id"], "");
+  if (companyId) return `Company #${companyId}`;
+  return "N/A";
+}
+
+function renderTopCompanyName() {
+  if (!ui.topCompanyName) return;
+  ui.topCompanyName.textContent = `Company: ${resolveCompanyName(hmState.currentProfile)}`;
 }
 
 function showSection(viewKey) {
@@ -451,6 +450,7 @@ function renderProfilePanel() {
     if (ui.profileFirstName) ui.profileFirstName.value = "";
     if (ui.profileLastName) ui.profileLastName.value = "";
     if (ui.profileEditEmail) ui.profileEditEmail.value = "";
+    renderTopCompanyName();
     return;
   }
 
@@ -462,6 +462,7 @@ function renderProfilePanel() {
   if (ui.profileFirstName) ui.profileFirstName.value = firstValue(profile, ["first_name"], "");
   if (ui.profileLastName) ui.profileLastName.value = firstValue(profile, ["last_name"], "");
   if (ui.profileEditEmail) ui.profileEditEmail.value = firstValue(profile, ["email"], "");
+  renderTopCompanyName();
 }
 
 function setSelectedJob(job) {
@@ -507,12 +508,6 @@ async function performLogout() {
     clearAuthStorage();
     window.location.href = "../public/login.html";
   }
-}
-
-function approverIdOrMe() {
-  const typed = String(ui.approverIdInput?.value || "").trim();
-  if (typed) return toNumber(typed);
-  return toNumber(firstValue(hmState.currentProfile || {}, ["id"], "")) || null;
 }
 
 function renderApprovalRows(rows) {
@@ -575,77 +570,194 @@ function renderApprovalRows(rows) {
 async function loadPendingApprovals() {
   try {
     setMessage(ui.approvalMsg, "Loading approvals...", "info");
-    const rows = normalizeArrayResponse(await hmApi.listPendingApprovals(approverIdOrMe()));
+    const rows = normalizeArrayResponse(await hmApi.listPendingApprovals());
     hmState.approvalsRows = rows;
+    hmState.approvalsLoaded = true;
     renderApprovalRows(rows);
     setMessage(ui.approvalMsg, `Loaded ${rows.length} pending approval(s).`, "success");
   } catch (error) {
     hmState.approvalsRows = [];
+    hmState.approvalsLoaded = false;
     renderApprovalRows([]);
     setMessage(ui.approvalMsg, error.message || "Failed to load approvals.", "error");
   }
 }
 
-async function loadJobById(jobId) {
+function decisionCandidateLabel(row) {
+  const first = firstValue(row, ["candidate_first_name"], "");
+  const last = firstValue(row, ["candidate_last_name"], "");
+  const name = `${first} ${last}`.trim() || "N/A";
+  const email = firstValue(row, ["candidate_email"], "");
+  return email ? `${name} (${email})` : name;
+}
+
+function renderDecisionRows(rows) {
+  if (!ui.decisionList) return;
+  if (!rows.length) {
+    showTableMessage(ui.decisionList, 8, "No offer accecepted applications found");
+    return;
+  }
+
+  ui.decisionList.innerHTML = "";
+
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    const applicationId = firstValue(row, ["application_id", "id"], "");
+
+    const cells = [
+      applicationId || "N/A",
+      firstValue(row, ["job_id"], "N/A"),
+      firstValue(row, ["job_title", "title"], "N/A"),
+      decisionCandidateLabel(row),
+      firstValue(row, ["openings_left", "positions_count"], "N/A"),
+      firstValue(row, ["status"], "N/A"),
+      formatDateTime(firstValue(row, ["updated_at"], ""))
+    ];
+
+    cells.forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+
+    const actionTd = document.createElement("td");
+    const useBtn = document.createElement("button");
+    useBtn.type = "button";
+    useBtn.className = "btn btn-outline-brand btn-sm";
+    useBtn.textContent = "Use";
+    useBtn.dataset.decisionUseApplicationId = applicationId;
+    actionTd.appendChild(useBtn);
+    tr.appendChild(actionTd);
+
+    ui.decisionList.appendChild(tr);
+  });
+}
+
+async function loadDecisionApplications(silent = false) {
+  const jobId = String(ui.decisionJobId?.value || "").trim();
+  const query = {};
+  if (jobId) query.job_id = jobId;
+
+  try {
+    if (!silent) {
+      setMessage(ui.finalDecisionMsg, "Loading offer accecepted applications...", "info");
+    }
+    const rows = normalizeArrayResponse(await hmApi.listApplications(query));
+    hmState.decisionsRows = rows;
+    hmState.decisionsLoaded = true;
+    renderDecisionRows(rows);
+    if (!silent) {
+      setMessage(ui.finalDecisionMsg, `Loaded ${rows.length} offer accecepted application(s).`, "success");
+    }
+  } catch (error) {
+    hmState.decisionsRows = [];
+    renderDecisionRows([]);
+    setMessage(ui.finalDecisionMsg, error.message || "Failed to load decision applications.", "error");
+  }
+}
+
+function renderJobsRows(rows) {
+  if (!ui.jobList) return;
+  if (!rows.length) {
+    showTableMessage(ui.jobList, 7, "No jobs found");
+    return;
+  }
+
+  ui.jobList.innerHTML = "";
+
+  rows.forEach((row) => {
+    const tr = document.createElement("tr");
+    const jobId = firstValue(row, ["id"], "");
+    const cells = [
+      jobId || "N/A",
+      firstValue(row, ["title"], "N/A"),
+      firstValue(row, ["status"], "N/A"),
+      firstValue(row, ["location"], "N/A"),
+      firstValue(row, ["positions_count"], "N/A"),
+      formatDateTime(firstValue(row, ["created_at"], "")),
+    ];
+
+    cells.forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.appendChild(td);
+    });
+
+    const actionTd = document.createElement("td");
+    const viewBtn = document.createElement("button");
+    viewBtn.type = "button";
+    viewBtn.className = "btn btn-outline-brand btn-sm";
+    viewBtn.textContent = "View";
+    viewBtn.dataset.hmJobAction = "view";
+    viewBtn.dataset.jobId = jobId;
+    actionTd.appendChild(viewBtn);
+    tr.appendChild(actionTd);
+
+    ui.jobList.appendChild(tr);
+  });
+}
+
+async function loadJobs(silent = false) {
+  try {
+    if (!silent) setMessage(ui.jobMsg, "Loading jobs...", "info");
+    const rows = normalizeArrayResponse(await hmApi.listJobs());
+    hmState.jobsRows = rows;
+    hmState.jobsLoaded = true;
+    renderJobsRows(rows);
+    if (hmState.selectedJob) {
+      const selectedId = String(firstValue(hmState.selectedJob, ["id"], ""));
+      const refreshed = rows.find((row) => String(firstValue(row, ["id"], "")) === selectedId);
+      if (refreshed) setSelectedJob(refreshed);
+    }
+    if (!silent) setMessage(ui.jobMsg, `Loaded ${rows.length} job(s).`, "success");
+  } catch (error) {
+    hmState.jobsRows = [];
+    hmState.jobsLoaded = false;
+    renderJobsRows([]);
+    setMessage(ui.jobMsg, error.message || "Failed to load jobs.", "error");
+  }
+}
+
+async function loadJobById(jobId, silent = false) {
   if (!jobId) {
-    setMessage(ui.jobMsg, "Job id is required.", "error");
+    if (!silent) setMessage(ui.jobMsg, "Job id is required.", "error");
     return;
   }
   try {
-    setMessage(ui.jobMsg, "Loading job...", "info");
+    if (!silent) setMessage(ui.jobMsg, "Loading job details...", "info");
     const job = await hmApi.getJobById(jobId);
     setSelectedJob(job);
-    setMessage(ui.jobMsg, "Job loaded.", "success");
+    if (!silent) setMessage(ui.jobMsg, "Job details loaded.", "success");
   } catch (error) {
-    setSelectedJob(null);
-    setMessage(ui.jobMsg, error.message || "Failed to load job.", "error");
+    if (!silent) {
+      setSelectedJob(null);
+      setMessage(ui.jobMsg, error.message || "Failed to load job details.", "error");
+    }
   }
 }
 
 async function runApprovalAction(action, jobId, comments) {
-  const approverId = approverIdOrMe();
-  if (!jobId || !approverId) {
-    setMessage(ui.approvalMsg, "Job id and approver id are required.", "error");
+  if (!jobId) {
+    setMessage(ui.approvalMsg, "Job id is required.", "error");
     return;
   }
 
   try {
     if (action === "approve") {
-      await hmApi.approveJob(jobId, { approver_id: approverId, comments: comments || "" });
+      await hmApi.approveJob(jobId, { comments: comments || "" });
       setMessage(ui.approvalMsg, "Job approved.", "success");
     } else {
-      await hmApi.rejectJob(jobId, { approver_id: approverId, comments: comments || "" });
+      await hmApi.rejectJob(jobId, { comments: comments || "" });
       setMessage(ui.approvalMsg, "Job rejected.", "success");
     }
     await loadPendingApprovals();
+    await loadJobs(true);
     await loadDashboardKpis();
-    await loadJobById(jobId);
+    if (String(firstValue(hmState.selectedJob || {}, ["id"], "")) === String(jobId)) {
+      await loadJobById(jobId, true);
+    }
   } catch (error) {
     setMessage(ui.approvalMsg, error.message || `Failed to ${action} job.`, "error");
-  }
-}
-
-async function runJobAction(action, jobId) {
-  if (!jobId) {
-    setMessage(ui.jobActionMsg, "Select a job first.", "error");
-    return;
-  }
-
-  try {
-    if (action === "publish") {
-      await hmApi.publishJob(jobId);
-      hmState.sessionPublishedCount += 1;
-      setMessage(ui.jobActionMsg, "Job published.", "success");
-    }
-    if (action === "close") {
-      await hmApi.closeJob(jobId);
-      hmState.sessionClosedCount += 1;
-      setMessage(ui.jobActionMsg, "Job closed.", "success");
-    }
-    await loadJobById(jobId);
-    await loadDashboardKpis();
-  } catch (error) {
-    setMessage(ui.jobActionMsg, error.message || `Failed to ${action} job.`, "error");
   }
 }
 
@@ -667,6 +779,7 @@ async function submitFinalDecision(event) {
 
   try {
     await hmApi.finalDecision(applicationId, status);
+    await loadDecisionApplications(true);
     setMessage(ui.finalDecisionMsg, "Final decision submitted successfully.", "success");
     if (ui.finalDecisionForm) ui.finalDecisionForm.reset();
   } catch (error) {
@@ -680,20 +793,38 @@ async function submitFinalDecision(event) {
 }
 
 async function loadDashboardKpis() {
-  setText(ui.kpiPublished, hmState.sessionPublishedCount);
-  setText(ui.kpiClosed, hmState.sessionClosedCount);
-
   if (!hmState.approvalsLoaded) {
     try {
-      const rows = normalizeArrayResponse(await hmApi.listPendingApprovals(approverIdOrMe()));
+      const rows = normalizeArrayResponse(await hmApi.listPendingApprovals());
       hmState.approvalsRows = rows;
       hmState.approvalsLoaded = true;
     } catch (error) {
       hmState.approvalsRows = [];
+      hmState.approvalsLoaded = false;
     }
   }
 
+  if (!hmState.jobsLoaded) {
+    try {
+      const rows = normalizeArrayResponse(await hmApi.listJobs());
+      hmState.jobsRows = rows;
+      hmState.jobsLoaded = true;
+    } catch (error) {
+      hmState.jobsRows = [];
+      hmState.jobsLoaded = false;
+    }
+  }
+
+  const publishedCount = hmState.jobsRows.filter(
+    (row) => String(firstValue(row, ["status"], "")).toLowerCase() === "published",
+  ).length;
+  const closedCount = hmState.jobsRows.filter(
+    (row) => String(firstValue(row, ["status"], "")).toLowerCase() === "closed",
+  ).length;
+
   setText(ui.kpiPendingApprovals, hmState.approvalsRows.length);
+  setText(ui.kpiPublished, publishedCount);
+  setText(ui.kpiClosed, closedCount);
 }
 
 // 5) Profile and session actions.
@@ -765,17 +896,22 @@ async function openDashboard() {
 async function openApprovals() {
   showSection("approvals");
   if (!hmState.approvalsLoaded) {
-    hmState.approvalsLoaded = true;
     await loadPendingApprovals();
   }
 }
 
 async function openJobs() {
   showSection("jobs");
+  if (!hmState.jobsLoaded) {
+    await loadJobs();
+  }
 }
 
 async function openDecisions() {
   showSection("decisions");
+  if (!hmState.decisionsLoaded) {
+    await loadDecisionApplications();
+  }
 }
 
 async function openProfile() {
@@ -819,7 +955,6 @@ function bindNavigation() {
 function bindActions() {
   if (ui.approvalLoadBtn) {
     ui.approvalLoadBtn.addEventListener("click", async () => {
-      hmState.approvalsLoaded = true;
       await loadPendingApprovals();
       await loadDashboardKpis();
     });
@@ -835,6 +970,7 @@ function bindActions() {
       if (!jobId) return;
 
       if (action === "view") {
+        await openJobs();
         await loadJobById(jobId);
         return;
       }
@@ -844,40 +980,38 @@ function bindActions() {
     });
   }
 
-  if (ui.jobLoadBtn) {
-    ui.jobLoadBtn.addEventListener("click", async () => {
-      const jobId = String(ui.jobIdInput?.value || "").trim();
+  if (ui.jobsLoadBtn) {
+    ui.jobsLoadBtn.addEventListener("click", async () => {
+      await loadJobs();
+      await loadDashboardKpis();
+    });
+  }
+
+  if (ui.jobList) {
+    ui.jobList.addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-hm-job-action]");
+      if (!button) return;
+      const action = String(button.dataset.hmJobAction || "").trim();
+      const jobId = String(button.dataset.jobId || "").trim();
+      if (action !== "view" || !jobId) return;
       await loadJobById(jobId);
     });
   }
 
-  if (ui.jobPublishBtn) {
-    ui.jobPublishBtn.addEventListener("click", async () => {
-      const jobId = firstValue(hmState.selectedJob || {}, ["id"], "");
-      await runJobAction("publish", jobId);
+  if (ui.decisionLoadBtn) {
+    ui.decisionLoadBtn.addEventListener("click", async () => {
+      await loadDecisionApplications();
     });
   }
 
-  if (ui.jobCloseBtn) {
-    ui.jobCloseBtn.addEventListener("click", async () => {
-      const jobId = firstValue(hmState.selectedJob || {}, ["id"], "");
-      await runJobAction("close", jobId);
-    });
-  }
-
-  if (ui.jobApproveBtn) {
-    ui.jobApproveBtn.addEventListener("click", async () => {
-      const jobId = firstValue(hmState.selectedJob || {}, ["id"], "");
-      const comments = String(ui.approvalComments?.value || "").trim();
-      await runApprovalAction("approve", jobId, comments);
-    });
-  }
-
-  if (ui.jobRejectBtn) {
-    ui.jobRejectBtn.addEventListener("click", async () => {
-      const jobId = firstValue(hmState.selectedJob || {}, ["id"], "");
-      const comments = String(ui.approvalComments?.value || "").trim();
-      await runApprovalAction("reject", jobId, comments);
+  if (ui.decisionList) {
+    ui.decisionList.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-decision-use-application-id]");
+      if (!button) return;
+      const applicationId = String(button.dataset.decisionUseApplicationId || "").trim();
+      if (!applicationId || !ui.applicationId) return;
+      ui.applicationId.value = applicationId;
+      setMessage(ui.finalDecisionMsg, `Application #${applicationId} selected for final decision.`, "info");
     });
   }
 
@@ -908,6 +1042,9 @@ async function initHiringManagerDashboard() {
   bindNavigation();
   bindActions();
   setSelectedJob(null);
+  if (ui.approvalList) showTableMessage(ui.approvalList, 6, "Load approvals to see records");
+  if (ui.jobList) showTableMessage(ui.jobList, 7, "Open jobs to load records");
+  if (ui.decisionList) showTableMessage(ui.decisionList, 8, "Open decisions to load offer accecepted applications");
 
   const sessionReady = await loadAuthProfile();
   if (!sessionReady) return;
@@ -928,6 +1065,7 @@ window.hiringManagerApi = {
   openDecisions,
   openProfile,
   loadPendingApprovals,
+  loadJobs,
   loadJobById,
   performLogout
 };

@@ -183,6 +183,19 @@ exports.getAuditTrail = async (req, res) => {
   }
 };
 
+exports.listContactRequests = async (req, res) => {
+  try {
+    return res.json(
+      await service.listContactRequests({
+        work_email: req.query.work_email,
+        company_name: req.query.company_name,
+      }),
+    );
+  } catch (err) {
+    return handleError(res, err);
+  }
+};
+
 exports.insertBackgroundJob = async (req, res) => {
   try {
     return res.status(201).json(await service.insertBackgroundJob(req.body));

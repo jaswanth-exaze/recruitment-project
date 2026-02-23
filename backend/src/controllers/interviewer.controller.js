@@ -50,6 +50,14 @@ exports.updateInterview = async (req, res) => {
   }
 };
 
+exports.getPendingScorecardInterviews = async (req, res) => {
+  try {
+    return res.json(await service.getPendingScorecardInterviews(req.user.user_id, req.user.company_id));
+  } catch (err) {
+    return handleError(res, err);
+  }
+};
+
 exports.submitScorecard = async (req, res) => {
   try {
     return res.status(201).json(await service.submitScorecard(req.body, req.user.company_id));
@@ -61,7 +69,7 @@ exports.submitScorecard = async (req, res) => {
 exports.finalizeScorecard = async (req, res) => {
   try {
     const affected = await service.finalizeScorecard(req.params.id, req.user.user_id, req.user.company_id);
-    if (!affected) return res.status(404).json({ message: "Scorecard not found" });
+    if (!affected) return res.status(404).json({ message: "Scorecard not found or already finalized" });
     return res.json({ message: "Scorecard finalized" });
   } catch (err) {
     return handleError(res, err);
@@ -70,9 +78,6 @@ exports.finalizeScorecard = async (req, res) => {
 
 exports.getScorecards = async (req, res) => {
   try {
-    if (!req.query.interview_id) {
-      return res.status(400).json({ message: "interview_id query param is required" });
-    }
     return res.json(await service.getScorecardsByInterview(req.query.interview_id, req.user.user_id, req.user.company_id));
   } catch (err) {
     return handleError(res, err);

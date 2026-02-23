@@ -286,10 +286,10 @@
               <div class="col-12">
                 <section class="table-card p-3">
                   <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
-                    <h2 class="h6 mb-0">Offers By Application</h2>
+                    <h2 class="h6 mb-0">All Offers</h2>
                     <div class="d-flex align-items-end gap-2">
                       <div>
-                        <label class="form-label small mb-1" for="candOfferApplicationId">Application ID</label>
+                        <label class="form-label small mb-1" for="candOfferApplicationId">Application ID (optional filter)</label>
                         <input id="candOfferApplicationId" type="number" min="1" class="form-control form-control-sm" data-cand-offer-application-id />
                       </div>
                       <button type="button" class="btn btn-outline-brand btn-sm" data-cand-offers-load>Load</button>
@@ -300,7 +300,9 @@
                     <table class="table align-middle mb-0">
                       <thead>
                         <tr>
-                          <th>ID</th>
+                          <th>Offer ID</th>
+                          <th>Application ID</th>
+                          <th>Job</th>
                           <th>Status</th>
                           <th>Details</th>
                           <th>Document</th>
@@ -316,16 +318,20 @@
             </div>
           </section>
 
-          <section data-cand-view="profile" class="d-none">
+          <section data-cand-view="profile" class="d-none profile-view">
             <div class="row g-3">
               <div class="col-lg-6">
-                <section class="table-card p-3 h-100">
-                  <h2 class="h6 mb-3">Account Profile</h2>
-                  <div class="table-responsive mb-3">
+                <section class="table-card p-3 p-md-4 h-100 profile-panel">
+                  <div class="profile-head mb-3">
+                    <p class="profile-kicker mb-1">Account</p>
+                    <h2 class="h5 mb-1">Account Profile</h2>
+                    <p class="profile-subtext mb-0">Keep your login profile details accurate.</p>
+                  </div>
+                  <div class="table-responsive profile-facts mb-3">
                     <table class="table align-middle mb-0">
                       <tbody>
                         <tr>
-                          <th style="width: 35%">Name</th>
+                          <th>Name</th>
                           <td data-cand-profile-name>N/A</td>
                         </tr>
                         <tr>
@@ -343,35 +349,41 @@
                       </tbody>
                     </table>
                   </div>
-                  <h3 class="h6 mb-3">Edit Account Profile</h3>
-                  <form class="row g-3" data-cand-profile-form>
-                    <div class="col-md-6">
-                      <label class="form-label" for="candFirstName">First Name</label>
-                      <input id="candFirstName" type="text" class="form-control" data-cand-edit-first-name required />
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="candLastName">Last Name</label>
-                      <input id="candLastName" type="text" class="form-control" data-cand-edit-last-name required />
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label" for="candEmail">Email</label>
-                      <input id="candEmail" type="email" class="form-control" data-cand-edit-email required />
-                    </div>
-                    <div class="col-12">
-                      <button type="submit" class="btn btn-brand" data-cand-profile-save>Save Account Profile</button>
-                    </div>
-                  </form>
+                  <div class="profile-form-block">
+                    <h3 class="h6 mb-3">Edit Account Profile</h3>
+                    <form class="row g-3" data-cand-profile-form>
+                      <div class="col-md-6">
+                        <label class="form-label" for="candFirstName">First Name</label>
+                        <input id="candFirstName" type="text" class="form-control" data-cand-edit-first-name required />
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="candLastName">Last Name</label>
+                        <input id="candLastName" type="text" class="form-control" data-cand-edit-last-name required />
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label" for="candEmail">Email</label>
+                        <input id="candEmail" type="email" class="form-control" data-cand-edit-email required />
+                      </div>
+                      <div class="col-12">
+                        <button type="submit" class="btn btn-brand" data-cand-profile-save>Save Account Profile</button>
+                      </div>
+                    </form>
+                  </div>
                 </section>
               </div>
 
               <div class="col-lg-6">
-                <section class="table-card p-3 h-100">
-                  <h2 class="h6 mb-3">Candidate Profile</h2>
-                  <div class="table-responsive mb-3">
+                <section class="table-card p-3 p-md-4 h-100 profile-panel">
+                  <div class="profile-head mb-3">
+                    <p class="profile-kicker mb-1">Candidate</p>
+                    <h2 class="h5 mb-1">Candidate Profile</h2>
+                    <p class="profile-subtext mb-0">Update your public candidate profile and resume details.</p>
+                  </div>
+                  <div class="table-responsive profile-facts mb-3">
                     <table class="table align-middle mb-0">
                       <tbody>
                         <tr>
-                          <th style="width: 35%">Phone</th>
+                          <th>Phone</th>
                           <td data-cand-cp-phone>N/A</td>
                         </tr>
                         <tr>
@@ -389,47 +401,172 @@
                       </tbody>
                     </table>
                   </div>
-                  <form class="row g-3" data-cand-cp-form>
-                    <div class="col-md-6">
-                      <label class="form-label" for="candCpPhone">Phone</label>
-                      <input id="candCpPhone" type="text" class="form-control" data-cand-cp-edit-phone />
-                    </div>
-                    <div class="col-md-6">
-                      <label class="form-label" for="candCpAddress">Address</label>
-                      <input id="candCpAddress" type="text" class="form-control" data-cand-cp-edit-address />
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label" for="candCpData">Profile Data (JSON)</label>
-                      <textarea id="candCpData" rows="4" class="form-control" data-cand-cp-edit-data></textarea>
-                    </div>
-                    <div class="col-md-9">
-                      <label class="form-label" for="candCpResume">Resume URL</label>
-                      <input id="candCpResume" type="url" class="form-control" data-cand-cp-resume-url />
-                    </div>
-                    <div class="col-md-3 d-flex align-items-end">
-                      <button type="button" class="btn btn-outline-brand w-100" data-cand-cp-upload-resume>Update Resume</button>
-                    </div>
-                    <div class="col-12">
-                      <button type="submit" class="btn btn-brand">Save Candidate Profile</button>
-                    </div>
-                  </form>
+                  <div class="profile-form-block">
+                    <form class="row g-3" data-cand-cp-form>
+                      <div class="col-md-6">
+                        <label class="form-label" for="candCpPhone">Phone</label>
+                        <input id="candCpPhone" type="text" class="form-control" data-cand-cp-edit-phone />
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="candCpAddress">Address</label>
+                        <input id="candCpAddress" type="text" class="form-control" data-cand-cp-edit-address />
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label" for="candCpData">Profile Data (JSON)</label>
+                        <textarea id="candCpData" rows="4" class="form-control" data-cand-cp-edit-data></textarea>
+                      </div>
+                      <div class="col-md-9">
+                        <label class="form-label" for="candCpResume">Resume URL</label>
+                        <input id="candCpResume" type="url" class="form-control" data-cand-cp-resume-url />
+                      </div>
+                      <div class="col-md-3 d-flex align-items-end">
+                        <button type="button" class="btn btn-outline-brand w-100" data-cand-cp-upload-resume>Update Resume</button>
+                      </div>
+                      <div class="col-12">
+                        <button type="submit" class="btn btn-brand">Save Candidate Profile</button>
+                      </div>
+                    </form>
+                  </div>
                 </section>
               </div>
             </div>
 
             <div class="row g-3 mt-1">
               <div class="col-12">
-                <section class="table-card p-3">
-                  <h2 class="h6 mb-3">Session Actions</h2>
-                  <div class="d-flex flex-wrap gap-2">
+                <section class="table-card p-3 p-md-4 profile-panel profile-actions-panel">
+                  <div class="profile-head mb-3">
+                    <p class="profile-kicker mb-1">Security</p>
+                    <h2 class="h5 mb-1">Session Actions</h2>
+                    <p class="profile-subtext mb-0">Reload profile data or log out securely.</p>
+                  </div>
+                  <div class="d-grid gap-2 profile-actions">
                     <button type="button" class="btn btn-outline-brand" data-cand-reload-profile>Reload Profile</button>
                     <button type="button" class="btn btn-danger" data-cand-logout>Logout</button>
                   </div>
-                  <p class="small mt-3 mb-0 text-secondary" data-cand-profile-status></p>
+                  <p class="profile-status-note mt-3 mb-0" data-cand-profile-status></p>
                 </section>
               </div>
             </div>
           </section>
+
+          <div
+            class="modal fade"
+            id="candApplyModal"
+            tabindex="-1"
+            aria-labelledby="candApplyModalLabel"
+            aria-hidden="true"
+            data-cand-apply-modal
+          >
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+              <div class="modal-content">
+                <form data-cand-apply-form>
+                  <div class="modal-header">
+                    <h2 class="modal-title h5 mb-0" id="candApplyModalLabel">Apply for Job</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                    <p class="small text-secondary mb-3">
+                      Complete required details before submitting. This confirmation step avoids accidental apply clicks.
+                    </p>
+                    <input type="hidden" data-cand-apply-job-id />
+                    <div class="row g-3">
+                      <div class="col-12">
+                        <label class="form-label" for="candApplyJobTitle">Job</label>
+                        <input
+                          id="candApplyJobTitle"
+                          type="text"
+                          class="form-control"
+                          data-cand-apply-job-title
+                          readonly
+                        />
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="candApplyPhone">Phone</label>
+                        <input
+                          id="candApplyPhone"
+                          type="text"
+                          class="form-control"
+                          data-cand-apply-phone
+                          required
+                        />
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="candApplyResumeUrl">Resume URL</label>
+                        <input
+                          id="candApplyResumeUrl"
+                          type="url"
+                          class="form-control"
+                          data-cand-apply-resume-url
+                          placeholder="https://..."
+                          required
+                        />
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label" for="candApplyAddress">Address</label>
+                        <input
+                          id="candApplyAddress"
+                          type="text"
+                          class="form-control"
+                          data-cand-apply-address
+                          required
+                        />
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label" for="candApplySource">Application Source</label>
+                        <select id="candApplySource" class="form-select" data-cand-apply-source required>
+                          <option value="" selected disabled>Select source</option>
+                          <option value="direct">Direct</option>
+                          <option value="referral">Referral</option>
+                          <option value="job_board">Job Board</option>
+                          <option value="campus">Campus</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div class="col-12 d-none" data-cand-apply-referral-wrap>
+                        <label class="form-label" for="candApplyReferralId">Referral ID</label>
+                        <input
+                          id="candApplyReferralId"
+                          type="text"
+                          class="form-control"
+                          data-cand-apply-referral-id
+                          placeholder="Enter referral id"
+                        />
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label" for="candApplyCoverLetter">Cover Letter / Application Note</label>
+                        <textarea
+                          id="candApplyCoverLetter"
+                          rows="4"
+                          class="form-control"
+                          data-cand-apply-cover-letter
+                          required
+                        ></textarea>
+                      </div>
+                      <div class="col-12">
+                        <div class="form-check">
+                          <input
+                            id="candApplyConfirm"
+                            class="form-check-input"
+                            type="checkbox"
+                            data-cand-apply-confirm
+                            required
+                          />
+                          <label class="form-check-label" for="candApplyConfirm">
+                            I verified all details and want to submit this application.
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                    <p class="small mt-3 mb-0 text-secondary" data-cand-apply-msg></p>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-brand" data-cand-apply-submit>Submit Application</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
         </main>
       </div>
     </div>

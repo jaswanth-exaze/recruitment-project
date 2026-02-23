@@ -14,6 +14,7 @@ const INTERVIEWER_CONFIG = {
     updateMyProfile: "/interviewer/profile",
     getInterviews: "/interviewer/interviews",
     updateInterview: "/interviewer/interviews/:id",
+    getPendingScorecardInterviews: "/interviewer/scorecards/pending-interviews",
     getScorecards: "/interviewer/scorecards",
     submitScorecard: "/interviewer/scorecards",
     finalizeScorecard: "/interviewer/scorecards/:id/finalize"
@@ -24,9 +25,9 @@ const intState = {
   currentView: "dashboard",
   currentProfile: null,
   interviewsRows: [],
+  pendingScorecardInterviews: [],
   scorecardsRows: [],
-  interviewsLoaded: false,
-  sessionCompletedCount: 0
+  interviewsLoaded: false
 };
 
 const intViewMeta = {
@@ -37,13 +38,13 @@ const intViewMeta = {
   },
   interviews: {
     title: "My Interviews",
-    subtitle: "View and update assigned interview records.",
+    subtitle: "View all company applications currently in interview stage.",
     searchPlaceholder: "Search interviews"
   },
   scorecards: {
     title: "Scorecards",
-    subtitle: "Submit and finalize scorecards by interview.",
-    searchPlaceholder: "Search scorecards by interview"
+    subtitle: "Submit and finalize scorecards for your interviews.",
+    searchPlaceholder: "Search scorecards"
   },
   profile: {
     title: "Profile",
@@ -57,10 +58,13 @@ const ui = {
   sections: document.querySelectorAll("[data-int-view]"),
   headerTitle: document.querySelector("[data-int-header-title]"),
   headerSubtitle: document.querySelector("[data-int-header-subtitle]"),
+  topCompanyName: document.querySelector("[data-int-top-company]"),
   searchInput: document.querySelector("[data-int-search]"),
 
   kpiScheduled: document.querySelector("[data-int-kpi-scheduled]"),
   kpiCompleted: document.querySelector("[data-int-kpi-completed]"),
+  kpiPendingScorecards: document.querySelector("[data-int-kpi-pending-scorecards]"),
+  kpiFinalized: document.querySelector("[data-int-kpi-finalized]"),
 
   interviewsLoadBtn: document.querySelector("[data-int-interviews-load]"),
   interviewList: document.querySelector("[data-int-interview-list]"),
@@ -68,6 +72,9 @@ const ui = {
 
   scorecardCreateForm: document.querySelector("[data-int-scorecard-create-form]"),
   scorecardCreateMsg: document.querySelector("[data-int-scorecard-create-msg]"),
+  scorecardCreateInterviewSelect: document.querySelector("[data-int-scorecard-create-interview]"),
+  scorecardPendingMsg: document.querySelector("[data-int-scorecard-pending-msg]"),
+  scorecardSubmitBtn: document.querySelector("[data-int-scorecard-submit]"),
   scorecardInterviewId: document.querySelector("[data-int-scorecard-interview-id]"),
   scorecardsLoadBtn: document.querySelector("[data-int-scorecards-load]"),
   scorecardList: document.querySelector("[data-int-scorecard-list]"),
@@ -328,6 +335,10 @@ const interviewerApi = {
     return apiRequest(INTERVIEWER_CONFIG.endpoints.getInterviews);
   },
 
+  getPendingScorecardInterviews() {
+    return apiRequest(INTERVIEWER_CONFIG.endpoints.getPendingScorecardInterviews);
+  },
+
   updateInterview(id, status, notes) {
     return apiRequest(buildPathWithId(INTERVIEWER_CONFIG.endpoints.updateInterview, id), {
       method: "PUT",
@@ -336,9 +347,9 @@ const interviewerApi = {
   },
 
   getScorecards(interviewId) {
-    return apiRequest(INTERVIEWER_CONFIG.endpoints.getScorecards, {
-      query: { interview_id: interviewId }
-    });
+    const query = {};
+    if (interviewId) query.interview_id = interviewId;
+    return apiRequest(INTERVIEWER_CONFIG.endpoints.getScorecards, { query });
   },
 
   submitScorecard(payload) {
@@ -374,6 +385,19 @@ function profileSuffixText() {
   return ` Signed in as ${name !== "N/A" ? name : role}.`;
 }
 
+function resolveCompanyName(profile) {
+  const companyName = firstValue(profile || {}, ["company_name"], "");
+  if (companyName) return companyName;
+  const companyId = firstValue(profile || {}, ["company_id"], "");
+  if (companyId) return `Company #${companyId}`;
+  return "N/A";
+}
+
+function renderTopCompanyName() {
+  if (!ui.topCompanyName) return;
+  ui.topCompanyName.textContent = `Company: ${resolveCompanyName(intState.currentProfile)}`;
+}
+
 function showSection(id) {
   ui.sections.forEach((sec) => {
     sec.classList.toggle("d-none", sec.dataset.intView !== id);
@@ -392,14 +416,50 @@ function showSection(id) {
 
 /* DASHBOARD */
 async function loadDashboardKpis() {
+  if (!intState.interviewsLoaded) {
+    try {
+      const rows = normalizeArrayResponse(await interviewerApi.getInterviews());
+      intState.interviewsRows = rows;
+      intState.interviewsLoaded = true;
+    } catch (error) {
+      intState.interviewsRows = [];
+      intState.interviewsLoaded = false;
+    }
+  }
+
   const interviews = Array.isArray(intState.interviewsRows) ? intState.interviewsRows : [];
   const scheduled = interviews.filter((row) => {
     const status = String(firstValue(row, ["status"], "")).trim().toLowerCase();
     return status === "scheduled";
   }).length;
+  const completed = interviews.filter((row) => {
+    const status = String(firstValue(row, ["status"], "")).trim().toLowerCase();
+    return status === "completed";
+  }).length;
+
+  const [pendingResult, scorecardsResult] = await Promise.allSettled([
+    interviewerApi.getPendingScorecardInterviews(),
+    interviewerApi.getScorecards(),
+  ]);
+
+  let pendingCount = "--";
+  if (pendingResult.status === "fulfilled") {
+    intState.pendingScorecardInterviews = normalizeArrayResponse(pendingResult.value);
+    pendingCount = intState.pendingScorecardInterviews.length;
+  }
+
+  let finalizedCount = "--";
+  if (scorecardsResult.status === "fulfilled") {
+    intState.scorecardsRows = normalizeArrayResponse(scorecardsResult.value);
+    finalizedCount = intState.scorecardsRows.filter(
+      (row) => String(firstValue(row, ["is_final"], "0")) === "1",
+    ).length;
+  }
 
   setText(ui.kpiScheduled, scheduled);
-  setText(ui.kpiCompleted, intState.sessionCompletedCount);
+  setText(ui.kpiCompleted, completed);
+  setText(ui.kpiPendingScorecards, pendingCount);
+  setText(ui.kpiFinalized, finalizedCount);
 }
 
 async function openDashboard() {
@@ -420,7 +480,7 @@ function renderInterviewRows(rows) {
   if (!ui.interviewList) return;
 
   if (!rows.length) {
-    showTableMessage(ui.interviewList, 7, "No interviews found");
+    showTableMessage(ui.interviewList, 7, "No interview-stage applications found");
     return;
   }
 
@@ -429,9 +489,12 @@ function renderInterviewRows(rows) {
   rows.forEach((row) => {
     const tr = document.createElement("tr");
     const interviewId = firstValue(row, ["id"], "");
+    const assignedInterviewerId = firstValue(row, ["interviewer_id"], "");
+    const currentUserId = firstValue(intState.currentProfile || {}, ["id"], "");
+    const canUpdate = Boolean(interviewId) && assignedInterviewerId === currentUserId;
 
     const idCell = document.createElement("td");
-    idCell.textContent = interviewId || "N/A";
+    idCell.textContent = interviewId || "-";
     tr.appendChild(idCell);
 
     const appCell = document.createElement("td");
@@ -459,11 +522,12 @@ function renderInterviewRows(rows) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "btn btn-outline-brand btn-sm";
-    btn.textContent = "Update";
+    btn.textContent = canUpdate ? "Update" : "Locked";
     btn.dataset.interviewAction = "update";
     btn.dataset.interviewId = interviewId;
     btn.dataset.interviewStatus = firstValue(row, ["status"], "");
     btn.dataset.interviewNotes = firstValue(row, ["notes"], "");
+    btn.disabled = !canUpdate;
     actionsCell.appendChild(btn);
 
     tr.appendChild(actionsCell);
@@ -473,14 +537,16 @@ function renderInterviewRows(rows) {
 
 async function loadInterviews() {
   try {
-    setMessage(ui.interviewMsg, "Loading interviews...", "info");
+    setMessage(ui.interviewMsg, "Loading interview-stage applications...", "info");
     const rows = normalizeArrayResponse(await interviewerApi.getInterviews());
     intState.interviewsRows = rows;
+    intState.interviewsLoaded = true;
     renderInterviewRows(rows);
-    setMessage(ui.interviewMsg, `Loaded ${rows.length} interview(s).`, "success");
+    setMessage(ui.interviewMsg, `Loaded ${rows.length} interview-stage application(s).`, "success");
     await loadDashboardKpis();
   } catch (error) {
     intState.interviewsRows = [];
+    intState.interviewsLoaded = false;
     renderInterviewRows([]);
     setMessage(ui.interviewMsg, error.message || "Failed to load interviews.", "error");
   }
@@ -494,9 +560,6 @@ async function updateInterviewByPrompt(interviewId, currentStatus, currentNotes)
 
   try {
     await interviewerApi.updateInterview(interviewId, status.trim(), notes.trim());
-    if (status.trim().toLowerCase() === "completed") {
-      intState.sessionCompletedCount += 1;
-    }
     setMessage(ui.interviewMsg, "Interview updated.", "success");
     await loadInterviews();
   } catch (error) {
@@ -507,15 +570,84 @@ async function updateInterviewByPrompt(interviewId, currentStatus, currentNotes)
 /* SCORECARDS */
 async function openScorecards() {
   showSection("scorecards");
+  await loadPendingScorecardInterviews();
+  await loadScorecards();
 }
 
-function parseRatingsJson(rawText) {
-  const value = String(rawText || "").trim();
-  if (!value) return null;
+function parseRatingValue(formData, key, label) {
+  const value = toNumber(formData.get(key));
+  if (!value || value < 1 || value > 5) {
+    throw new Error(`${label} rating is required (1-5).`);
+  }
+  return value;
+}
+
+function buildStructuredRatings(formData) {
+  const technical = parseRatingValue(formData, "technical_rating", "Technical");
+  const communication = parseRatingValue(formData, "communication_rating", "Communication");
+  const problemSolving = parseRatingValue(formData, "problem_solving_rating", "Problem solving");
+  const collaboration = parseRatingValue(formData, "collaboration_rating", "Collaboration");
+  const domainKnowledge = parseRatingValue(formData, "domain_knowledge_rating", "Domain knowledge");
+
+  const average = Number(((technical + communication + problemSolving + collaboration + domainKnowledge) / 5).toFixed(2));
+
+  return {
+    technical,
+    communication,
+    problem_solving: problemSolving,
+    collaboration,
+    domain_knowledge: domainKnowledge,
+    overall_average: average,
+  };
+}
+
+function renderPendingScorecardInterviewOptions(rows) {
+  if (!ui.scorecardCreateInterviewSelect) return;
+
+  const select = ui.scorecardCreateInterviewSelect;
+  const currentValue = String(select.value || "").trim();
+  select.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = rows.length ? "Select pending interview" : "No pending interviews";
+  select.appendChild(placeholder);
+
+  rows.forEach((row) => {
+    const interviewId = firstValue(row, ["id"], "");
+    if (!interviewId) return;
+
+    const option = document.createElement("option");
+    option.value = interviewId;
+    const candidate = `${firstValue(row, ["candidate_first"], "")} ${firstValue(row, ["candidate_last"], "")}`.trim() || "Candidate";
+    const role = firstValue(row, ["title"], "Role");
+    const when = formatDateTime(firstValue(row, ["scheduled_at"], ""));
+    option.textContent = `#${interviewId} | ${candidate} | ${role} | ${when}`;
+    select.appendChild(option);
+  });
+
+  if (currentValue) {
+    const hasCurrent = rows.some((row) => firstValue(row, ["id"], "") === currentValue);
+    if (hasCurrent) select.value = currentValue;
+  }
+
+  if (ui.scorecardSubmitBtn) ui.scorecardSubmitBtn.disabled = !rows.length;
+  setMessage(
+    ui.scorecardPendingMsg,
+    rows.length ? `Loaded ${rows.length} pending interview(s).` : "No pending interviews available for scoring.",
+    rows.length ? "success" : "info",
+  );
+}
+
+async function loadPendingScorecardInterviews() {
   try {
-    return JSON.parse(value);
+    const rows = normalizeArrayResponse(await interviewerApi.getPendingScorecardInterviews());
+    intState.pendingScorecardInterviews = rows;
+    renderPendingScorecardInterviewOptions(rows);
   } catch (error) {
-    throw new Error("Ratings must be valid JSON");
+    intState.pendingScorecardInterviews = [];
+    renderPendingScorecardInterviewOptions([]);
+    setMessage(ui.scorecardPendingMsg, error.message || "Failed to load pending interviews.", "error");
   }
 }
 
@@ -523,7 +655,7 @@ function renderScorecardRows(rows) {
   if (!ui.scorecardList) return;
 
   if (!rows.length) {
-    showTableMessage(ui.scorecardList, 5, "No scorecards found");
+    showTableMessage(ui.scorecardList, 7, "No scorecards found");
     return;
   }
 
@@ -536,6 +668,16 @@ function renderScorecardRows(rows) {
     const idCell = document.createElement("td");
     idCell.textContent = scorecardId || "N/A";
     tr.appendChild(idCell);
+
+    const interviewCell = document.createElement("td");
+    interviewCell.textContent = firstValue(row, ["interview_id"], "N/A");
+    tr.appendChild(interviewCell);
+
+    const applicationCell = document.createElement("td");
+    const applicationId = firstValue(row, ["application_id"], "");
+    const jobTitle = firstValue(row, ["job_title"], "");
+    applicationCell.textContent = applicationId && jobTitle ? `#${applicationId} - ${jobTitle}` : applicationId || jobTitle || "N/A";
+    tr.appendChild(applicationCell);
 
     const recommendationCell = document.createElement("td");
     recommendationCell.textContent = firstValue(row, ["recommendation"], "N/A");
@@ -566,18 +708,14 @@ function renderScorecardRows(rows) {
 
 async function loadScorecards() {
   const interviewId = String(ui.scorecardInterviewId?.value || "").trim();
-  if (!interviewId) {
-    showTableMessage(ui.scorecardList, 5, "Enter interview_id to load scorecards.");
-    setMessage(ui.scorecardMsg, "interview_id is required.", "error");
-    return;
-  }
 
   try {
     setMessage(ui.scorecardMsg, "Loading scorecards...", "info");
     const rows = normalizeArrayResponse(await interviewerApi.getScorecards(interviewId));
     intState.scorecardsRows = rows;
     renderScorecardRows(rows);
-    setMessage(ui.scorecardMsg, `Loaded ${rows.length} scorecard(s).`, "success");
+    const filterText = interviewId ? ` for interview #${interviewId}` : "";
+    setMessage(ui.scorecardMsg, `Loaded ${rows.length} scorecard(s)${filterText}.`, "success");
   } catch (error) {
     intState.scorecardsRows = [];
     renderScorecardRows([]);
@@ -600,7 +738,7 @@ async function submitScorecard(event) {
 
   let ratings = null;
   try {
-    ratings = parseRatingsJson(formData.get("ratings"));
+    ratings = buildStructuredRatings(formData);
   } catch (error) {
     setMessage(ui.scorecardCreateMsg, error.message, "error");
     return;
@@ -618,6 +756,7 @@ async function submitScorecard(event) {
     ui.scorecardCreateForm.reset();
     setMessage(ui.scorecardCreateMsg, result?.message || "Scorecard submitted successfully.", "success");
     if (ui.scorecardInterviewId) ui.scorecardInterviewId.value = String(interviewId);
+    await loadPendingScorecardInterviews();
     await loadScorecards();
   } catch (error) {
     setMessage(ui.scorecardCreateMsg, error.message || "Failed to submit scorecard.", "error");
@@ -629,7 +768,8 @@ async function finalizeScorecard(scorecardId) {
 
   try {
     await interviewerApi.finalizeScorecard(scorecardId);
-    setMessage(ui.scorecardMsg, "Scorecard finalized successfully.", "success");
+    setMessage(ui.scorecardMsg, "Scorecard finalized. Application moved to interview score submited.", "success");
+    await loadPendingScorecardInterviews();
     await loadScorecards();
   } catch (error) {
     setMessage(ui.scorecardMsg, error.message || "Failed to finalize scorecard.", "error");
@@ -657,6 +797,7 @@ function renderProfilePanel() {
     if (ui.profileFirstName) ui.profileFirstName.value = "";
     if (ui.profileLastName) ui.profileLastName.value = "";
     if (ui.profileEditEmail) ui.profileEditEmail.value = "";
+    renderTopCompanyName();
     return;
   }
 
@@ -669,6 +810,7 @@ function renderProfilePanel() {
   if (ui.profileFirstName) ui.profileFirstName.value = firstValue(profile, ["first_name"], "");
   if (ui.profileLastName) ui.profileLastName.value = firstValue(profile, ["last_name"], "");
   if (ui.profileEditEmail) ui.profileEditEmail.value = firstValue(profile, ["email"], "");
+  renderTopCompanyName();
 }
 
 async function loadAuthProfile() {

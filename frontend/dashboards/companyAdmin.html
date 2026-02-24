@@ -80,7 +80,7 @@
               </button>
               <div>
                 <h1 class="h5 mb-0" data-company-header-title>Company Admin Dashboard</h1>
-                <p class="mb-0 text-secondary small" data-company-header-subtitle>
+                <p class="mb-0 text-secondary small dash-subtitle" data-company-header-subtitle>
                   Manage team access, jobs, and recruitment progress.
                 </p>
                 <p class="dash-company-name mb-0" data-company-top-company>Company: N/A</p>
@@ -282,6 +282,18 @@
                           <option value="HR">HR</option>
                           <option value="HiringManager">HiringManager</option>
                           <option value="Interviewer">Interviewer</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="form-label small mb-1" for="companyUserStatusFilter">Status</label>
+                        <select
+                          id="companyUserStatusFilter"
+                          class="form-select form-select-sm"
+                          data-company-user-status-filter
+                        >
+                          <option value="all" selected>All</option>
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
                         </select>
                       </div>
                       <button type="button" class="btn btn-outline-brand btn-sm" data-company-user-load>Load</button>

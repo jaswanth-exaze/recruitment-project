@@ -2,6 +2,7 @@ const db = require("../config/db");
 const { notifyApplicationStatusChange } = require("./applicationStatusNotification.service");
 const {
   sendInterviewAssignedEmail,
+  sendCandidateInterviewInvitationEmail,
   sendJobApprovalRequestEmail,
 } = require("./recruitmentEmail.service");
 
@@ -462,6 +463,7 @@ exports.scheduleInterview = async (payload, companyId) => {
     throw new Error("application_id is not part of your company");
   }
   await sendInterviewAssignedEmail({ interviewId: result.insertId, companyId });
+  await sendCandidateInterviewInvitationEmail({ interviewId: result.insertId, companyId });
   return { id: result.insertId };
 };
 

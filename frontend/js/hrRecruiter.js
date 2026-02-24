@@ -57,7 +57,9 @@ const hrState = {
   currentCandidate: null,
   interviewsRows: [],
   interviewerRows: [],
-  offerEligibleRows: []
+  offerEligibleRows: [],
+  pipelineChart: null,
+  sourceChart: null
 };
 
 const hrViewMeta = {
@@ -586,6 +588,33 @@ function profileSuffixText() {
   return ` Signed in as ${name !== "N/A" ? name : role}.`;
 }
 
+function renderHeaderSubtitle(baseSubtitle) {
+  if (!ui.headerSubtitle) return;
+
+  const subtitle = String(baseSubtitle || "").trim();
+  ui.headerSubtitle.textContent = subtitle;
+
+  const profile = hrState.currentProfile;
+  if (!profile) return;
+  const name = fullName(profile);
+  const role = firstValue(profile, ["role"], "");
+  if (name === "N/A" && !role) return;
+
+  ui.headerSubtitle.textContent = "";
+  ui.headerSubtitle.append(document.createTextNode(`${subtitle} Signed in as `));
+
+  const chip = document.createElement("span");
+  chip.className = "dash-user-chip";
+  chip.textContent = name !== "N/A" ? name : role;
+  ui.headerSubtitle.append(chip);
+
+  if (name !== "N/A" && role) {
+    ui.headerSubtitle.append(document.createTextNode(` (${role}).`));
+  } else {
+    ui.headerSubtitle.append(document.createTextNode("."));
+  }
+}
+
 function resolveCompanyName(profile) {
   const companyName = firstValue(profile || {}, ["company_name"], "");
   if (companyName) return companyName;
@@ -611,7 +640,7 @@ function showSection(viewKey) {
   if (!meta) return;
 
   if (ui.headerTitle) ui.headerTitle.textContent = meta.title;
-  if (ui.headerSubtitle) ui.headerSubtitle.textContent = `${meta.subtitle}${profileSuffixText()}`;
+  renderHeaderSubtitle(meta.subtitle);
   if (ui.searchInput) ui.searchInput.placeholder = meta.searchPlaceholder;
 }
 
@@ -759,9 +788,126 @@ function candidateValue(profile, key, fallback = "N/A") {
   return fromProfileData || fallback;
 }
 
+function destroyChart(chartInstance) {
+  if (chartInstance && typeof chartInstance.destroy === "function") {
+    chartInstance.destroy();
+  }
+}
+
+function parseApplicationDataValue(raw) {
+  if (!raw) return null;
+  if (typeof raw === "object") return raw;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+  return null;
+}
+
+function renderDashboardCharts(applications) {
+  if (typeof window.Chart === "undefined") return;
+  const rows = Array.isArray(applications) ? applications : [];
+
+  const pipelineCanvas = document.getElementById("pipelineChart");
+  if (pipelineCanvas) {
+    const statusOrder = [
+      "applied",
+      "screening",
+      "interview",
+      "interview score submited",
+      "selected",
+      "offer_letter_sent",
+      "offer accecepted",
+      "hired",
+      "rejected",
+    ];
+    const statusMap = Object.fromEntries(statusOrder.map((status) => [status, 0]));
+
+    rows.forEach((row) => {
+      const status = String(firstValue(row, ["status"], "")).trim().toLowerCase();
+      if (!status) return;
+      if (!Object.prototype.hasOwnProperty.call(statusMap, status)) {
+        statusMap[status] = 0;
+      }
+      statusMap[status] += 1;
+    });
+
+    const labels = Object.keys(statusMap).map((status) => status.replace(/_/g, " "));
+    const values = Object.values(statusMap);
+
+    destroyChart(hrState.pipelineChart);
+    hrState.pipelineChart = new window.Chart(pipelineCanvas, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Applications",
+            data: values,
+            backgroundColor: "#4167df",
+            borderColor: "#365ad1",
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+        scales: { y: { beginAtZero: true } },
+      },
+    });
+  }
+
+  const sourceCanvas = document.getElementById("sourceChart");
+  if (sourceCanvas) {
+    const sourceMap = {};
+    rows.forEach((row) => {
+      const payload = parseApplicationDataValue(row?.application_data);
+      const source = String(payload?.source || "unknown").trim().toLowerCase() || "unknown";
+      sourceMap[source] = (sourceMap[source] || 0) + 1;
+    });
+
+    const entries = Object.entries(sourceMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const labels = entries.length ? entries.map(([key]) => key.replace(/_/g, " ")) : ["No data"];
+    const values = entries.length ? entries.map(([, value]) => value) : [1];
+
+    destroyChart(hrState.sourceChart);
+    hrState.sourceChart = new window.Chart(sourceCanvas, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: ["#4167df", "#2f7a5b", "#3da9fc", "#6c8eff", "#8dc9b7", "#c9d6ff"],
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+      },
+    });
+  }
+}
+
 async function loadDashboardKpis() {
   try {
-    const rows = normalizeArrayResponse(await hrApi.listJobs());
+    const [jobsResult, applicationsResult] = await Promise.allSettled([
+      hrApi.listJobs(),
+      hrApi.listApplications(),
+    ]);
+
+    const rows = jobsResult.status === "fulfilled" ? normalizeArrayResponse(jobsResult.value) : [];
+    const applications = applicationsResult.status === "fulfilled"
+      ? normalizeArrayResponse(applicationsResult.value)
+      : [];
+
     const counts = {
       open: 0,
       draft: 0,
@@ -781,11 +927,13 @@ async function loadDashboardKpis() {
     setText(ui.kpiDraftJobs, counts.draft);
     setText(ui.kpiPendingJobs, counts.pending);
     setText(ui.kpiPublishedJobs, counts.published);
+    renderDashboardCharts(applications);
   } catch (error) {
     setText(ui.kpiOpenJobs, "--");
     setText(ui.kpiDraftJobs, "--");
     setText(ui.kpiPendingJobs, "--");
     setText(ui.kpiPublishedJobs, "--");
+    renderDashboardCharts([]);
   }
 }
 

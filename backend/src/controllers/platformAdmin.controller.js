@@ -7,6 +7,14 @@ function handleError(res, err) {
   return res.status(400).json({ message: err.message || "Request failed" });
 }
 
+function parseIsActiveQuery(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized || normalized === "all") return null;
+  if (["1", "true", "active", "enabled"].includes(normalized)) return 1;
+  if (["0", "false", "inactive", "disabled"].includes(normalized)) return 0;
+  throw new Error("is_active must be one of: all, active, inactive, 1, 0, true, false");
+}
+
 exports.getMyProfile = async (req, res) => {
   try {
     const data = await service.getMyProfile(req.user.user_id);
@@ -28,7 +36,8 @@ exports.updateMyProfile = async (req, res) => {
 
 exports.listActiveCompanies = async (req, res) => {
   try {
-    return res.json(await service.listActiveCompanies());
+    const isActive = parseIsActiveQuery(req.query.is_active);
+    return res.json(await service.listActiveCompanies({ isActive }));
   } catch (err) {
     return handleError(res, err);
   }
@@ -74,7 +83,7 @@ exports.deactivateCompany = async (req, res) => {
   try {
     const affected = await service.deactivateCompany(req.params.id);
     if (!affected) return res.status(404).json({ message: "Company not found" });
-    return res.json({ message: "Company deactivated" });
+    return res.json({ message: "Company and related users deactivated" });
   } catch (err) {
     return handleError(res, err);
   }
@@ -84,7 +93,7 @@ exports.activateCompany = async (req, res) => {
   try {
     const affected = await service.activateCompany(req.params.id);
     if (!affected) return res.status(404).json({ message: "Company not found" });
-    return res.json({ message: "Company activated" });
+    return res.json({ message: "Company and related users activated" });
   } catch (err) {
     return handleError(res, err);
   }
@@ -93,7 +102,18 @@ exports.activateCompany = async (req, res) => {
 exports.listUsersByRole = async (req, res) => {
   try {
     if (!req.query.role) return res.status(400).json({ message: "role query param is required" });
-    return res.json(await service.listUsersByRole(req.query.role));
+    const isActive = parseIsActiveQuery(req.query.is_active);
+    const companyIdRaw = String(req.query.company_id || "").trim();
+    let companyId = null;
+    if (companyIdRaw) {
+      const parsed = Number(companyIdRaw);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return res.status(400).json({ message: "company_id must be a positive number" });
+      }
+      companyId = Math.trunc(parsed);
+    }
+
+    return res.json(await service.listUsersByRole(req.query.role, { companyId, isActive }));
   } catch (err) {
     return handleError(res, err);
   }

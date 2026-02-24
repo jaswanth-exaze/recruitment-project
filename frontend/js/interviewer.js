@@ -27,7 +27,9 @@ const intState = {
   interviewsRows: [],
   pendingScorecardInterviews: [],
   scorecardsRows: [],
-  interviewsLoaded: false
+  interviewsLoaded: false,
+  pipelineChart: null,
+  sourceChart: null
 };
 
 const intViewMeta = {
@@ -147,6 +149,118 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
+}
+
+function destroyChart(chartInstance) {
+  if (chartInstance && typeof chartInstance.destroy === "function") {
+    chartInstance.destroy();
+  }
+}
+
+function normalizeRecommendation(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "Not set";
+  if (raw.includes("strong") && raw.includes("hire")) return "Strong hire";
+  if (raw.includes("hire") || raw.includes("select")) return "Hire";
+  if (raw.includes("hold")) return "Hold";
+  if (raw.includes("reject") || raw.includes("no hire")) return "Reject";
+  return raw.replace(/_/g, " ");
+}
+
+function titleCase(value) {
+  return String(value || "")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function renderDashboardCharts(interviews, scorecards) {
+  if (typeof window.Chart === "undefined") return;
+
+  const safeInterviews = Array.isArray(interviews) ? interviews : [];
+  const safeScorecards = Array.isArray(scorecards) ? scorecards : [];
+
+  const pipelineCanvas = document.getElementById("pipelineChart");
+  if (pipelineCanvas) {
+    const statusOrder = ["interview", "scheduled", "completed"];
+    const statusMap = Object.fromEntries(statusOrder.map((status) => [status, 0]));
+
+    safeInterviews.forEach((row) => {
+      const status = String(firstValue(row, ["status"], "interview")).trim().toLowerCase() || "interview";
+      if (!Object.prototype.hasOwnProperty.call(statusMap, status)) {
+        statusMap[status] = 0;
+      }
+      statusMap[status] += 1;
+    });
+
+    const orderedKeys = [
+      ...statusOrder.filter((status) => statusMap[status] > 0),
+      ...Object.keys(statusMap).filter((status) => !statusOrder.includes(status) && statusMap[status] > 0),
+    ];
+    const keys = orderedKeys.length ? orderedKeys : statusOrder;
+    const labels = keys.map((status) => titleCase(status.replace(/_/g, " ")));
+    const values = keys.map((status) => statusMap[status] || 0);
+
+    destroyChart(intState.pipelineChart);
+    intState.pipelineChart = new window.Chart(pipelineCanvas, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Applications",
+            data: values,
+            borderRadius: 10,
+            backgroundColor: ["#6c8eff", "#4167df", "#2f7a5b", "#f0ad4e", "#6b7280"],
+            borderWidth: 0,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  const sourceCanvas = document.getElementById("sourceChart");
+  if (sourceCanvas) {
+    const finalScorecards = safeScorecards.filter((row) => String(firstValue(row, ["is_final"], "0")) === "1");
+    const rowsForChart = finalScorecards.length ? finalScorecards : safeScorecards;
+    const recommendationMap = {};
+
+    rowsForChart.forEach((row) => {
+      const key = normalizeRecommendation(firstValue(row, ["recommendation"], ""));
+      recommendationMap[key] = (recommendationMap[key] || 0) + 1;
+    });
+
+    const entries = Object.entries(recommendationMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const labels = entries.length ? entries.map(([key]) => titleCase(key)) : ["No recommendation data"];
+    const values = entries.length ? entries.map(([, count]) => count) : [1];
+    const colors = entries.length
+      ? ["#2f7a5b", "#4167df", "#f0ad4e", "#d9534f", "#3da9fc", "#8dc9b7"]
+      : ["#d7dce6"];
+
+    destroyChart(intState.sourceChart);
+    intState.sourceChart = new window.Chart(sourceCanvas, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 1,
+            hoverOffset: 6,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        cutout: "62%",
+        plugins: { legend: { position: "bottom" } },
+      },
+    });
+  }
 }
 
 function isValidEmail(email) {
@@ -374,15 +488,31 @@ function setActiveNav(key) {
   if (target) target.classList.add("active");
 }
 
-function profileSuffixText() {
-  if (!intState.currentProfile) return "";
+function renderHeaderSubtitle(baseSubtitle) {
+  if (!ui.headerSubtitle) return;
 
-  const name = fullName(intState.currentProfile);
-  const role = firstValue(intState.currentProfile, ["role"], "");
+  const subtitle = String(baseSubtitle || "").trim();
+  ui.headerSubtitle.textContent = subtitle;
 
-  if (name === "N/A" && !role) return "";
-  if (name !== "N/A" && role) return ` Signed in as ${name} (${role}).`;
-  return ` Signed in as ${name !== "N/A" ? name : role}.`;
+  const profile = intState.currentProfile;
+  if (!profile) return;
+  const name = fullName(profile);
+  const role = firstValue(profile, ["role"], "");
+  if (name === "N/A" && !role) return;
+
+  ui.headerSubtitle.textContent = "";
+  ui.headerSubtitle.append(document.createTextNode(`${subtitle} Signed in as `));
+
+  const chip = document.createElement("span");
+  chip.className = "dash-user-chip";
+  chip.textContent = name !== "N/A" ? name : role;
+  ui.headerSubtitle.append(chip);
+
+  if (name !== "N/A" && role) {
+    ui.headerSubtitle.append(document.createTextNode(` (${role}).`));
+  } else {
+    ui.headerSubtitle.append(document.createTextNode("."));
+  }
 }
 
 function resolveCompanyName(profile) {
@@ -410,21 +540,36 @@ function showSection(id) {
   if (!meta) return;
 
   if (ui.headerTitle) ui.headerTitle.textContent = meta.title;
-  if (ui.headerSubtitle) ui.headerSubtitle.textContent = `${meta.subtitle}${profileSuffixText()}`;
+  renderHeaderSubtitle(meta.subtitle);
   if (ui.searchInput) ui.searchInput.placeholder = meta.searchPlaceholder;
 }
 
 /* DASHBOARD */
 async function loadDashboardKpis() {
-  if (!intState.interviewsLoaded) {
-    try {
-      const rows = normalizeArrayResponse(await interviewerApi.getInterviews());
-      intState.interviewsRows = rows;
-      intState.interviewsLoaded = true;
-    } catch (error) {
-      intState.interviewsRows = [];
-      intState.interviewsLoaded = false;
-    }
+  const [interviewsResult, pendingResult, scorecardsResult] = await Promise.allSettled([
+    interviewerApi.getInterviews(),
+    interviewerApi.getPendingScorecardInterviews(),
+    interviewerApi.getScorecards(),
+  ]);
+
+  if (interviewsResult.status === "fulfilled") {
+    intState.interviewsRows = normalizeArrayResponse(interviewsResult.value);
+    intState.interviewsLoaded = true;
+  } else if (!intState.interviewsLoaded) {
+    intState.interviewsRows = [];
+    intState.interviewsLoaded = false;
+  }
+
+  if (pendingResult.status === "fulfilled") {
+    intState.pendingScorecardInterviews = normalizeArrayResponse(pendingResult.value);
+  } else if (!Array.isArray(intState.pendingScorecardInterviews)) {
+    intState.pendingScorecardInterviews = [];
+  }
+
+  if (scorecardsResult.status === "fulfilled") {
+    intState.scorecardsRows = normalizeArrayResponse(scorecardsResult.value);
+  } else if (!Array.isArray(intState.scorecardsRows)) {
+    intState.scorecardsRows = [];
   }
 
   const interviews = Array.isArray(intState.interviewsRows) ? intState.interviewsRows : [];
@@ -437,20 +582,13 @@ async function loadDashboardKpis() {
     return status === "completed";
   }).length;
 
-  const [pendingResult, scorecardsResult] = await Promise.allSettled([
-    interviewerApi.getPendingScorecardInterviews(),
-    interviewerApi.getScorecards(),
-  ]);
-
   let pendingCount = "--";
-  if (pendingResult.status === "fulfilled") {
-    intState.pendingScorecardInterviews = normalizeArrayResponse(pendingResult.value);
+  if (Array.isArray(intState.pendingScorecardInterviews)) {
     pendingCount = intState.pendingScorecardInterviews.length;
   }
 
   let finalizedCount = "--";
-  if (scorecardsResult.status === "fulfilled") {
-    intState.scorecardsRows = normalizeArrayResponse(scorecardsResult.value);
+  if (Array.isArray(intState.scorecardsRows)) {
     finalizedCount = intState.scorecardsRows.filter(
       (row) => String(firstValue(row, ["is_final"], "0")) === "1",
     ).length;
@@ -460,6 +598,7 @@ async function loadDashboardKpis() {
   setText(ui.kpiCompleted, completed);
   setText(ui.kpiPendingScorecards, pendingCount);
   setText(ui.kpiFinalized, finalizedCount);
+  renderDashboardCharts(interviews, intState.scorecardsRows);
 }
 
 async function openDashboard() {

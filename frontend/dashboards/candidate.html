@@ -76,7 +76,7 @@
               </button>
               <div>
                 <h1 class="h5 mb-0" data-cand-header-title>Candidate Dashboard</h1>
-                <p class="mb-0 text-secondary small" data-cand-header-subtitle>
+                <p class="mb-0 text-secondary small dash-subtitle" data-cand-header-subtitle>
                   Monitor applications, saved jobs, and offer responses.
                 </p>
               </div>
@@ -145,18 +145,29 @@
                     <h2 class="h6 mb-0">Available Jobs</h2>
                     <div class="d-flex align-items-end gap-2">
                       <div>
-                        <label class="form-label small mb-1" for="candJobStatus">Status</label>
-                        <select id="candJobStatus" class="form-select form-select-sm" data-cand-job-status>
-                          <option value="all" selected>All</option>
-                          <option value="published">Published</option>
-                          <option value="draft">Draft</option>
-                          <option value="pending">Pending</option>
-                          <option value="closed">Closed</option>
+                        <label class="form-label small mb-1" for="candJobCompanyFilter">Company</label>
+                        <select
+                          id="candJobCompanyFilter"
+                          class="form-control form-control-sm"
+                          data-cand-job-company
+                        >
+                          <option value="all" selected>All Companies</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="form-label small mb-1" for="candJobLocationFilter">Location</label>
+                        <select
+                          id="candJobLocationFilter"
+                          class="form-control form-control-sm"
+                          data-cand-job-location
+                        >
+                          <option value="all" selected>All Locations</option>
                         </select>
                       </div>
                       <button type="button" class="btn btn-outline-brand btn-sm" data-cand-jobs-load>Load</button>
                     </div>
                   </div>
+                  <p class="small text-secondary mb-2">Only published jobs are visible to candidates.</p>
 
                   <div class="table-responsive">
                     <table class="table align-middle mb-0">
@@ -178,35 +189,6 @@
               </div>
             </div>
 
-            <div class="row g-3 mt-1">
-              <div class="col-12">
-                <section class="table-card p-3">
-                  <h2 class="h6 mb-3">Selected Job Details</h2>
-                  <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                      <tbody>
-                        <tr>
-                          <th style="width: 25%">Title</th>
-                          <td data-cand-selected-job-title>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Description</th>
-                          <td data-cand-selected-job-description>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Requirements</th>
-                          <td data-cand-selected-job-requirements>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Employment</th>
-                          <td data-cand-selected-job-employment>N/A</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              </div>
-            </div>
           </section>
 
           <section data-cand-view="applications" class="d-none">
@@ -448,6 +430,110 @@
               </div>
             </div>
           </section>
+
+          <div
+            class="modal fade"
+            id="candJobDetailsModal"
+            tabindex="-1"
+            aria-labelledby="candJobDetailsModalLabel"
+            aria-hidden="true"
+            data-cand-job-details-modal
+          >
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h2 class="modal-title h5 mb-0" id="candJobDetailsModalLabel">Job Details</h2>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body candidate-job-modal-body">
+                  <p class="small text-secondary mb-3">
+                    Full details for this job requisition.
+                  </p>
+
+                  <div class="cand-job-detail-shell">
+                    <section class="cand-job-detail-group">
+                      <h3 class="h6 mb-3 cand-job-detail-heading">Overview</h3>
+                      <div class="row g-3">
+                        <div class="col-md-3">
+                          <label class="form-label" for="candDetailJobId">Job ID</label>
+                          <input id="candDetailJobId" type="text" class="form-control" data-cand-job-detail-field="id" readonly />
+                        </div>
+                        <div class="col-md-9">
+                          <label class="form-label" for="candDetailTitle">Job Title</label>
+                          <input id="candDetailTitle" type="text" class="form-control" data-cand-job-detail-field="title" readonly />
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label" for="candDetailCompany">Company</label>
+                          <input id="candDetailCompany" type="text" class="form-control" data-cand-job-detail-field="company_name" readonly />
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label" for="candDetailStatus">Status</label>
+                          <input id="candDetailStatus" type="text" class="form-control" data-cand-job-detail-field="status" readonly />
+                        </div>
+                        <div class="col-md-3">
+                          <label class="form-label" for="candDetailOpenings">Open Positions</label>
+                          <input id="candDetailOpenings" type="text" class="form-control" data-cand-job-detail-field="positions_count" readonly />
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label" for="candDetailLocation">Location</label>
+                          <input id="candDetailLocation" type="text" class="form-control" data-cand-job-detail-field="location" readonly />
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label" for="candDetailEmployment">Employment Type</label>
+                          <input id="candDetailEmployment" type="text" class="form-control" data-cand-job-detail-field="employment_type" readonly />
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="cand-job-detail-group">
+                      <h3 class="h6 mb-3 cand-job-detail-heading">Timeline and Ownership</h3>
+                      <div class="row g-3">
+                        <div class="col-md-6">
+                          <label class="form-label" for="candDetailOpenDate">Open / Published Date</label>
+                          <input id="candDetailOpenDate" type="text" class="form-control" data-cand-job-detail-field="published_at" readonly />
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label" for="candDetailCloseDate">Closed Date</label>
+                          <input id="candDetailCloseDate" type="text" class="form-control" data-cand-job-detail-field="closed_at" readonly />
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label" for="candDetailCreatedDate">Created Date</label>
+                          <input id="candDetailCreatedDate" type="text" class="form-control" data-cand-job-detail-field="created_at" readonly />
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label" for="candDetailUpdatedDate">Updated Date</label>
+                          <input id="candDetailUpdatedDate" type="text" class="form-control" data-cand-job-detail-field="updated_at" readonly />
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label" for="candDetailCompanyId">Company ID</label>
+                          <input id="candDetailCompanyId" type="text" class="form-control" data-cand-job-detail-field="company_id" readonly />
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label" for="candDetailCreatedBy">Created By</label>
+                          <input id="candDetailCreatedBy" type="text" class="form-control" data-cand-job-detail-field="created_by" readonly />
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="cand-job-detail-group">
+                      <h3 class="h6 mb-3 cand-job-detail-heading">Description</h3>
+                      <label class="form-label visually-hidden" for="candDetailDescription">Description</label>
+                      <textarea id="candDetailDescription" rows="5" class="form-control" data-cand-job-detail-field="description" readonly></textarea>
+                    </section>
+
+                    <section class="cand-job-detail-group">
+                      <h3 class="h6 mb-3 cand-job-detail-heading">Requirements</h3>
+                      <label class="form-label visually-hidden" for="candDetailRequirements">Requirements</label>
+                      <textarea id="candDetailRequirements" rows="5" class="form-control" data-cand-job-detail-field="requirements" readonly></textarea>
+                    </section>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div
             class="modal fade"

@@ -27,6 +27,15 @@ function parsePositiveInt(value) {
   return Math.trunc(parsed);
 }
 
+function parseIsActiveFilter(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "active", "enabled"].includes(normalized)) return 1;
+  if (["0", "false", "inactive", "disabled"].includes(normalized)) return 0;
+  return null;
+}
+
 const AUDIT_LOG_SELECT_SQL = `
   SELECT
     al.id,
@@ -101,13 +110,23 @@ exports.updateMyProfile = async (userId, body) => {
   return getUserProfileById(userId);
 };
 
-exports.listUsersByRole = async (role, companyId, includeInactive = false) => {
+exports.listUsersByRole = async (role, companyId, { includeInactive = false, isActive = null } = {}) => {
   if (!companyId) throw new Error("company_id is required");
   const validRole = assertManagedRole(role);
-  const activeFilterSql = includeInactive ? "" : " AND is_active = 1";
+  const where = ["role = ?", "company_id = ?"];
+  const params = [validRole, companyId];
+  const parsedIsActive = parseIsActiveFilter(isActive);
+
+  if (parsedIsActive !== null) {
+    where.push("is_active = ?");
+    params.push(parsedIsActive);
+  } else if (!includeInactive) {
+    where.push("is_active = 1");
+  }
+
   const [rows] = await db.promise().query(
-    `SELECT id, company_id, email, first_name, last_name, role, is_active, created_at FROM users WHERE role = ? AND company_id = ?${activeFilterSql} ORDER BY last_name, first_name`,
-    [validRole, companyId],
+    `SELECT id, company_id, email, first_name, last_name, role, is_active, created_at FROM users WHERE ${where.join(" AND ")} ORDER BY last_name, first_name`,
+    params,
   );
   return rows;
 };

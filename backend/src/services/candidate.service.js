@@ -117,18 +117,28 @@ exports.verifyCandidateEmail = async (userId) => {
   return result.affectedRows;
 };
 
-exports.listJobs = async ({ status, company_id }) => {
-  const where = [];
+exports.listJobs = async ({ company_id, company, location } = {}) => {
+  const where = ["j.status = 'published'"];
   const params = [];
-  if (status) {
-    where.push("j.status = ?");
-    params.push(status);
-  }
+
   if (company_id) {
     where.push("j.company_id = ?");
     params.push(company_id);
   }
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+  const companyFilter = String(company || "").trim();
+  if (companyFilter) {
+    where.push("c.name LIKE ?");
+    params.push(`%${companyFilter}%`);
+  }
+
+  const locationFilter = String(location || "").trim();
+  if (locationFilter) {
+    where.push("j.location LIKE ?");
+    params.push(`%${locationFilter}%`);
+  }
+
+  const whereSql = `WHERE ${where.join(" AND ")}`;
   const [rows] = await db.promise().query(
     `SELECT j.id, j.title, j.description, j.location, j.employment_type, j.status, j.positions_count, j.created_at, c.name AS company_name FROM job_requisitions j JOIN companies c ON j.company_id = c.id ${whereSql} ORDER BY j.created_at DESC`,
     params,
@@ -138,7 +148,7 @@ exports.listJobs = async ({ status, company_id }) => {
 
 exports.getJobById = async (id) => {
   const [rows] = await db.promise().query(
-    `SELECT j.*, c.name AS company_name, u.first_name AS creator_first, u.last_name AS creator_last FROM job_requisitions j JOIN companies c ON j.company_id = c.id JOIN users u ON j.created_by = u.id WHERE j.id = ? LIMIT 1`,
+    `SELECT j.*, c.name AS company_name, u.first_name AS creator_first, u.last_name AS creator_last FROM job_requisitions j JOIN companies c ON j.company_id = c.id JOIN users u ON j.created_by = u.id WHERE j.id = ? AND j.status = 'published' LIMIT 1`,
     [id],
   );
   return rows[0] || null;

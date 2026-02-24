@@ -24,6 +24,15 @@ function parsePositiveInt(value) {
   return Math.trunc(parsed);
 }
 
+function parseIsActiveFilter(value) {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  const normalized = String(value).trim().toLowerCase();
+  if (["1", "true", "active", "enabled"].includes(normalized)) return 1;
+  if (["0", "false", "inactive", "disabled"].includes(normalized)) return 0;
+  return null;
+}
+
 const AUDIT_LOG_SELECT_SQL = `
   SELECT
     al.id,
@@ -74,9 +83,38 @@ exports.updateMyProfile = async (userId, body) => {
   return getUserProfileById(userId);
 };
 
-exports.listActiveCompanies = async () => {
+exports.listActiveCompanies = async ({ isActive = null } = {}) => {
+  const where = [];
+  const params = [];
+  const parsedIsActive = parseIsActiveFilter(isActive);
+
+  if (parsedIsActive !== null) {
+    where.push("c.is_active = ?");
+    params.push(parsedIsActive);
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const [rows] = await db.promise().query(
-    `SELECT id, name, domain, is_active, created_at FROM companies WHERE is_active = 1 ORDER BY name`,
+    `
+      SELECT
+        c.id,
+        c.name,
+        c.domain,
+        c.is_active,
+        c.created_at,
+        c.updated_at,
+        (
+          SELECT u.email
+          FROM users u
+          WHERE u.company_id = c.id AND u.role = 'CompanyAdmin'
+          ORDER BY u.id ASC
+          LIMIT 1
+        ) AS company_admin_email
+      FROM companies c
+      ${whereSql}
+      ORDER BY c.is_active DESC, c.name ASC
+    `,
+    params,
   );
   return rows;
 };
@@ -113,25 +151,105 @@ exports.updateCompany = async (id, { name, domain }) => {
 };
 
 exports.deactivateCompany = async (id) => {
-  const [result] = await db.promise().query(
-    `UPDATE companies SET is_active = 0, updated_at = NOW() WHERE id = ?`,
-    [id],
-  );
-  return result.affectedRows;
+  const connection = await db.promise().getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [companyRows] = await connection.query(
+      `SELECT id FROM companies WHERE id = ? LIMIT 1 FOR UPDATE`,
+      [id],
+    );
+    if (!companyRows.length) {
+      await connection.rollback();
+      return 0;
+    }
+
+    await connection.query(
+      `UPDATE companies SET is_active = 0, updated_at = NOW() WHERE id = ?`,
+      [id],
+    );
+    await connection.query(
+      `UPDATE users SET is_active = 0, updated_at = NOW() WHERE company_id = ?`,
+      [id],
+    );
+
+    await connection.commit();
+    return 1;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 };
 
 exports.activateCompany = async (id) => {
-  const [result] = await db.promise().query(
-    `UPDATE companies SET is_active = 1, updated_at = NOW() WHERE id = ?`,
-    [id],
-  );
-  return result.affectedRows;
+  const connection = await db.promise().getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [companyRows] = await connection.query(
+      `SELECT id FROM companies WHERE id = ? LIMIT 1 FOR UPDATE`,
+      [id],
+    );
+    if (!companyRows.length) {
+      await connection.rollback();
+      return 0;
+    }
+
+    await connection.query(
+      `UPDATE companies SET is_active = 1, updated_at = NOW() WHERE id = ?`,
+      [id],
+    );
+    await connection.query(
+      `UPDATE users SET is_active = 1, updated_at = NOW() WHERE company_id = ?`,
+      [id],
+    );
+
+    await connection.commit();
+    return 1;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
 };
 
-exports.listUsersByRole = async (role) => {
+exports.listUsersByRole = async (role, { companyId = null, isActive = null } = {}) => {
+  const where = ["u.role = ?"];
+  const params = [role];
+
+  const parsedCompanyId = parsePositiveInt(companyId);
+  if (parsedCompanyId) {
+    where.push("u.company_id = ?");
+    params.push(parsedCompanyId);
+  }
+
+  const parsedIsActive = parseIsActiveFilter(isActive);
+  if (parsedIsActive !== null) {
+    where.push("u.is_active = ?");
+    params.push(parsedIsActive);
+  }
+
   const [rows] = await db.promise().query(
-    `SELECT id, email, first_name, last_name, role, is_active, created_at FROM users WHERE role = ? AND is_active = 1 ORDER BY last_name, first_name`,
-    [role],
+    `
+      SELECT
+        u.id,
+        u.company_id,
+        c.name AS company_name,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.role,
+        u.is_active,
+        u.created_at
+      FROM users u
+      LEFT JOIN companies c ON c.id = u.company_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY u.is_active DESC, COALESCE(c.name, ''), u.last_name ASC, u.first_name ASC
+    `,
+    params,
   );
   return rows;
 };

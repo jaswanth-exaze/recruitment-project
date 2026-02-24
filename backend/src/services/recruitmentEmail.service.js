@@ -474,6 +474,115 @@ exports.sendInterviewAssignedEmail = async ({ interviewId, companyId }) => {
   }
 };
 
+exports.sendCandidateInterviewInvitationEmail = async ({ interviewId, companyId }) => {
+  if (!interviewId || !companyId) return false;
+  try {
+    const [rows] = await db.promise().query(
+      `
+        SELECT
+          i.id AS interview_id,
+          i.application_id,
+          i.scheduled_at,
+          i.duration_minutes,
+          i.meeting_link,
+          i.notes,
+          candidate.email AS candidate_email,
+          candidate.first_name AS candidate_first_name,
+          candidate.last_name AS candidate_last_name,
+          interviewer.first_name AS interviewer_first_name,
+          interviewer.last_name AS interviewer_last_name,
+          j.title AS job_title,
+          c.name AS company_name
+        FROM interviews i
+        JOIN applications a ON i.application_id = a.id
+        JOIN users candidate ON a.candidate_id = candidate.id
+        JOIN users interviewer ON i.interviewer_id = interviewer.id
+        JOIN job_requisitions j ON a.job_id = j.id
+        LEFT JOIN companies c ON c.id = j.company_id
+        WHERE i.id = ? AND j.company_id = ?
+        LIMIT 1
+      `,
+      [interviewId, companyId],
+    );
+
+    const context = rows[0];
+    if (!context || !context.candidate_email) return false;
+
+    const candidateName = fullName(
+      context.candidate_first_name,
+      context.candidate_last_name,
+      "Candidate",
+    );
+    const interviewerName = fullName(
+      context.interviewer_first_name,
+      context.interviewer_last_name,
+      "Interviewer",
+    );
+    const companyName = context.company_name || "your company";
+    const subject = `Interview Invitation: Application #${context.application_id}`;
+    const lines = [
+      `Hello ${candidateName},`,
+      "",
+      "Congratulations! You have cleared screening and your interview has been scheduled.",
+      `Interview ID: ${context.interview_id}`,
+      `Application ID: ${context.application_id}`,
+      `Job: ${context.job_title || "N/A"}`,
+      `Interviewer: ${interviewerName}`,
+      `Scheduled At: ${formatDateTime(context.scheduled_at)}`,
+      context.duration_minutes ? `Duration: ${context.duration_minutes} minutes` : "",
+      context.meeting_link ? `Interview Link: ${context.meeting_link}` : "Interview Link: Will be shared shortly by HR.",
+      context.notes ? `Notes: ${context.notes}` : "",
+      "",
+      "All the best for your interview. Be prepared and join a few minutes early.",
+      "",
+      "Best regards,",
+      `${companyName} Hiring Team`,
+    ].filter(Boolean);
+    const text = lines.join("\n");
+
+    const login = loginUrl();
+    const ctaUrl = canUseCta(context.meeting_link) ? context.meeting_link : login;
+    const ctaLabel = canUseCta(context.meeting_link)
+      ? "Join Interview"
+      : (canUseCta(login) ? "Open Candidate Login" : "");
+
+    const html = buildRecruitmentEmailHtml({
+      preheader: `Interview invitation for Application #${context.application_id}`,
+      title: "Interview Invitation",
+      subtitle: "You have progressed to the interview round",
+      greeting: `Hello ${candidateName},`,
+      summary: "Congratulations! You have cleared screening and your interview has been scheduled.",
+      details: [
+        { label: "Interview ID", value: context.interview_id },
+        { label: "Application ID", value: context.application_id },
+        { label: "Job", value: context.job_title || "N/A" },
+        { label: "Interviewer", value: interviewerName },
+        { label: "Scheduled At", value: formatDateTime(context.scheduled_at) },
+        ...(context.duration_minutes
+          ? [{ label: "Duration", value: `${context.duration_minutes} minutes` }]
+          : []),
+        ...(context.meeting_link ? [{ label: "Interview Link", value: context.meeting_link }] : []),
+        ...(context.notes ? [{ label: "Notes", value: context.notes }] : []),
+      ],
+      highlights: [
+        "All the best for your interview.",
+        "Be prepared and join the meeting a few minutes early.",
+        "Keep your resume and key project details ready for discussion.",
+      ],
+      tone: "success",
+      companyName,
+      footerText: `Best regards,\n${companyName} Hiring Team`,
+      ctaLabel,
+      ctaUrl: canUseCta(ctaUrl) ? ctaUrl : "",
+    });
+
+    return sendEmail({ to: context.candidate_email, subject, text, html });
+  } catch (err) {
+    console.error("Failed to send candidate interview invitation email:", err.message);
+    return false;
+  }
+};
+
 exports.sendScoreSubmittedToHrEmail = async ({ scorecardId, companyId }) => {
   if (!scorecardId || !companyId) return false;
   try {

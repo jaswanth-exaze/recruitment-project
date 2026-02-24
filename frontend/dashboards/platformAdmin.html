@@ -100,7 +100,7 @@
                 <h1 class="h5 mb-0" data-admin-header-title>
                   Platform Admin Dashboard
                 </h1>
-                <p class="mb-0 text-secondary small" data-admin-header-subtitle>
+                <p class="mb-0 text-secondary small dash-subtitle" data-admin-header-subtitle>
                   Governance, subscriptions, and global recruitment activity.
                 </p>
               </div>
@@ -149,7 +149,7 @@
             <div class="row g-3 mt-1">
               <div class="col-lg-8">
                 <section class="chart-card p-3">
-                  <h2 class="h6 mb-3">Global Pipeline Trend</h2>
+                  <h2 class="h6 mb-3">Onboarding Trend (6 Months)</h2>
                   <div class="chart-wrap">
                     <canvas id="pipelineChart"></canvas>
                   </div>
@@ -157,7 +157,7 @@
               </div>
               <div class="col-lg-4">
                 <section class="chart-card p-3 h-100">
-                  <h2 class="h6 mb-3">Primary Candidate Sources</h2>
+                  <h2 class="h6 mb-3">User Role Distribution</h2>
                   <div class="chart-wrap">
                     <canvas id="sourceChart"></canvas>
                   </div>
@@ -305,7 +305,30 @@
               </div>
               <div class="col-lg-7">
                 <section class="table-card p-3 h-100">
-                  <h2 class="h6 mb-3">Company List</h2>
+                  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+                    <h2 class="h6 mb-0">Company List</h2>
+                    <div class="d-flex align-items-end gap-2">
+                      <div>
+                        <label class="form-label small mb-1" for="companyStatusFilter">Status</label>
+                        <select
+                          id="companyStatusFilter"
+                          class="form-select form-select-sm"
+                          data-company-status-filter
+                        >
+                          <option value="all" selected>All</option>
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        class="btn btn-outline-brand btn-sm"
+                        data-company-load
+                      >
+                        Load
+                      </button>
+                    </div>
+                  </div>
                   <div class="table-responsive">
                     <table class="table align-middle mb-0">
                       <thead>
@@ -316,6 +339,7 @@
                           <th>Company Admin</th>
                           <th>Status</th>
                           <th>Created</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody data-company-list>
@@ -325,9 +349,12 @@
                           <td>blueorbit.com</td>
                           <td>admin@blueorbit.com</td>
                           <td>
-                            <span class="badge text-bg-success">Active</span>
+                            <span class="badge status-badge status-badge-active">Active</span>
                           </td>
                           <td>2026-01-08</td>
+                          <td>
+                            <button type="button" class="btn btn-outline-danger btn-sm">Deactivate</button>
+                          </td>
                         </tr>
                         <tr>
                           <td>2</td>
@@ -335,9 +362,12 @@
                           <td>novalynx.com</td>
                           <td>admin@novalynx.com</td>
                           <td>
-                            <span class="badge text-bg-success">Active</span>
+                            <span class="badge status-badge status-badge-active">Active</span>
                           </td>
                           <td>2026-01-14</td>
+                          <td>
+                            <button type="button" class="btn btn-outline-danger btn-sm">Deactivate</button>
+                          </td>
                         </tr>
                         <tr>
                           <td>3</td>
@@ -345,9 +375,12 @@
                           <td>arcadiahealth.com</td>
                           <td>admin@arcadiahealth.com</td>
                           <td>
-                            <span class="badge text-bg-warning">Pending</span>
+                            <span class="badge status-badge status-badge-inactive">Inactive</span>
                           </td>
                           <td>2026-01-20</td>
+                          <td>
+                            <button type="button" class="btn btn-outline-success btn-sm">Activate</button>
+                          </td>
                         </tr>
                       </tbody>
                     </table>
@@ -386,6 +419,36 @@
                           <option value="Candidate">Candidate</option>
                         </select>
                       </div>
+                      <div>
+                        <label
+                          class="form-label small mb-1"
+                          for="userCompanyFilter"
+                          >Company</label
+                        >
+                        <select
+                          id="userCompanyFilter"
+                          class="form-select form-select-sm"
+                          data-user-company-filter
+                        >
+                          <option value="all" selected>All Companies</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label
+                          class="form-label small mb-1"
+                          for="userStatusFilter"
+                          >Status</label
+                        >
+                        <select
+                          id="userStatusFilter"
+                          class="form-select form-select-sm"
+                          data-user-status-filter
+                        >
+                          <option value="all" selected>All</option>
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      </div>
                       <button
                         type="button"
                         class="btn btn-outline-brand btn-sm"
@@ -403,8 +466,10 @@
                           <th>Name</th>
                           <th>Email</th>
                           <th>Role</th>
+                          <th>Company</th>
                           <th>Status</th>
                           <th>Created</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody data-user-list>
@@ -413,44 +478,61 @@
                           <td>Anika Patel</td>
                           <td>anika.patel@blueorbit.com</td>
                           <td>HR</td>
+                          <td>BlueOrbit Labs</td>
                           <td>
-                            <span class="badge text-bg-success">Active</span>
+                            <span class="badge status-badge status-badge-active">Active</span>
                           </td>
                           <td>2026-01-04</td>
+                          <td>
+                            <button type="button" class="btn btn-outline-danger btn-sm">Deactivate</button>
+                          </td>
                         </tr>
                         <tr>
                           <td>5</td>
                           <td>Kevin Brooks</td>
                           <td>k.brooks@novalynx.com</td>
                           <td>HR</td>
+                          <td>Novalynx Technologies</td>
                           <td>
-                            <span class="badge text-bg-success">Active</span>
+                            <span class="badge status-badge status-badge-active">Active</span>
                           </td>
                           <td>2026-01-06</td>
+                          <td>
+                            <button type="button" class="btn btn-outline-danger btn-sm">Deactivate</button>
+                          </td>
                         </tr>
                         <tr>
                           <td>8</td>
                           <td>Ria Nair</td>
                           <td>ria.nair@cora.com</td>
                           <td>HR</td>
+                          <td>Cora Systems</td>
                           <td>
-                            <span class="badge text-bg-success">Active</span>
+                            <span class="badge status-badge status-badge-active">Active</span>
                           </td>
                           <td>2026-01-12</td>
+                          <td>
+                            <button type="button" class="btn btn-outline-danger btn-sm">Deactivate</button>
+                          </td>
                         </tr>
                         <tr>
                           <td>11</td>
                           <td>Nisha Rao</td>
                           <td>nisha.rao@arcadiahealth.com</td>
                           <td>HR</td>
+                          <td>Arcadia Health</td>
                           <td>
-                            <span class="badge text-bg-success">Active</span>
+                            <span class="badge status-badge status-badge-active">Active</span>
                           </td>
                           <td>2026-01-16</td>
+                          <td>
+                            <button type="button" class="btn btn-outline-danger btn-sm">Deactivate</button>
+                          </td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
+                  <p class="small mt-2 mb-0 d-none" data-user-msg></p>
                   <div
                     class="d-flex justify-content-between align-items-center mt-3"
                   >

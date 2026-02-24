@@ -8,6 +8,14 @@ function handleError(res, err) {
   return res.status(400).json({ message: err.message || "Request failed" });
 }
 
+function parseIsActiveQuery(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized || normalized === "all") return null;
+  if (["1", "true", "active", "enabled"].includes(normalized)) return 1;
+  if (["0", "false", "inactive", "disabled"].includes(normalized)) return 0;
+  throw new Error("is_active must be one of: all, active, inactive, 1, 0, true, false");
+}
+
 exports.getMyProfile = async (req, res) => {
   try {
     const data = await service.getMyProfile(req.user.user_id);
@@ -30,8 +38,15 @@ exports.updateMyProfile = async (req, res) => {
 exports.listUsersByRole = async (req, res) => {
   try {
     if (!req.query.role) return res.status(400).json({ message: "role query param is required" });
-    const includeInactive = String(req.query.include_inactive || "").trim().toLowerCase() === "true";
-    return res.json(await service.listUsersByRole(req.query.role, req.user.company_id, includeInactive));
+    const isActiveRaw = String(req.query.is_active || "").trim().toLowerCase();
+    const isActive = parseIsActiveQuery(req.query.is_active);
+    let includeInactive = String(req.query.include_inactive || "").trim().toLowerCase() === "true";
+    if (isActiveRaw === "all") {
+      includeInactive = true;
+    }
+    return res.json(
+      await service.listUsersByRole(req.query.role, req.user.company_id, { includeInactive, isActive }),
+    );
   } catch (err) {
     return handleError(res, err);
   }

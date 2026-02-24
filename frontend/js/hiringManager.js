@@ -35,7 +35,9 @@ const hmState = {
   jobsRows: [],
   jobsLoaded: false,
   decisionsRows: [],
-  decisionsLoaded: false
+  decisionsLoaded: false,
+  pipelineChart: null,
+  sourceChart: null
 };
 
 const hmViewMeta = {
@@ -169,6 +171,110 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
+}
+
+function destroyChart(chartInstance) {
+  if (chartInstance && typeof chartInstance.destroy === "function") {
+    chartInstance.destroy();
+  }
+}
+
+function toStatusLabel(status) {
+  return String(status || "unknown")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function renderDashboardCharts(jobs, decisionRows) {
+  if (typeof window.Chart === "undefined") return;
+
+  const safeJobs = Array.isArray(jobs) ? jobs : [];
+  const safeDecisions = Array.isArray(decisionRows) ? decisionRows : [];
+
+  const pipelineCanvas = document.getElementById("pipelineChart");
+  if (pipelineCanvas) {
+    const preferredOrder = ["draft", "pending", "published", "rejected", "closed"];
+    const statusMap = Object.fromEntries(preferredOrder.map((status) => [status, 0]));
+
+    safeJobs.forEach((row) => {
+      const status = String(firstValue(row, ["status"], "unknown")).trim().toLowerCase() || "unknown";
+      if (!Object.prototype.hasOwnProperty.call(statusMap, status)) {
+        statusMap[status] = 0;
+      }
+      statusMap[status] += 1;
+    });
+
+    const orderedKeys = [
+      ...preferredOrder.filter((status) => statusMap[status] > 0),
+      ...Object.keys(statusMap).filter((status) => !preferredOrder.includes(status) && statusMap[status] > 0),
+    ];
+    const keys = orderedKeys.length ? orderedKeys : preferredOrder;
+    const labels = keys.map((status) => toStatusLabel(status));
+    const values = keys.map((status) => statusMap[status] || 0);
+
+    destroyChart(hmState.pipelineChart);
+    hmState.pipelineChart = new window.Chart(pipelineCanvas, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Jobs",
+            data: values,
+            borderRadius: 10,
+            backgroundColor: ["#6c8eff", "#f0ad4e", "#2f7a5b", "#d9534f", "#6b7280", "#4167df"],
+            borderWidth: 0,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  const sourceCanvas = document.getElementById("sourceChart");
+  if (sourceCanvas) {
+    const jobMap = {};
+    safeDecisions.forEach((row) => {
+      const key = String(firstValue(row, ["job_id"], "N/A"));
+      const title = firstValue(row, ["job_title", "title"], "Job");
+      const label = `${title} (#${key})`;
+      jobMap[label] = (jobMap[label] || 0) + 1;
+    });
+
+    const entries = Object.entries(jobMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const labels = entries.length ? entries.map(([label]) => label) : ["No pending decisions"];
+    const values = entries.length ? entries.map(([, count]) => count) : [1];
+    const colors = entries.length
+      ? ["#4167df", "#2f7a5b", "#3da9fc", "#6c8eff", "#8dc9b7", "#c9d6ff"]
+      : ["#d7dce6"];
+
+    destroyChart(hmState.sourceChart);
+    hmState.sourceChart = new window.Chart(sourceCanvas, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 1,
+            hoverOffset: 6,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        cutout: "62%",
+        plugins: { legend: { position: "bottom" } },
+      },
+    });
+  }
 }
 
 function isValidEmail(email) {
@@ -402,6 +508,33 @@ function profileSuffixText() {
   return ` Signed in as ${name !== "N/A" ? name : role}.`;
 }
 
+function renderHeaderSubtitle(baseSubtitle) {
+  if (!ui.headerSubtitle) return;
+
+  const subtitle = String(baseSubtitle || "").trim();
+  ui.headerSubtitle.textContent = subtitle;
+
+  const profile = hmState.currentProfile;
+  if (!profile) return;
+  const name = fullName(profile);
+  const role = firstValue(profile, ["role"], "");
+  if (name === "N/A" && !role) return;
+
+  ui.headerSubtitle.textContent = "";
+  ui.headerSubtitle.append(document.createTextNode(`${subtitle} Signed in as `));
+
+  const chip = document.createElement("span");
+  chip.className = "dash-user-chip";
+  chip.textContent = name !== "N/A" ? name : role;
+  ui.headerSubtitle.append(chip);
+
+  if (name !== "N/A" && role) {
+    ui.headerSubtitle.append(document.createTextNode(` (${role}).`));
+  } else {
+    ui.headerSubtitle.append(document.createTextNode("."));
+  }
+}
+
 function resolveCompanyName(profile) {
   const companyName = firstValue(profile || {}, ["company_name"], "");
   if (companyName) return companyName;
@@ -427,7 +560,7 @@ function showSection(viewKey) {
   if (!meta) return;
 
   if (ui.headerTitle) ui.headerTitle.textContent = meta.title;
-  if (ui.headerSubtitle) ui.headerSubtitle.textContent = `${meta.subtitle}${profileSuffixText()}`;
+  renderHeaderSubtitle(meta.subtitle);
   if (ui.searchInput) ui.searchInput.placeholder = meta.searchPlaceholder;
 }
 
@@ -793,26 +926,34 @@ async function submitFinalDecision(event) {
 }
 
 async function loadDashboardKpis() {
-  if (!hmState.approvalsLoaded) {
-    try {
-      const rows = normalizeArrayResponse(await hmApi.listPendingApprovals());
-      hmState.approvalsRows = rows;
-      hmState.approvalsLoaded = true;
-    } catch (error) {
-      hmState.approvalsRows = [];
-      hmState.approvalsLoaded = false;
-    }
+  const [approvalsResult, jobsResult, decisionsResult] = await Promise.allSettled([
+    hmApi.listPendingApprovals(),
+    hmApi.listJobs(),
+    hmApi.listApplications(),
+  ]);
+
+  if (approvalsResult.status === "fulfilled") {
+    hmState.approvalsRows = normalizeArrayResponse(approvalsResult.value);
+    hmState.approvalsLoaded = true;
+  } else if (!hmState.approvalsLoaded) {
+    hmState.approvalsRows = [];
+    hmState.approvalsLoaded = false;
   }
 
-  if (!hmState.jobsLoaded) {
-    try {
-      const rows = normalizeArrayResponse(await hmApi.listJobs());
-      hmState.jobsRows = rows;
-      hmState.jobsLoaded = true;
-    } catch (error) {
-      hmState.jobsRows = [];
-      hmState.jobsLoaded = false;
-    }
+  if (jobsResult.status === "fulfilled") {
+    hmState.jobsRows = normalizeArrayResponse(jobsResult.value);
+    hmState.jobsLoaded = true;
+  } else if (!hmState.jobsLoaded) {
+    hmState.jobsRows = [];
+    hmState.jobsLoaded = false;
+  }
+
+  const decisionRows = decisionsResult.status === "fulfilled"
+    ? normalizeArrayResponse(decisionsResult.value)
+    : (Array.isArray(hmState.decisionsRows) ? hmState.decisionsRows : []);
+
+  if (decisionsResult.status === "fulfilled") {
+    hmState.decisionsRows = decisionRows;
   }
 
   const publishedCount = hmState.jobsRows.filter(
@@ -825,6 +966,7 @@ async function loadDashboardKpis() {
   setText(ui.kpiPendingApprovals, hmState.approvalsRows.length);
   setText(ui.kpiPublished, publishedCount);
   setText(ui.kpiClosed, closedCount);
+  renderDashboardCharts(hmState.jobsRows, decisionRows);
 }
 
 // 5) Profile and session actions.
@@ -895,23 +1037,36 @@ async function openDashboard() {
 
 async function openApprovals() {
   showSection("approvals");
-  if (!hmState.approvalsLoaded) {
-    await loadPendingApprovals();
+  if (hmState.approvalsLoaded) {
+    renderApprovalRows(hmState.approvalsRows);
+    setMessage(ui.approvalMsg, `Loaded ${hmState.approvalsRows.length} pending approval(s).`, "success");
+    return;
   }
+  await loadPendingApprovals();
 }
 
 async function openJobs() {
   showSection("jobs");
-  if (!hmState.jobsLoaded) {
-    await loadJobs();
+  if (hmState.jobsLoaded) {
+    renderJobsRows(hmState.jobsRows);
+    setMessage(ui.jobMsg, `Loaded ${hmState.jobsRows.length} job(s).`, "success");
+    return;
   }
+  await loadJobs();
 }
 
 async function openDecisions() {
   showSection("decisions");
-  if (!hmState.decisionsLoaded) {
-    await loadDecisionApplications();
+  if (hmState.decisionsLoaded) {
+    renderDecisionRows(hmState.decisionsRows);
+    setMessage(
+      ui.finalDecisionMsg,
+      `Loaded ${hmState.decisionsRows.length} offer accecepted application(s).`,
+      "success",
+    );
+    return;
   }
+  await loadDecisionApplications();
 }
 
 async function openProfile() {

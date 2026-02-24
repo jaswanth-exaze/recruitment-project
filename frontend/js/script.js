@@ -337,6 +337,8 @@
 
   function setupCharts() {
     if (typeof window.Chart === "undefined") return;
+    // Dashboard pages render role-specific charts in their own scripts.
+    if (document.body.classList.contains("dashboard-body")) return;
 
     const pipelineCanvas = document.getElementById("pipelineChart");
     if (pipelineCanvas) {

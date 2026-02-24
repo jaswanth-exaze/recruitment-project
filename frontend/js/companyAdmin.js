@@ -62,7 +62,9 @@ const companyState = {
   offerRows: [],
   currentOfferApplicationId: "",
   auditRows: [],
-  redirecting: false
+  redirecting: false,
+  pipelineChart: null,
+  sourceChart: null
 };
 
 const viewMeta = {
@@ -119,6 +121,7 @@ const ui = {
   userCreateForm: document.querySelector("[data-company-user-create-form]"),
   userCreateMsg: document.querySelector("[data-company-user-create-msg]"),
   userRoleFilter: document.querySelector("[data-company-user-role-filter]"),
+  userStatusFilter: document.querySelector("[data-company-user-status-filter]"),
   userLoadBtn: document.querySelector("[data-company-user-load]"),
   userLoadIdInput: document.querySelector("[data-company-user-id-input]"),
   userLoadIdBtn: document.querySelector("[data-company-user-load-id]"),
@@ -228,6 +231,14 @@ function isActive(value) {
   return normalized === "1" || normalized === "true" || normalized === "active" || normalized === "enabled";
 }
 
+function selectedActiveFilter(selectElement) {
+  const normalized = String(selectElement?.value || "all").trim().toLowerCase();
+  if (!normalized || normalized === "all") return null;
+  if (["1", "true", "active", "enabled"].includes(normalized)) return "1";
+  if (["0", "false", "inactive", "disabled"].includes(normalized)) return "0";
+  return null;
+}
+
 function formatDate(value) {
   if (!value) return "N/A";
   const date = new Date(value);
@@ -240,6 +251,163 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
+}
+
+function destroyChart(chartInstance) {
+  if (chartInstance && typeof chartInstance.destroy === "function") {
+    chartInstance.destroy();
+  }
+}
+
+function toWeekKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const monday = new Date(date);
+  const day = monday.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  monday.setDate(monday.getDate() + diff);
+  monday.setHours(0, 0, 0, 0);
+  return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+}
+
+function getLastWeekRange(totalWeeks = 6) {
+  const now = new Date();
+  const base = new Date(now);
+  const day = base.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  base.setDate(base.getDate() + diff);
+  base.setHours(0, 0, 0, 0);
+
+  const weeks = [];
+  for (let i = totalWeeks - 1; i >= 0; i -= 1) {
+    const weekStart = new Date(base);
+    weekStart.setDate(base.getDate() - (i * 7));
+    weeks.push({
+      key: `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`,
+      label: weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    });
+  }
+  return weeks;
+}
+
+function parseApplicationDataValue(raw) {
+  if (!raw) return null;
+  if (typeof raw === "object") return raw;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+  return null;
+}
+
+function renderDashboardCharts(jobs, applications) {
+  if (typeof window.Chart === "undefined") return;
+
+  const safeJobs = Array.isArray(jobs) ? jobs : [];
+  const safeApplications = Array.isArray(applications) ? applications : [];
+
+  const pipelineCanvas = document.getElementById("pipelineChart");
+  if (pipelineCanvas) {
+    const weeks = getLastWeekRange(6);
+    const weekKeys = weeks.map((w) => w.key);
+    const labels = weeks.map((w) => w.label);
+
+    const allApplications = Object.fromEntries(weekKeys.map((key) => [key, 0]));
+    const progressedApplications = Object.fromEntries(weekKeys.map((key) => [key, 0]));
+    const progressedStatuses = new Set([
+      "interview",
+      "interview score submited",
+      "selected",
+      "offer_letter_sent",
+      "offer accecepted",
+      "hired",
+    ]);
+
+    safeApplications.forEach((row) => {
+      const key = toWeekKey(firstValue(row, ["applied_at", "created_at"], ""));
+      if (!key || !Object.prototype.hasOwnProperty.call(allApplications, key)) return;
+      allApplications[key] += 1;
+      const status = String(firstValue(row, ["status"], "")).trim().toLowerCase();
+      if (progressedStatuses.has(status)) {
+        progressedApplications[key] += 1;
+      }
+    });
+
+    destroyChart(companyState.pipelineChart);
+    companyState.pipelineChart = new window.Chart(pipelineCanvas, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Applications Received",
+            data: weekKeys.map((key) => allApplications[key] || 0),
+            borderColor: "#4167df",
+            backgroundColor: "rgba(65, 103, 223, 0.14)",
+            fill: true,
+            tension: 0.35,
+          },
+          {
+            label: "Moved to Advanced Stages",
+            data: weekKeys.map((key) => progressedApplications[key] || 0),
+            borderColor: "#2f7a5b",
+            backgroundColor: "rgba(47, 122, 91, 0.14)",
+            fill: true,
+            tension: 0.35,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+        scales: { y: { beginAtZero: true } },
+      },
+    });
+  }
+
+  const sourceCanvas = document.getElementById("sourceChart");
+  if (sourceCanvas) {
+    const sourceMap = {};
+    safeApplications.forEach((row) => {
+      const payload = parseApplicationDataValue(row?.application_data);
+      const source = String(payload?.source || "unknown").trim().toLowerCase() || "unknown";
+      sourceMap[source] = (sourceMap[source] || 0) + 1;
+    });
+
+    const entries = Object.entries(sourceMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const labels = entries.length ? entries.map(([key]) => key.replace(/_/g, " ")) : ["No data"];
+    const values = entries.length ? entries.map(([, value]) => value) : [1];
+
+    destroyChart(companyState.sourceChart);
+    companyState.sourceChart = new window.Chart(sourceCanvas, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: ["#4167df", "#2f7a5b", "#3da9fc", "#6c8eff", "#8dc9b7", "#c9d6ff"],
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+      },
+    });
+  }
+
+  if (!safeJobs.length && !safeApplications.length) {
+    destroyChart(companyState.pipelineChart);
+    destroyChart(companyState.sourceChart);
+    companyState.pipelineChart = null;
+    companyState.sourceChart = null;
+  }
 }
 
 function formatAuditAction(action) {
@@ -314,6 +482,33 @@ function profileSuffixText() {
   return ` Signed in as ${name !== "N/A" ? name : role}.`;
 }
 
+function renderHeaderSubtitle(baseSubtitle) {
+  if (!ui.headerSubtitle) return;
+
+  const subtitle = String(baseSubtitle || "").trim();
+  ui.headerSubtitle.textContent = subtitle;
+
+  const profile = companyState.currentProfile;
+  if (!profile) return;
+  const name = fullName(profile);
+  const role = firstValue(profile, ["role"], "");
+  if (name === "N/A" && !role) return;
+
+  ui.headerSubtitle.textContent = "";
+  ui.headerSubtitle.append(document.createTextNode(`${subtitle} Signed in as `));
+
+  const chip = document.createElement("span");
+  chip.className = "dash-user-chip";
+  chip.textContent = name !== "N/A" ? name : role;
+  ui.headerSubtitle.append(chip);
+
+  if (name !== "N/A" && role) {
+    ui.headerSubtitle.append(document.createTextNode(` (${role}).`));
+  } else {
+    ui.headerSubtitle.append(document.createTextNode("."));
+  }
+}
+
 function resolveCompanyName(profile) {
   const companyName = firstValue(profile || {}, ["company_name"], "");
   if (companyName) return companyName;
@@ -338,7 +533,7 @@ function showSection(viewKey) {
   const meta = viewMeta[viewKey];
   if (!meta) return;
   if (ui.headerTitle) ui.headerTitle.textContent = meta.title;
-  if (ui.headerSubtitle) ui.headerSubtitle.textContent = `${meta.subtitle}${profileSuffixText()}`;
+  renderHeaderSubtitle(meta.subtitle);
   if (ui.searchInput) ui.searchInput.placeholder = meta.searchPlaceholder;
 }
 
@@ -535,9 +730,13 @@ const companyAdminApi = {
     });
   },
 
-  listUsersByRole(role, includeInactive = true) {
+  listUsersByRole(role, { includeInactive = true, isActive = null } = {}) {
+    const query = { role, include_inactive: includeInactive ? "true" : "false" };
+    if (isActive !== null && isActive !== undefined && String(isActive).trim() !== "") {
+      query.is_active = String(isActive).trim();
+    }
     return apiRequest(COMPANY_ADMIN_CONFIG.endpoints.listUsersByRole, {
-      query: { role, include_inactive: includeInactive ? "true" : "false" }
+      query
     });
   },
 
@@ -709,7 +908,7 @@ function showTableMessage(tbody, colSpan, text) {
 
 function createStatusBadge(value) {
   const badge = document.createElement("span");
-  badge.className = `badge ${isActive(value) ? "text-bg-success" : "text-bg-secondary"}`;
+  badge.className = `badge status-badge ${isActive(value) ? "status-badge-active" : "status-badge-inactive"}`;
   badge.textContent = isActive(value) ? "Active" : "Inactive";
   return badge;
 }
@@ -811,33 +1010,51 @@ function setKpiText(element, value) {
 async function loadDashboardKpis() {
   if (!COMPANY_ADMIN_CONFIG.useApi) return;
 
-  const [hrResult, managerResult, interviewerResult, jobsResult] = await Promise.allSettled([
+  const [hrResult, managerResult, interviewerResult, jobsResult, applicationsResult] = await Promise.allSettled([
     companyAdminApi.countUsersByRole("HR"),
     companyAdminApi.countUsersByRole("HiringManager"),
     companyAdminApi.countUsersByRole("Interviewer"),
-    companyAdminApi.listJobs()
+    companyAdminApi.listJobs(),
+    companyAdminApi.listApplications()
   ]);
+
+  let jobs = [];
+  let applications = [];
 
   if (hrResult.status === "fulfilled") {
     setKpiText(ui.kpiHr, firstValue(hrResult.value, ["total"], "--"));
+  } else {
+    setKpiText(ui.kpiHr, "--");
   }
 
   if (managerResult.status === "fulfilled") {
     setKpiText(ui.kpiManagers, firstValue(managerResult.value, ["total"], "--"));
+  } else {
+    setKpiText(ui.kpiManagers, "--");
   }
 
   if (interviewerResult.status === "fulfilled") {
     setKpiText(ui.kpiInterviewers, firstValue(interviewerResult.value, ["total"], "--"));
+  } else {
+    setKpiText(ui.kpiInterviewers, "--");
   }
 
   if (jobsResult.status === "fulfilled") {
-    const jobs = normalizeArrayResponse(jobsResult.value);
+    jobs = normalizeArrayResponse(jobsResult.value);
     const openJobsCount = jobs.filter((job) => {
       const status = String(firstValue(job, ["status"], "")).toLowerCase();
       return status !== "closed";
     }).length;
     setKpiText(ui.kpiOpenJobs, openJobsCount);
+  } else {
+    setKpiText(ui.kpiOpenJobs, "--");
   }
+
+  if (applicationsResult.status === "fulfilled") {
+    applications = normalizeArrayResponse(applicationsResult.value);
+  }
+
+  renderDashboardCharts(jobs, applications);
 }
 
 function dedupeById(records) {
@@ -984,12 +1201,17 @@ function renderUserRows(rows) {
 async function loadUsersByRole() {
   if (!COMPANY_ADMIN_CONFIG.useApi) return;
   const selectedRole = String(ui.userRoleFilter?.value || "all").trim();
+  const statusFilter = selectedActiveFilter(ui.userStatusFilter);
+  const includeInactive = statusFilter === null;
 
   try {
     let rows = [];
 
     if (selectedRole === "all") {
-      const calls = COMPANY_ADMIN_CONFIG.managedRoles.map((role) => companyAdminApi.listUsersByRole(role));
+      const calls = COMPANY_ADMIN_CONFIG.managedRoles.map((role) => companyAdminApi.listUsersByRole(role, {
+        includeInactive,
+        isActive: statusFilter
+      }));
       const results = await Promise.allSettled(calls);
       const combined = [];
 
@@ -1000,7 +1222,10 @@ async function loadUsersByRole() {
 
       rows = dedupeById(combined);
     } else {
-      rows = normalizeArrayResponse(await companyAdminApi.listUsersByRole(selectedRole));
+      rows = normalizeArrayResponse(await companyAdminApi.listUsersByRole(selectedRole, {
+        includeInactive,
+        isActive: statusFilter
+      }));
     }
 
     rows = await filterUsersToCurrentCompany(rows);

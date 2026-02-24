@@ -25,9 +25,20 @@ exports.login = async ({ email, password }) => {
 
   const [rows] = await db.promise().query(
     `
-      SELECT id, company_id, email, first_name, last_name, role, password_hash, is_active, last_login_at
-      FROM users
-      WHERE email = ?
+      SELECT
+        u.id,
+        u.company_id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.role,
+        u.password_hash,
+        u.is_active,
+        u.last_login_at,
+        c.is_active AS company_is_active
+      FROM users u
+      LEFT JOIN companies c ON c.id = u.company_id
+      WHERE u.email = ?
       LIMIT 1
     `,
     [email],
@@ -38,6 +49,10 @@ exports.login = async ({ email, password }) => {
   }
 
   const user = rows[0];
+  if (user.company_id && Number(user.company_is_active) !== 1) {
+    throw new Error("Your company account is inactive. Contact Platform Admin.");
+  }
+
   const isValid = await comparePassword(password, user.password_hash);
   if (!isValid) {
     throw new Error("Invalid credentials");
@@ -223,9 +238,15 @@ exports.refreshAccessToken = async (refreshToken) => {
 
     const [userRows] = await connection.query(
       `
-        SELECT id, company_id, role, is_active
-        FROM users
-        WHERE id = ?
+        SELECT
+          u.id,
+          u.company_id,
+          u.role,
+          u.is_active,
+          c.is_active AS company_is_active
+        FROM users u
+        LEFT JOIN companies c ON c.id = u.company_id
+        WHERE u.id = ?
         LIMIT 1
       `,
       [decoded.user_id],
@@ -236,6 +257,9 @@ exports.refreshAccessToken = async (refreshToken) => {
     }
 
     const user = userRows[0];
+    if (user.company_id && Number(user.company_is_active) !== 1) {
+      throw new Error("Your company account is inactive. Contact Platform Admin.");
+    }
 
     const nextAccessToken = generateAccessToken({
       user_id: user.id,

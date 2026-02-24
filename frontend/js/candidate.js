@@ -33,6 +33,7 @@ const candState = {
   currentProfile: null,
   currentCandidateProfile: null,
   selectedJob: null,
+  jobsRows: [],
   applicationsRows: [],
   savedRows: [],
   offersRows: [],
@@ -41,7 +42,10 @@ const candState = {
   savedLoaded: false,
   offersLoaded: false,
   offersLoadedApplicationId: "",
+  jobDetailsModal: null,
   applyModal: null,
+  pipelineChart: null,
+  sourceChart: null,
 };
 
 const viewMeta = {
@@ -65,7 +69,8 @@ const ui = {
   kpiOffers: document.querySelector("[data-cand-kpi-offers]"),
   kpiProfile: document.querySelector("[data-cand-kpi-profile]"),
 
-  jobStatus: document.querySelector("[data-cand-job-status]"),
+  jobCompanyFilter: document.querySelector("[data-cand-job-company]"),
+  jobLocationFilter: document.querySelector("[data-cand-job-location]"),
   jobsLoadBtn: document.querySelector("[data-cand-jobs-load]"),
   jobList: document.querySelector("[data-cand-job-list]"),
   jobMsg: document.querySelector("[data-cand-job-msg]"),
@@ -73,6 +78,8 @@ const ui = {
   selectedJobDescription: document.querySelector("[data-cand-selected-job-description]"),
   selectedJobRequirements: document.querySelector("[data-cand-selected-job-requirements]"),
   selectedJobEmployment: document.querySelector("[data-cand-selected-job-employment]"),
+  jobDetailsModalEl: document.querySelector("[data-cand-job-details-modal]"),
+  jobDetailsFields: document.querySelectorAll("[data-cand-job-detail-field]"),
 
   appsLoadBtn: document.querySelector("[data-cand-apps-load]"),
   appList: document.querySelector("[data-cand-app-list]"),
@@ -183,6 +190,45 @@ function fmtDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
+}
+
+function destroyChart(chartInstance) {
+  if (chartInstance && typeof chartInstance.destroy === "function") {
+    chartInstance.destroy();
+  }
+}
+
+function toMonthKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function recentMonths(totalMonths = 6) {
+  const now = new Date();
+  const months = [];
+  for (let i = totalMonths - 1; i >= 0; i -= 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+      label: date.toLocaleString(undefined, { month: "short", year: "2-digit" }),
+    });
+  }
+  return months;
+}
+
+function parseApplicationPayload(raw) {
+  if (!raw) return null;
+  if (typeof raw === "object") return raw;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+  return null;
 }
 
 function toNum(value) {
@@ -383,14 +429,31 @@ function setActiveNav(viewKey) {
   if (target) target.classList.add("active");
 }
 
-function profileSuffix() {
-  const p = candState.currentProfile;
-  if (!p) return "";
-  const name = fullName(p);
-  const role = getValue(p, ["role"], "");
-  if (name === "N/A" && !role) return "";
-  if (name !== "N/A" && role) return ` Signed in as ${name} (${role}).`;
-  return ` Signed in as ${name !== "N/A" ? name : role}.`;
+function renderHeaderSubtitle(baseSubtitle) {
+  if (!ui.headerSubtitle) return;
+
+  const subtitle = String(baseSubtitle || "").trim();
+  ui.headerSubtitle.textContent = subtitle;
+
+  const profile = candState.currentProfile;
+  if (!profile) return;
+  const name = fullName(profile);
+  const role = getValue(profile, ["role"], "");
+  if (name === "N/A" && !role) return;
+
+  ui.headerSubtitle.textContent = "";
+  ui.headerSubtitle.append(document.createTextNode(`${subtitle} Signed in as `));
+
+  const chip = document.createElement("span");
+  chip.className = "dash-user-chip";
+  chip.textContent = name !== "N/A" ? name : role;
+  ui.headerSubtitle.append(chip);
+
+  if (name !== "N/A" && role) {
+    ui.headerSubtitle.append(document.createTextNode(` (${role}).`));
+  } else {
+    ui.headerSubtitle.append(document.createTextNode("."));
+  }
 }
 
 function showSection(viewKey) {
@@ -400,7 +463,7 @@ function showSection(viewKey) {
   const meta = viewMeta[viewKey];
   if (!meta) return;
   if (ui.headerTitle) ui.headerTitle.textContent = meta.title;
-  if (ui.headerSubtitle) ui.headerSubtitle.textContent = `${meta.subtitle}${profileSuffix()}`;
+  renderHeaderSubtitle(meta.subtitle);
   if (ui.searchInput) ui.searchInput.placeholder = meta.search;
 }
 
@@ -476,10 +539,85 @@ function setSelectedJob(job) {
   setText(ui.selectedJobDescription, getValue(job || {}, ["description"], "N/A"));
   setText(ui.selectedJobRequirements, getValue(job || {}, ["requirements"], "N/A"));
   setText(ui.selectedJobEmployment, getValue(job || {}, ["employment_type"], "N/A"));
+  renderJobDetailsFields(job);
 }
 
 function applyMsg(text, type = "info") {
   setMsg(ui.applyMsg, text, type);
+}
+
+function getJobCreatorLabel(job) {
+  const first = getValue(job || {}, ["creator_first"], "");
+  const last = getValue(job || {}, ["creator_last"], "");
+  const full = `${first} ${last}`.trim();
+  const createdById = getValue(job || {}, ["created_by"], "");
+  if (full && createdById) return `${full} (#${createdById})`;
+  if (full) return full;
+  if (createdById) return `User #${createdById}`;
+  return "N/A";
+}
+
+function jobDetailValues(job) {
+  return {
+    id: getValue(job || {}, ["id"], "N/A"),
+    title: getValue(job || {}, ["title"], "N/A"),
+    company_name: getValue(job || {}, ["company_name"], "N/A"),
+    status: getValue(job || {}, ["status"], "N/A"),
+    location: getValue(job || {}, ["location"], "N/A"),
+    employment_type: getValue(job || {}, ["employment_type"], "N/A"),
+    positions_count: getValue(job || {}, ["positions_count"], "N/A"),
+    created_at: fmtDateTime(getValue(job || {}, ["created_at"], "")),
+    updated_at: fmtDateTime(getValue(job || {}, ["updated_at"], "")),
+    published_at: fmtDateTime(getValue(job || {}, ["published_at", "created_at"], "")),
+    closed_at: fmtDateTime(getValue(job || {}, ["closed_at"], "")),
+    company_id: getValue(job || {}, ["company_id"], "N/A"),
+    created_by: getJobCreatorLabel(job),
+    description: getValue(job || {}, ["description"], "N/A"),
+    requirements: getValue(job || {}, ["requirements"], "N/A"),
+  };
+}
+
+function renderJobDetailsFields(job) {
+  if (!ui.jobDetailsFields?.length) return;
+  const values = jobDetailValues(job);
+  ui.jobDetailsFields.forEach((field) => {
+    const key = String(field.dataset.candJobDetailField || "").trim();
+    if (!key) return;
+    const value = Object.prototype.hasOwnProperty.call(values, key) ? values[key] : "N/A";
+    if ("value" in field) {
+      field.value = value === undefined || value === null || value === "" ? "N/A" : String(value);
+      return;
+    }
+    field.textContent = value === undefined || value === null || value === "" ? "N/A" : String(value);
+  });
+}
+
+function getJobDetailsModal() {
+  if (!ui.jobDetailsModalEl || !window.bootstrap?.Modal) return null;
+  if (!candState.jobDetailsModal) {
+    candState.jobDetailsModal = new window.bootstrap.Modal(ui.jobDetailsModalEl);
+  }
+  return candState.jobDetailsModal;
+}
+
+async function openJobDetails(jobId) {
+  if (!jobId) return;
+
+  let job = null;
+  try {
+    setMsg(ui.jobMsg, "Loading job details...", "info");
+    job = await candApi.getJobById(jobId);
+  } catch (error) {
+    setMsg(ui.jobMsg, error.message || "Failed to load job details.", "error");
+    return;
+  }
+
+  setSelectedJob(job);
+  const modal = getJobDetailsModal();
+  if (modal) {
+    modal.show();
+  }
+  setMsg(ui.jobMsg, "Job details loaded.", "success");
 }
 
 function getApplyModal() {
@@ -630,16 +768,67 @@ function renderJobRows(rows) {
   });
 }
 
+function uniqueSortedValues(rows, key) {
+  const values = Array.from(
+    new Set(
+      (rows || [])
+        .map((row) => String(getValue(row, [key], "")).trim())
+        .filter(Boolean),
+    ),
+  );
+  values.sort((a, b) => a.localeCompare(b));
+  return values;
+}
+
+function setFilterOptions(selectEl, values, allLabel) {
+  if (!selectEl) return;
+  const currentValue = String(selectEl.value || "all").trim();
+  selectEl.innerHTML = "";
+
+  const allOption = document.createElement("option");
+  allOption.value = "all";
+  allOption.textContent = allLabel;
+  selectEl.appendChild(allOption);
+
+  values.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    selectEl.appendChild(option);
+  });
+
+  const hasCurrentValue = Array.from(selectEl.options).some((option) => option.value === currentValue);
+  selectEl.value = hasCurrentValue ? currentValue : "all";
+}
+
+function populateJobFilterOptions(rows) {
+  setFilterOptions(ui.jobCompanyFilter, uniqueSortedValues(rows, "company_name"), "All Companies");
+  setFilterOptions(ui.jobLocationFilter, uniqueSortedValues(rows, "location"), "All Locations");
+}
+
 async function loadJobs() {
-  const status = String(ui.jobStatus?.value || "all").trim();
-  const query = {};
-  if (status && status !== "all") query.status = status;
   try {
     setMsg(ui.jobMsg, "Loading jobs...", "info");
-    const rows = toRows(await candApi.listJobs(query));
-    renderJobRows(rows);
-    setMsg(ui.jobMsg, `Loaded ${rows.length} job(s).`, "success");
+    const rows = toRows(await candApi.listJobs());
+    candState.jobsRows = rows;
+    populateJobFilterOptions(rows);
+
+    const selectedCompany = String(ui.jobCompanyFilter?.value || "all").trim();
+    const selectedLocation = String(ui.jobLocationFilter?.value || "all").trim();
+
+    const filteredRows = rows.filter((row) => {
+      const companyName = String(getValue(row, ["company_name"], "")).trim();
+      const locationName = String(getValue(row, ["location"], "")).trim();
+      const companyMatch = selectedCompany === "all" || companyName === selectedCompany;
+      const locationMatch = selectedLocation === "all" || locationName === selectedLocation;
+      return companyMatch && locationMatch;
+    });
+
+    renderJobRows(filteredRows);
+    setMsg(ui.jobMsg, `Loaded ${filteredRows.length} published job(s).`, "success");
   } catch (error) {
+    candState.jobsRows = [];
+    populateJobFilterOptions([]);
     renderJobRows([]);
     setMsg(ui.jobMsg, error.message || "Failed to load jobs.", "error");
   }
@@ -1009,17 +1198,122 @@ function isActiveApplication(status) {
   return !["rejected", "hired", "withdrawn", "declined", "closed"].includes(normalized);
 }
 
+function renderDashboardCharts(applications, offers) {
+  if (typeof window.Chart === "undefined") return;
+
+  const safeApplications = Array.isArray(applications) ? applications : [];
+  const safeOffers = Array.isArray(offers) ? offers : [];
+  const months = recentMonths(6);
+  const monthKeys = months.map((item) => item.key);
+
+  const pipelineCanvas = document.getElementById("pipelineChart");
+  if (pipelineCanvas) {
+    const submittedMap = Object.fromEntries(monthKeys.map((key) => [key, 0]));
+    const offerMap = Object.fromEntries(monthKeys.map((key) => [key, 0]));
+
+    safeApplications.forEach((row) => {
+      const key = toMonthKey(getValue(row, ["applied_at", "created_at"], ""));
+      if (key && Object.prototype.hasOwnProperty.call(submittedMap, key)) {
+        submittedMap[key] += 1;
+      }
+    });
+
+    safeOffers.forEach((row) => {
+      const key = toMonthKey(getValue(row, ["created_at"], ""));
+      if (key && Object.prototype.hasOwnProperty.call(offerMap, key)) {
+        offerMap[key] += 1;
+      }
+    });
+
+    destroyChart(candState.pipelineChart);
+    candState.pipelineChart = new window.Chart(pipelineCanvas, {
+      type: "line",
+      data: {
+        labels: months.map((item) => item.label),
+        datasets: [
+          {
+            label: "Applications Submitted",
+            data: monthKeys.map((key) => submittedMap[key] || 0),
+            borderColor: "#4167df",
+            backgroundColor: "rgba(65, 103, 223, 0.14)",
+            fill: true,
+            tension: 0.35,
+          },
+          {
+            label: "Offers Received",
+            data: monthKeys.map((key) => offerMap[key] || 0),
+            borderColor: "#2f7a5b",
+            backgroundColor: "rgba(47, 122, 91, 0.14)",
+            fill: true,
+            tension: 0.35,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  const sourceCanvas = document.getElementById("sourceChart");
+  if (sourceCanvas) {
+    const sourceMap = {};
+    safeApplications.forEach((row) => {
+      const data = parseApplicationPayload(row?.application_data);
+      const source = String(data?.source || "unknown").trim().toLowerCase() || "unknown";
+      sourceMap[source] = (sourceMap[source] || 0) + 1;
+    });
+
+    const entries = Object.entries(sourceMap).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const labels = entries.length ? entries.map(([key]) => key.replace(/_/g, " ")) : ["No source data"];
+    const values = entries.length ? entries.map(([, count]) => count) : [1];
+    const colors = entries.length
+      ? ["#4167df", "#2f7a5b", "#3da9fc", "#6c8eff", "#8dc9b7", "#c9d6ff"]
+      : ["#d7dce6"];
+
+    destroyChart(candState.sourceChart);
+    candState.sourceChart = new window.Chart(sourceCanvas, {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 1,
+            hoverOffset: 6,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        cutout: "62%",
+        plugins: { legend: { position: "bottom" } },
+      },
+    });
+  }
+}
+
 async function loadDashboardKpis() {
-  const results = await Promise.allSettled([candApi.listMyApplications(), candApi.listSavedJobs(), candApi.getCandidateProfile()]);
+  const results = await Promise.allSettled([
+    candApi.listMyApplications(),
+    candApi.listSavedJobs(),
+    candApi.getCandidateProfile(),
+    candApi.getOffers(),
+  ]);
   if (results[0].status === "fulfilled") candState.applicationsRows = toRows(results[0].value);
   if (results[1].status === "fulfilled") candState.savedRows = toRows(results[1].value);
   if (results[2].status === "fulfilled") renderCandidateProfile(toRecord(results[2].value) || null);
+  if (results[3].status === "fulfilled") candState.offersRows = toRows(results[3].value);
 
   const activeApps = (candState.applicationsRows || []).filter((row) => isActiveApplication(getValue(row, ["status"], ""))).length;
   setText(ui.kpiActiveApps, activeApps);
   setText(ui.kpiSavedJobs, (candState.savedRows || []).length);
   setText(ui.kpiOffers, (candState.offersRows || []).length);
   setText(ui.kpiProfile, profileCompletion(candState.currentCandidateProfile));
+  renderDashboardCharts(candState.applicationsRows, candState.offersRows);
 }
 
 async function reloadProfile() {
@@ -1180,6 +1474,18 @@ function bindActions() {
     });
   }
 
+  if (ui.jobCompanyFilter) {
+    ui.jobCompanyFilter.addEventListener("change", async () => {
+      await loadJobs();
+    });
+  }
+
+  if (ui.jobLocationFilter) {
+    ui.jobLocationFilter.addEventListener("change", async () => {
+      await loadJobs();
+    });
+  }
+
   if (ui.jobList) {
     ui.jobList.addEventListener("click", async (event) => {
       const button = event.target.closest("button[data-job-action]");
@@ -1187,7 +1493,7 @@ function bindActions() {
       const action = String(button.dataset.jobAction || "").trim();
       const jobId = String(button.dataset.jobId || "").trim();
       if (!jobId) return;
-      if (action === "view") await loadJobById(jobId);
+      if (action === "view") await openJobDetails(jobId);
       if (action === "apply") await openApplyForm(jobId);
       if (action === "save") await saveJob(jobId, ui.jobMsg);
     });
@@ -1241,8 +1547,8 @@ function bindActions() {
       const jobId = String(button.dataset.jobId || "").trim();
       if (!jobId) return;
       if (action === "view") {
-        await loadJobById(jobId, true);
         await openJobs();
+        await openJobDetails(jobId);
       }
       if (action === "unsave") await unsaveJob(jobId);
     });

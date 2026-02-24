@@ -57,13 +57,16 @@ const adminState = {
   activityLoaded: false,
   contactsLoaded: false,
   companyMsgTimer: null,
+  userMsgTimer: null,
   currentProfile: null,
   usersRows: [],
   usersPage: 1,
   auditRows: [],
   auditPage: 1,
   contactRows: [],
-  contactPage: 1
+  contactPage: 1,
+  pipelineChart: null,
+  sourceChart: null
 };
 
 const viewMeta = {
@@ -74,12 +77,12 @@ const viewMeta = {
   },
   companies: {
     title: "Companies",
-    subtitle: "Manage active companies and add company admin accounts.",
+    subtitle: "Manage companies and control activation/deactivation access.",
     searchPlaceholder: "Search company name or domain"
   },
   users: {
     title: "Users",
-    subtitle: "View all users first, then filter by role if needed.",
+    subtitle: "View all users first, then filter by role and company if needed.",
     searchPlaceholder: "Search user name or email"
   },
   activity: {
@@ -112,11 +115,16 @@ const ui = {
 
   companyForm: document.querySelector("[data-company-form]"),
   companyList: document.querySelector("[data-company-list]"),
+  companyStatusFilter: document.querySelector("[data-company-status-filter]"),
+  companyLoadBtn: document.querySelector("[data-company-load]"),
   companyMsg: document.querySelector("[data-company-msg]"),
 
   userList: document.querySelector("[data-user-list]"),
   userRoleFilter: document.querySelector("[data-user-role-filter]"),
+  userCompanyFilter: document.querySelector("[data-user-company-filter]"),
+  userStatusFilter: document.querySelector("[data-user-status-filter]"),
   userLoadBtn: document.querySelector("[data-user-load]"),
+  userMsg: document.querySelector("[data-user-msg]"),
   usersPrevBtn: document.querySelector("[data-users-prev]"),
   usersNextBtn: document.querySelector("[data-users-next]"),
   usersPageMeta: document.querySelector("[data-users-page-meta]"),
@@ -186,6 +194,36 @@ function profileSuffixText() {
   return ` Signed in as ${name || role}.`;
 }
 
+function renderHeaderSubtitle(baseSubtitle) {
+  if (!ui.headerSubtitle) return;
+
+  const subtitle = String(baseSubtitle || "").trim();
+  ui.headerSubtitle.textContent = subtitle;
+
+  const profile = adminState.currentProfile;
+  if (!profile) return;
+
+  const firstName = String(profile.first_name || "").trim();
+  const lastName = String(profile.last_name || "").trim();
+  const name = `${firstName} ${lastName}`.trim();
+  const role = String(profile.role || "").trim();
+  if (!name && !role) return;
+
+  ui.headerSubtitle.textContent = "";
+  ui.headerSubtitle.append(document.createTextNode(`${subtitle} Signed in as `));
+
+  const chip = document.createElement("span");
+  chip.className = "dash-user-chip";
+  chip.textContent = name || role;
+  ui.headerSubtitle.append(chip);
+
+  if (name && role) {
+    ui.headerSubtitle.append(document.createTextNode(` (${role}).`));
+  } else {
+    ui.headerSubtitle.append(document.createTextNode("."));
+  }
+}
+
 function showSection(viewKey) {
   ui.sections.forEach((sec) => {
     sec.classList.toggle("d-none", sec.dataset.adminView !== viewKey);
@@ -198,7 +236,7 @@ function showSection(viewKey) {
   if (!meta) return;
 
   if (ui.headerTitle) ui.headerTitle.textContent = meta.title;
-  if (ui.headerSubtitle) ui.headerSubtitle.textContent = `${meta.subtitle}${profileSuffixText()}`;
+  renderHeaderSubtitle(meta.subtitle);
   if (ui.searchInput) ui.searchInput.placeholder = meta.searchPlaceholder;
 }
 
@@ -265,9 +303,68 @@ function isActive(value) {
 
 function createStatusBadge(value) {
   const badge = document.createElement("span");
-  badge.className = `badge ${isActive(value) ? "text-bg-success" : "text-bg-secondary"}`;
+  badge.className = `badge status-badge ${isActive(value) ? "status-badge-active" : "status-badge-inactive"}`;
   badge.textContent = isActive(value) ? "Active" : "Inactive";
   return badge;
+}
+
+function getCompanyIdFromRecord(company) {
+  const id = Number(firstValue(company, ["id"], ""));
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return Math.trunc(id);
+}
+
+function createCompanyActionButton(company) {
+  const isCompanyActive = isActive(firstValue(company, ["is_active", "status"], 1));
+  const companyId = getCompanyIdFromRecord(company);
+  const button = document.createElement("button");
+
+  button.type = "button";
+  button.className = `btn btn-sm ${isCompanyActive ? "btn-outline-danger" : "btn-outline-success"}`;
+  button.dataset.companyToggle = companyId ? String(companyId) : "";
+  button.dataset.nextState = isCompanyActive ? "deactivate" : "activate";
+  button.textContent = isCompanyActive ? "Deactivate" : "Activate";
+
+  if (!companyId) {
+    button.disabled = true;
+    button.title = "Company id is missing";
+  }
+
+  return button;
+}
+
+function createCompanyTableRow(company) {
+  const tr = document.createElement("tr");
+
+  const idCell = document.createElement("td");
+  idCell.textContent = firstValue(company, ["id"], "N/A");
+  tr.appendChild(idCell);
+
+  const nameCell = document.createElement("td");
+  nameCell.textContent = firstValue(company, ["name"], "N/A");
+  tr.appendChild(nameCell);
+
+  const domainCell = document.createElement("td");
+  domainCell.textContent = firstValue(company, ["domain"], "N/A");
+  tr.appendChild(domainCell);
+
+  const adminCell = document.createElement("td");
+  adminCell.textContent = firstValue(company, ["company_admin_email", "admin_email"], "-");
+  tr.appendChild(adminCell);
+
+  const statusCell = document.createElement("td");
+  statusCell.appendChild(createStatusBadge(firstValue(company, ["is_active", "status"], 1)));
+  tr.appendChild(statusCell);
+
+  const createdCell = document.createElement("td");
+  createdCell.textContent = formatDate(firstValue(company, ["created_at"], ""));
+  tr.appendChild(createdCell);
+
+  const actionCell = document.createElement("td");
+  actionCell.appendChild(createCompanyActionButton(company));
+  tr.appendChild(actionCell);
+
+  return tr;
 }
 
 function setKpiText(element, value) {
@@ -287,6 +384,124 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
+}
+
+function destroyChart(chartInstance) {
+  if (chartInstance && typeof chartInstance.destroy === "function") {
+    chartInstance.destroy();
+  }
+}
+
+function monthKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getLastMonthRange(totalMonths = 6) {
+  const now = new Date();
+  const months = [];
+  for (let i = totalMonths - 1; i >= 0; i -= 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+      label: date.toLocaleString(undefined, { month: "short", year: "2-digit" }),
+    });
+  }
+  return months;
+}
+
+function countRowsByMonth(rows, dateField, monthKeys) {
+  const map = {};
+  monthKeys.forEach((key) => {
+    map[key] = 0;
+  });
+
+  (rows || []).forEach((row) => {
+    const key = monthKey(firstValue(row, [dateField], ""));
+    if (key && Object.prototype.hasOwnProperty.call(map, key)) {
+      map[key] += 1;
+    }
+  });
+
+  return monthKeys.map((key) => map[key] || 0);
+}
+
+function renderDashboardCharts(companies, users) {
+  if (typeof window.Chart === "undefined") return;
+
+  const safeCompanies = Array.isArray(companies) ? companies : [];
+  const safeUsers = Array.isArray(users) ? users : [];
+
+  const pipelineCanvas = document.getElementById("pipelineChart");
+  if (pipelineCanvas) {
+    const months = getLastMonthRange(6);
+    const monthKeys = months.map((item) => item.key);
+    const labels = months.map((item) => item.label);
+
+    const companySeries = countRowsByMonth(safeCompanies, "created_at", monthKeys);
+    const userSeries = countRowsByMonth(safeUsers, "created_at", monthKeys);
+
+    destroyChart(adminState.pipelineChart);
+    adminState.pipelineChart = new window.Chart(pipelineCanvas, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Companies Onboarded",
+            data: companySeries,
+            borderColor: "#2f7a5b",
+            backgroundColor: "rgba(47, 122, 91, 0.16)",
+            fill: true,
+            tension: 0.35,
+          },
+          {
+            label: "Users Added",
+            data: userSeries,
+            borderColor: "#4167df",
+            backgroundColor: "rgba(65, 103, 223, 0.14)",
+            fill: true,
+            tension: 0.35,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+        scales: { y: { beginAtZero: true } },
+      },
+    });
+  }
+
+  const sourceCanvas = document.getElementById("sourceChart");
+  if (sourceCanvas) {
+    const roleLabels = PLATFORM_ADMIN_CONFIG.allRoles.map((role) => role.replace(/([a-z])([A-Z])/g, "$1 $2"));
+    const roleCounts = PLATFORM_ADMIN_CONFIG.allRoles.map((role) => (
+      safeUsers.filter(
+        (user) => String(firstValue(user, ["role"], "")).trim() === role && isActive(firstValue(user, ["is_active"], 1)),
+      ).length
+    ));
+
+    destroyChart(adminState.sourceChart);
+    adminState.sourceChart = new window.Chart(sourceCanvas, {
+      type: "doughnut",
+      data: {
+        labels: roleLabels,
+        datasets: [
+          {
+            data: roleCounts,
+            backgroundColor: ["#2f7a5b", "#4167df", "#3da9fc", "#6c8eff", "#9ec5ff", "#c9d6ff"],
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+      },
+    });
+  }
 }
 
 function formatAuditAction(action) {
@@ -377,6 +592,22 @@ function showCompanyStatus(text, type) {
 
   adminState.companyMsgTimer = window.setTimeout(() => {
     ui.companyMsg?.classList.add("d-none");
+  }, 2400);
+}
+
+function showUserStatus(text, type) {
+  if (!ui.userMsg) return;
+
+  ui.userMsg.textContent = text;
+  ui.userMsg.classList.remove("d-none", "text-success", "text-danger");
+  ui.userMsg.classList.add(type === "error" ? "text-danger" : "text-success");
+
+  if (adminState.userMsgTimer) {
+    window.clearTimeout(adminState.userMsgTimer);
+  }
+
+  adminState.userMsgTimer = window.setTimeout(() => {
+    ui.userMsg?.classList.add("d-none");
   }, 2400);
 }
 
@@ -612,8 +843,14 @@ const platformAdminApi = {
     return apiRequest(PLATFORM_ADMIN_CONFIG.endpoints.getPendingJobs);
   },
 
-  listActiveCompanies() {
-    return apiRequest(PLATFORM_ADMIN_CONFIG.endpoints.listActiveCompanies);
+  listActiveCompanies(statusFilter = null) {
+    const query = {};
+    if (statusFilter !== null && statusFilter !== undefined && String(statusFilter).trim() !== "") {
+      query.is_active = String(statusFilter).trim();
+    }
+    return apiRequest(PLATFORM_ADMIN_CONFIG.endpoints.listActiveCompanies, {
+      query
+    });
   },
 
   createCompany(payload) {
@@ -663,9 +900,14 @@ const platformAdminApi = {
     });
   },
 
-  listUsersByRole(role) {
+  listUsersByRole(role, companyId = null, statusFilter = null) {
+    const query = { role };
+    if (companyId) query.company_id = companyId;
+    if (statusFilter !== null && statusFilter !== undefined && String(statusFilter).trim() !== "") {
+      query.is_active = String(statusFilter).trim();
+    }
     return apiRequest(PLATFORM_ADMIN_CONFIG.endpoints.listUsersByRole, {
-      query: { role }
+      query
     });
   },
 
@@ -757,40 +999,45 @@ async function performLogout() {
    DASHBOARD KPI LOAD
    ========================================================= */
 
-async function countUsersAcrossAllRoles() {
-  const calls = PLATFORM_ADMIN_CONFIG.allRoles.map((role) => platformAdminApi.countUsersByRole(role));
-  const results = await Promise.allSettled(calls);
-
-  let total = 0;
-  results.forEach((result) => {
-    if (result.status !== "fulfilled") return;
-    const count = Number(firstValue(result.value, ["total"], "0"));
-    if (!Number.isNaN(count)) total += count;
-  });
-
-  return total;
-}
-
 async function loadDashboardKpis() {
   if (!PLATFORM_ADMIN_CONFIG.useApi) return;
 
-  const [companiesResult, usersResult, pendingJobsResult] = await Promise.allSettled([
+  const [companiesCountResult, pendingJobsResult, companiesListResult, usersRowsResult] = await Promise.allSettled([
     platformAdminApi.countActiveCompanies(),
-    countUsersAcrossAllRoles(),
-    platformAdminApi.getPendingJobs()
+    platformAdminApi.getPendingJobs(),
+    platformAdminApi.listActiveCompanies(),
+    loadUsersAllRoles()
   ]);
 
-  if (companiesResult.status === "fulfilled") {
-    setKpiText(ui.kpiActiveCompanies, firstValue(companiesResult.value, ["total"], "--"));
+  const companies = companiesListResult.status === "fulfilled"
+    ? normalizeArrayResponse(companiesListResult.value)
+    : [];
+
+  const users = usersRowsResult.status === "fulfilled"
+    ? usersRowsResult.value
+    : [];
+
+  if (companiesCountResult.status === "fulfilled") {
+    setKpiText(ui.kpiActiveCompanies, firstValue(companiesCountResult.value, ["total"], "--"));
+  } else if (companies.length) {
+    const activeCompanies = companies.filter((row) => isActive(firstValue(row, ["is_active"], 1))).length;
+    setKpiText(ui.kpiActiveCompanies, activeCompanies);
   }
 
-  if (usersResult.status === "fulfilled") {
-    setKpiText(ui.kpiActiveUsers, usersResult.value);
+  if (users.length) {
+    const activeUsers = users.filter((row) => isActive(firstValue(row, ["is_active"], 1))).length;
+    setKpiText(ui.kpiActiveUsers, activeUsers);
+  } else {
+    setKpiText(ui.kpiActiveUsers, "--");
   }
 
   if (pendingJobsResult.status === "fulfilled") {
     setKpiText(ui.kpiPendingJobs, normalizeArrayResponse(pendingJobsResult.value).length);
+  } else {
+    setKpiText(ui.kpiPendingJobs, "--");
   }
+
+  renderDashboardCharts(companies, users);
 }
 
 /* =========================================================
@@ -801,81 +1048,37 @@ function renderCompanyRows(companies) {
   if (!ui.companyList) return;
 
   if (!companies.length) {
-    showTableMessage(ui.companyList, 6, "No companies found");
+    showTableMessage(ui.companyList, 7, "No companies found");
     return;
   }
 
   ui.companyList.innerHTML = "";
 
   companies.forEach((company) => {
-    const tr = document.createElement("tr");
-
-    const idCell = document.createElement("td");
-    idCell.textContent = firstValue(company, ["id"], "N/A");
-    tr.appendChild(idCell);
-
-    const nameCell = document.createElement("td");
-    nameCell.textContent = firstValue(company, ["name"], "N/A");
-    tr.appendChild(nameCell);
-
-    const domainCell = document.createElement("td");
-    domainCell.textContent = firstValue(company, ["domain"], "N/A");
-    tr.appendChild(domainCell);
-
-    const adminCell = document.createElement("td");
-    adminCell.textContent = firstValue(company, ["company_admin_email", "admin_email"], "-");
-    tr.appendChild(adminCell);
-
-    const statusCell = document.createElement("td");
-    statusCell.appendChild(createStatusBadge(firstValue(company, ["is_active", "status"], 1)));
-    tr.appendChild(statusCell);
-
-    const createdCell = document.createElement("td");
-    createdCell.textContent = formatDate(firstValue(company, ["created_at"], ""));
-    tr.appendChild(createdCell);
-
-    ui.companyList.appendChild(tr);
+    ui.companyList.appendChild(createCompanyTableRow(company));
   });
 }
 
 function prependCompanyRow(company) {
   if (!ui.companyList) return;
-
-  const tr = document.createElement("tr");
-
-  const values = [
-    firstValue(company, ["id"], `tmp-${Date.now()}`),
-    firstValue(company, ["name"], "N/A"),
-    firstValue(company, ["domain"], "N/A"),
-    firstValue(company, ["company_admin_email", "admin_email"], "-")
-  ];
-
-  values.forEach((value) => {
-    const td = document.createElement("td");
-    td.textContent = value;
-    tr.appendChild(td);
-  });
-
-  const statusCell = document.createElement("td");
-  statusCell.appendChild(createStatusBadge(firstValue(company, ["is_active", "status"], 1)));
-  tr.appendChild(statusCell);
-
-  const createdCell = document.createElement("td");
-  createdCell.textContent = formatDate(firstValue(company, ["created_at"], new Date().toISOString()));
-  tr.appendChild(createdCell);
-
-  ui.companyList.prepend(tr);
+  ui.companyList.prepend(
+    createCompanyTableRow({
+      ...company,
+      created_at: firstValue(company, ["created_at"], new Date().toISOString())
+    }),
+  );
 }
 
 async function loadCompanies() {
   if (!PLATFORM_ADMIN_CONFIG.useApi) return;
+  const statusFilter = selectedActiveFilter(ui.companyStatusFilter);
 
   try {
-    const payload = await platformAdminApi.listActiveCompanies();
+    const payload = await platformAdminApi.listActiveCompanies(statusFilter);
     renderCompanyRows(normalizeArrayResponse(payload));
   } catch (error) {
     console.error("Companies load error:", error);
-    showTableMessage(ui.companyList, 6, error.message || "Failed to load companies");
+    showTableMessage(ui.companyList, 7, error.message || "Failed to load companies");
   }
 }
 
@@ -916,15 +1119,8 @@ async function handleCreateCompanySubmit(event) {
         role: "CompanyAdmin"
       });
 
-      prependCompanyRow({
-        id: companyId,
-        name,
-        domain,
-        company_admin_email: companyAdminEmail,
-        is_active: 1,
-        created_at: new Date().toISOString()
-      });
-
+      await loadCompanies();
+      await loadUserCompanyFilterOptions();
       await loadDashboardKpis();
       showCompanyStatus("Company and CompanyAdmin created successfully.", "success");
     } else {
@@ -946,9 +1142,133 @@ async function handleCreateCompanySubmit(event) {
   }
 }
 
+async function handleCompanyActionClick(event) {
+  const button = event.target.closest("[data-company-toggle]");
+  if (!button) return;
+
+  const companyId = Number(button.dataset.companyToggle || "");
+  const nextState = String(button.dataset.nextState || "").trim().toLowerCase();
+  if (!companyId || Number.isNaN(companyId) || !["activate", "deactivate"].includes(nextState)) return;
+
+  const row = button.closest("tr");
+  const companyName = String(row?.children?.[1]?.textContent || "").trim() || `Company #${companyId}`;
+  const actionVerb = nextState === "deactivate" ? "deactivate" : "activate";
+  if (!window.confirm(`Do you want to ${actionVerb} ${companyName}?`)) return;
+
+  const initialText = button.textContent || "";
+  button.disabled = true;
+  button.textContent = nextState === "deactivate" ? "Deactivating..." : "Activating...";
+
+  try {
+    if (nextState === "deactivate") {
+      await platformAdminApi.deactivateCompany(companyId);
+    } else {
+      await platformAdminApi.activateCompany(companyId);
+    }
+
+    await loadCompanies();
+    await loadUserCompanyFilterOptions();
+    await loadDashboardKpis();
+    showCompanyStatus(
+      `Company ${nextState === "deactivate" ? "deactivated" : "activated"} successfully.`,
+      "success",
+    );
+  } catch (error) {
+    console.error("Company status update error:", error);
+    showCompanyStatus(error.message || "Failed to update company status.", "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = initialText;
+  }
+}
+
 /* =========================================================
    USERS SECTION
    ========================================================= */
+
+function getUserIdFromRecord(user) {
+  const id = Number(firstValue(user, ["id"], ""));
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return Math.trunc(id);
+}
+
+function createUserActionButton(user) {
+  const isUserActive = isActive(firstValue(user, ["is_active", "status"], 1));
+  const userId = getUserIdFromRecord(user);
+  const currentUserId = Number(firstValue(adminState.currentProfile, ["id"], ""));
+  const isSelf = Boolean(userId && Number.isFinite(currentUserId) && userId === currentUserId);
+  const button = document.createElement("button");
+
+  button.type = "button";
+  button.className = `btn btn-sm ${isUserActive ? "btn-outline-danger" : "btn-outline-success"}`;
+  button.dataset.userToggle = userId ? String(userId) : "";
+  button.dataset.nextState = isUserActive ? "deactivate" : "activate";
+  button.textContent = isUserActive ? "Deactivate" : "Activate";
+
+  if (!userId || isSelf) {
+    button.disabled = true;
+    if (isSelf) button.textContent = "Current User";
+  }
+
+  return button;
+}
+
+function selectedCompanyFilterId() {
+  const raw = String(ui.userCompanyFilter?.value || "all").trim().toLowerCase();
+  if (!raw || raw === "all") return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.trunc(parsed);
+}
+
+function selectedActiveFilter(selectElement) {
+  const normalized = String(selectElement?.value || "all").trim().toLowerCase();
+  if (!normalized || normalized === "all") return null;
+  if (["1", "true", "active", "enabled"].includes(normalized)) return "1";
+  if (["0", "false", "inactive", "disabled"].includes(normalized)) return "0";
+  return null;
+}
+
+function companyDisplayName(user) {
+  const companyName = firstValue(user, ["company_name"], "").trim();
+  if (companyName) return companyName;
+  const companyId = firstValue(user, ["company_id"], "").trim();
+  if (companyId) return `Company #${companyId}`;
+  return "-";
+}
+
+async function loadUserCompanyFilterOptions() {
+  if (!PLATFORM_ADMIN_CONFIG.useApi || !ui.userCompanyFilter) return;
+  const currentValue = String(ui.userCompanyFilter.value || "all");
+
+  try {
+    const payload = await platformAdminApi.listActiveCompanies();
+    const rows = normalizeArrayResponse(payload);
+
+    ui.userCompanyFilter.innerHTML = "";
+
+    const allOption = document.createElement("option");
+    allOption.value = "all";
+    allOption.textContent = "All Companies";
+    ui.userCompanyFilter.appendChild(allOption);
+
+    rows.forEach((company) => {
+      const companyId = Number(firstValue(company, ["id"], ""));
+      if (!Number.isFinite(companyId) || companyId <= 0) return;
+
+      const option = document.createElement("option");
+      option.value = String(Math.trunc(companyId));
+      const label = firstValue(company, ["name"], `Company #${companyId}`);
+      option.textContent = isActive(firstValue(company, ["is_active"], 1)) ? label : `${label} (Inactive)`;
+      ui.userCompanyFilter.appendChild(option);
+    });
+
+    const hasCurrentValue = Array.from(ui.userCompanyFilter.options).some((opt) => opt.value === currentValue);
+    ui.userCompanyFilter.value = hasCurrentValue ? currentValue : "all";
+  } catch (error) {
+    console.error("Company filter load error:", error);
+  }
+}
 
 function renderUsersCurrentPage() {
   if (!ui.userList) return;
@@ -961,7 +1281,7 @@ function renderUsersCurrentPage() {
   adminState.usersPage = page;
 
   if (!pagedRows.length) {
-    showTableMessage(ui.userList, 6, "No users found");
+    showTableMessage(ui.userList, 8, "No users found");
     updatePager(ui.usersPageMeta, ui.usersPrevBtn, ui.usersNextBtn, page, totalPages);
     return;
   }
@@ -988,6 +1308,10 @@ function renderUsersCurrentPage() {
     roleCell.textContent = firstValue(user, ["role"], "N/A");
     tr.appendChild(roleCell);
 
+    const companyCell = document.createElement("td");
+    companyCell.textContent = companyDisplayName(user);
+    tr.appendChild(companyCell);
+
     const statusCell = document.createElement("td");
     statusCell.appendChild(createStatusBadge(firstValue(user, ["is_active", "status"], 1)));
     tr.appendChild(statusCell);
@@ -996,14 +1320,20 @@ function renderUsersCurrentPage() {
     createdCell.textContent = formatDate(firstValue(user, ["created_at"], ""));
     tr.appendChild(createdCell);
 
+    const actionCell = document.createElement("td");
+    actionCell.appendChild(createUserActionButton(user));
+    tr.appendChild(actionCell);
+
     ui.userList.appendChild(tr);
   });
 
   updatePager(ui.usersPageMeta, ui.usersPrevBtn, ui.usersNextBtn, page, totalPages);
 }
 
-async function loadUsersAllRoles() {
-  const calls = PLATFORM_ADMIN_CONFIG.allRoles.map((role) => platformAdminApi.listUsersByRole(role));
+async function loadUsersAllRoles(companyId = null, statusFilter = null) {
+  const calls = PLATFORM_ADMIN_CONFIG.allRoles.map(
+    (role) => platformAdminApi.listUsersByRole(role, companyId, statusFilter),
+  );
   const results = await Promise.allSettled(calls);
   const combined = [];
 
@@ -1019,14 +1349,16 @@ async function loadUsersByRole() {
   if (!PLATFORM_ADMIN_CONFIG.useApi) return;
 
   const selectedRole = String(ui.userRoleFilter?.value || "all").trim();
+  const companyId = selectedCompanyFilterId();
+  const statusFilter = selectedActiveFilter(ui.userStatusFilter);
 
   try {
     let rows = [];
 
     if (selectedRole === "all") {
-      rows = await loadUsersAllRoles();
+      rows = await loadUsersAllRoles(companyId, statusFilter);
     } else {
-      const payload = await platformAdminApi.listUsersByRole(selectedRole);
+      const payload = await platformAdminApi.listUsersByRole(selectedRole, companyId, statusFilter);
       rows = normalizeArrayResponse(payload);
     }
 
@@ -1037,8 +1369,47 @@ async function loadUsersByRole() {
     console.error("Users load error:", error);
     adminState.usersRows = [];
     adminState.usersPage = 1;
-    showTableMessage(ui.userList, 6, error.message || "Failed to load users");
+    showTableMessage(ui.userList, 8, error.message || "Failed to load users");
     updatePager(ui.usersPageMeta, ui.usersPrevBtn, ui.usersNextBtn, 1, 1);
+  }
+}
+
+async function handleUserActionClick(event) {
+  const button = event.target.closest("[data-user-toggle]");
+  if (!button) return;
+
+  const userId = Number(button.dataset.userToggle || "");
+  const nextState = String(button.dataset.nextState || "").trim().toLowerCase();
+  if (!userId || Number.isNaN(userId) || !["activate", "deactivate"].includes(nextState)) return;
+
+  const row = button.closest("tr");
+  const userName = String(row?.children?.[1]?.textContent || "").trim() || `User #${userId}`;
+  const actionVerb = nextState === "deactivate" ? "deactivate" : "activate";
+  if (!window.confirm(`Do you want to ${actionVerb} ${userName}?`)) return;
+
+  const initialText = button.textContent || "";
+  button.disabled = true;
+  button.textContent = nextState === "deactivate" ? "Deactivating..." : "Activating...";
+
+  try {
+    if (nextState === "deactivate") {
+      await platformAdminApi.deactivateUser(userId);
+    } else {
+      await platformAdminApi.activateUser(userId);
+    }
+
+    await loadUsersByRole();
+    await loadDashboardKpis();
+    showUserStatus(
+      `User ${nextState === "deactivate" ? "deactivated" : "activated"} successfully.`,
+      "success",
+    );
+  } catch (error) {
+    console.error("User status update error:", error);
+    showUserStatus(error.message || "Failed to update user status.", "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = initialText;
   }
 }
 
@@ -1240,6 +1611,9 @@ async function openCompanies() {
 
 async function openUsers() {
   showSection("users");
+  if (PLATFORM_ADMIN_CONFIG.useApi) {
+    await loadUserCompanyFilterOptions();
+  }
   if (PLATFORM_ADMIN_CONFIG.useApi && !adminState.usersLoaded) {
     adminState.usersLoaded = true;
     await loadUsersByRole();
@@ -1433,6 +1807,21 @@ function bindActionButtons() {
     ui.companyForm.addEventListener("submit", handleCreateCompanySubmit);
   }
 
+  if (ui.companyList) {
+    ui.companyList.addEventListener("click", async (event) => {
+      await handleCompanyActionClick(event);
+    });
+  }
+
+  if (ui.companyLoadBtn) {
+    ui.companyLoadBtn.addEventListener("click", async () => {
+      adminState.companiesLoaded = true;
+      await loadCompanies();
+      await loadUserCompanyFilterOptions();
+      await loadDashboardKpis();
+    });
+  }
+
   if (ui.profileEditForm) {
     ui.profileEditForm.addEventListener("submit", submitProfileUpdate);
   }
@@ -1441,6 +1830,12 @@ function bindActionButtons() {
     ui.userLoadBtn.addEventListener("click", async () => {
       await loadUsersByRole();
       await loadDashboardKpis();
+    });
+  }
+
+  if (ui.userList) {
+    ui.userList.addEventListener("click", async (event) => {
+      await handleUserActionClick(event);
     });
   }
 

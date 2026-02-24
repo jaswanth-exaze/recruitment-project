@@ -1,4 +1,33 @@
 const jwt = require("jsonwebtoken");
+const db = require("../config/db");
+
+async function resolveAuthorizedUser(userId) {
+  const [rows] = await db.promise().query(
+    `
+      SELECT
+        u.id,
+        u.role,
+        u.company_id,
+        u.is_active,
+        c.is_active AS company_is_active
+      FROM users u
+      LEFT JOIN companies c ON c.id = u.company_id
+      WHERE u.id = ?
+      LIMIT 1
+    `,
+    [userId],
+  );
+
+  const user = rows[0] || null;
+  if (!user || !user.is_active) return null;
+  if (user.company_id && Number(user.company_is_active) !== 1) return null;
+
+  return {
+    user_id: user.id,
+    role: user.role,
+    company_id: user.company_id,
+  };
+}
 
 exports.verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -14,7 +43,7 @@ exports.verifyToken = (req, res, next) => {
     return res.status(401).json({ message: "Bearer token missing" });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
     if (err) {
       if (err.name === "TokenExpiredError") {
         return res.status(401).json({
@@ -27,7 +56,20 @@ exports.verifyToken = (req, res, next) => {
       });
     }
 
-    req.user = decoded;
-    next();
+    try {
+      const authorizedUser = await resolveAuthorizedUser(decoded.user_id);
+      if (!authorizedUser) {
+        return res.status(401).json({
+          message: "Account is inactive. Please contact admin.",
+        });
+      }
+
+      req.user = authorizedUser;
+      return next();
+    } catch (dbErr) {
+      return res.status(500).json({
+        message: "Unable to validate session. Please try again.",
+      });
+    }
   });
 };

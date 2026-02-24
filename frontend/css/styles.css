@@ -864,6 +864,125 @@ textarea.form-control {
   background: linear-gradient(165deg, #ffffff 0%, #f3f8ff 100%);
 }
 
+.profile-view .profile-hero-panel {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(30rem 18rem at 90% -10%, rgba(61, 169, 252, 0.16) 0%, rgba(61, 169, 252, 0) 65%),
+    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.profile-view .profile-hero-panel::after {
+  content: "";
+  position: absolute;
+  inset: auto -3rem -3rem auto;
+  width: 12rem;
+  height: 12rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(65, 103, 223, 0.16) 0%, rgba(65, 103, 223, 0) 70%);
+  pointer-events: none;
+}
+
+.profile-view .profile-identity {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.95rem;
+}
+
+.profile-view .profile-avatar {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1rem;
+  display: grid;
+  place-items: center;
+  font-family: "Poppins", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--brand-700), var(--sky-500));
+  box-shadow:
+    0 10px 22px rgba(65, 103, 223, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.profile-view .profile-reload-btn {
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+}
+
+.profile-view .profile-highlight-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.72rem;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.profile-view .profile-highlight-item {
+  border: 1px solid #dbe6ff;
+  border-radius: 0.82rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8ff 100%);
+  padding: 0.72rem 0.82rem;
+}
+
+.profile-view .profile-highlight-item span {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #5f719b;
+  margin-bottom: 0.2rem;
+}
+
+.profile-view .profile-highlight-item strong {
+  display: block;
+  font-size: 0.94rem;
+  color: #1c2f5d;
+  font-weight: 700;
+}
+
+.profile-view .profile-facts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.profile-view .profile-fact-chip {
+  border: 1px solid #dfe8ff;
+  border-radius: 0.78rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  padding: 0.65rem 0.75rem;
+}
+
+.profile-view .profile-fact-chip-wide {
+  grid-column: 1 / -1;
+}
+
+.profile-view .profile-fact-chip span {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6a7dab;
+  margin-bottom: 0.22rem;
+}
+
+.profile-view .profile-fact-chip strong {
+  display: block;
+  color: var(--ink-900);
+  font-size: 0.92rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.profile-view .profile-fact-chip strong a {
+  color: var(--brand-700);
+  text-decoration: underline;
+}
+
 .candidate-job-modal-body {
   background: linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
 }
@@ -1153,6 +1272,10 @@ textarea.form-control {
   .search-box {
     min-width: min(100%, 280px);
   }
+
+  .profile-view .profile-reload-btn {
+    width: 100%;
+  }
 }
 
 @media (max-width: 767.98px) {
@@ -1175,6 +1298,14 @@ textarea.form-control {
 
   .profile-view .profile-facts th {
     width: 40%;
+  }
+
+  .profile-view .profile-identity {
+    align-items: flex-start;
+  }
+
+  .profile-view .profile-facts-grid {
+    grid-template-columns: 1fr;
   }
 
   .dash-topbar {

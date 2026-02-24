@@ -204,18 +204,19 @@ const ui = {
   auditMsg: document.querySelector("[data-company-audit-msg]"),
 
   profileName: document.querySelector("[data-company-profile-name]"),
+  profileAvatar: document.querySelector("[data-company-profile-avatar]"),
   profileEmail: document.querySelector("[data-company-profile-email]"),
   profileRole: document.querySelector("[data-company-profile-role]"),
   profileCompany: document.querySelector("[data-company-profile-company]"),
   profileLastLogin: document.querySelector("[data-company-profile-last-login]"),
+  profileCompletion: document.querySelector("[data-company-profile-completion]"),
   profileForm: document.querySelector("[data-company-profile-form]"),
   profileFirstName: document.querySelector("[data-company-edit-first-name]"),
   profileLastName: document.querySelector("[data-company-edit-last-name]"),
   profileEditEmail: document.querySelector("[data-company-edit-email]"),
   profileSaveBtn: document.querySelector("[data-company-profile-save]"),
   profileStatus: document.querySelector("[data-company-profile-status]"),
-  reloadProfileBtn: document.querySelector("[data-company-reload-profile]"),
-  profileLogoutBtn: document.querySelector("[data-company-logout]")
+  reloadProfileBtn: document.querySelector("[data-company-reload-profile]")
 };
 
 // 2) Shared helpers.
@@ -465,6 +466,32 @@ function fullName(record) {
   const last = firstValue(record, ["last_name"], "");
   const name = `${first} ${last}`.trim();
   return name || firstValue(record, ["name"], "N/A");
+}
+
+function profileInitials(record, fallback = "CA") {
+  const first = firstValue(record, ["first_name"], "").trim();
+  const last = firstValue(record, ["last_name"], "").trim();
+  const joined = `${first} ${last}`.trim();
+  if (joined) {
+    const parts = joined.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.charAt(0) || "";
+    const b = parts[1]?.charAt(0) || "";
+    return (a + b || a).toUpperCase() || fallback;
+  }
+  const email = firstValue(record, ["email"], "").trim();
+  if (email) return email.charAt(0).toUpperCase();
+  return fallback;
+}
+
+function accountProfileCompletion(record) {
+  if (!record || typeof record !== "object") return "--";
+  const required = [
+    firstValue(record, ["first_name"], ""),
+    firstValue(record, ["last_name"], ""),
+    firstValue(record, ["email"], ""),
+  ];
+  const completed = required.filter((value) => String(value || "").trim() !== "").length;
+  return `${Math.round((completed / required.length) * 100)}%`;
 }
 
 function setText(element, value) {
@@ -947,11 +974,13 @@ function createStatusBadge(value) {
 function renderProfilePanel() {
   const profile = companyState.currentProfile;
   if (!profile) {
+    setText(ui.profileAvatar, "CA");
     setText(ui.profileName, "N/A");
     setText(ui.profileEmail, "N/A");
     setText(ui.profileRole, "N/A");
     setText(ui.profileCompany, "N/A");
     setText(ui.profileLastLogin, "N/A");
+    setText(ui.profileCompletion, "--");
     if (ui.profileFirstName) ui.profileFirstName.value = "";
     if (ui.profileLastName) ui.profileLastName.value = "";
     if (ui.profileEditEmail) ui.profileEditEmail.value = "";
@@ -959,11 +988,13 @@ function renderProfilePanel() {
     return;
   }
 
+  setText(ui.profileAvatar, profileInitials(profile, "CA"));
   setText(ui.profileName, fullName(profile));
   setText(ui.profileEmail, firstValue(profile, ["email"], "N/A"));
   setText(ui.profileRole, firstValue(profile, ["role"], "N/A"));
   setText(ui.profileCompany, firstValue(profile, ["company_id"], "N/A"));
   setText(ui.profileLastLogin, formatDateTime(firstValue(profile, ["last_login_at"], "")));
+  setText(ui.profileCompletion, accountProfileCompletion(profile));
 
   if (ui.profileFirstName) ui.profileFirstName.value = firstValue(profile, ["first_name"], "");
   if (ui.profileLastName) ui.profileLastName.value = firstValue(profile, ["last_name"], "");
@@ -2689,13 +2720,6 @@ function bindActionButtons() {
   if (ui.reloadProfileBtn) {
     ui.reloadProfileBtn.addEventListener("click", async () => {
       await reloadCompanyProfile();
-    });
-  }
-
-  if (ui.profileLogoutBtn) {
-    ui.profileLogoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to log out?")) return;
-      await performLogout();
     });
   }
 }

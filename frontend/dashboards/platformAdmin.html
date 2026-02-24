@@ -720,77 +720,84 @@
           </section>
 
           <section data-admin-view="profile" class="d-none profile-view">
+            <section class="table-card p-3 p-md-4 mb-3 profile-panel profile-hero-panel">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="profile-identity">
+                  <div class="profile-avatar" data-admin-profile-avatar>PA</div>
+                  <div>
+                    <p class="profile-kicker mb-1">Platform Admin Profile</p>
+                    <h2 class="h4 mb-1" data-admin-profile-name>N/A</h2>
+                    <p class="profile-subtext mb-0" data-admin-profile-email>N/A</p>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-outline-brand profile-reload-btn" data-admin-reload-profile>
+                  <i class="bi bi-arrow-clockwise"></i>
+                  Reload Profile
+                </button>
+              </div>
+
+              <div class="profile-highlight-grid mt-3">
+                <article class="profile-highlight-item">
+                  <span>Role</span>
+                  <strong data-admin-profile-role>N/A</strong>
+                </article>
+                <article class="profile-highlight-item">
+                  <span>Company ID</span>
+                  <strong data-admin-profile-company>N/A</strong>
+                </article>
+                <article class="profile-highlight-item">
+                  <span>Last Login</span>
+                  <strong data-admin-profile-last-login>N/A</strong>
+                </article>
+                <article class="profile-highlight-item">
+                  <span>Account Completion</span>
+                  <strong data-admin-profile-completion>--</strong>
+                </article>
+              </div>
+              <p class="profile-status-note mt-3 mb-0" data-admin-profile-status></p>
+            </section>
+
             <div class="row g-3">
-              <div class="col-xl-8">
+              <div class="col-12">
                 <section class="table-card p-3 p-md-4 h-100 profile-panel">
                   <div class="profile-head mb-3">
-                    <p class="profile-kicker mb-1">Account</p>
-                    <h2 class="h5 mb-1">My Profile</h2>
+                    <p class="profile-kicker mb-1">Account Details</p>
+                    <h3 class="h5 mb-1">Edit Platform Admin Profile</h3>
                     <p class="profile-subtext mb-0">
-                      Review your account details and keep contact information current.
+                      Keep your platform governance contact details current.
                     </p>
                   </div>
-                  <div class="table-responsive profile-facts mb-3">
-                    <table class="table align-middle mb-0">
-                      <tbody>
-                        <tr>
-                          <th>Name</th>
-                          <td data-admin-profile-name>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Email</th>
-                          <td data-admin-profile-email>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Role</th>
-                          <td data-admin-profile-role>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Company ID</th>
-                          <td data-admin-profile-company>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Last Login</th>
-                          <td data-admin-profile-last-login>N/A</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
                   <div class="profile-form-block">
-                    <h3 class="h6 mb-3">Edit Profile</h3>
                     <form class="row g-3" data-admin-profile-form>
-                      <div class="col-md-6">
-                        <label class="form-label" for="adminProfileFirstName"
-                          >First Name</label
-                        >
+                      <div class="col-md-4">
+                        <label class="form-label" for="adminProfileFirstName">First Name</label>
                         <input
                           id="adminProfileFirstName"
                           type="text"
                           class="form-control"
+                          placeholder="First name"
                           data-admin-edit-first-name
                           required
                         />
                       </div>
-                      <div class="col-md-6">
-                        <label class="form-label" for="adminProfileLastName"
-                          >Last Name</label
-                        >
+                      <div class="col-md-4">
+                        <label class="form-label" for="adminProfileLastName">Last Name</label>
                         <input
                           id="adminProfileLastName"
                           type="text"
                           class="form-control"
+                          placeholder="Last name"
                           data-admin-edit-last-name
                           required
                         />
                       </div>
-                      <div class="col-12">
-                        <label class="form-label" for="adminProfileEmail"
-                          >Email</label
-                        >
+                      <div class="col-md-4">
+                        <label class="form-label" for="adminProfileEmail">Email</label>
                         <input
                           id="adminProfileEmail"
                           type="email"
                           class="form-control"
+                          placeholder="you@example.com"
                           data-admin-edit-email
                           required
                         />
@@ -798,7 +805,7 @@
                       <div class="col-12">
                         <button
                           type="submit"
-                          class="btn btn-brand"
+                          class="btn btn-brand w-100"
                           data-admin-profile-save
                         >
                           Save Profile
@@ -806,44 +813,6 @@
                       </div>
                     </form>
                   </div>
-                </section>
-              </div>
-              <div class="col-xl-4">
-                <section class="table-card p-3 p-md-4 h-100 profile-panel profile-actions-panel">
-                  <div class="profile-head mb-3">
-                    <p class="profile-kicker mb-1">Security</p>
-                    <h2 class="h5 mb-1">Session Actions</h2>
-                    <p class="profile-subtext mb-0">
-                      Refresh tokens, sync profile data, or log out securely.
-                    </p>
-                  </div>
-                  <div class="d-grid gap-2 profile-actions">
-                    <button
-                      type="button"
-                      class="btn btn-outline-brand"
-                      data-admin-refresh-session
-                    >
-                      Refresh Session
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-outline-brand"
-                      data-admin-reload-profile
-                    >
-                      Reload Profile
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-danger"
-                      data-admin-logout
-                    >
-                      Logout
-                    </button>
-                  </div>
-                  <p
-                    class="profile-status-note mt-3 mb-0"
-                    data-admin-profile-status
-                  ></p>
                 </section>
               </div>
             </div>

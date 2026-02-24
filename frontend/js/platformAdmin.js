@@ -155,18 +155,19 @@ const ui = {
   contactPageMeta: document.querySelector("[data-contact-page-meta]"),
 
   profileName: document.querySelector("[data-admin-profile-name]"),
+  profileAvatar: document.querySelector("[data-admin-profile-avatar]"),
   profileEmail: document.querySelector("[data-admin-profile-email]"),
   profileRole: document.querySelector("[data-admin-profile-role]"),
   profileCompany: document.querySelector("[data-admin-profile-company]"),
   profileLastLogin: document.querySelector("[data-admin-profile-last-login]"),
+  profileCompletion: document.querySelector("[data-admin-profile-completion]"),
   profileEditForm: document.querySelector("[data-admin-profile-form]"),
   profileEditFirstName: document.querySelector("[data-admin-edit-first-name]"),
   profileEditLastName: document.querySelector("[data-admin-edit-last-name]"),
   profileEditEmail: document.querySelector("[data-admin-edit-email]"),
   profileSaveBtn: document.querySelector("[data-admin-profile-save]"),
   profileStatus: document.querySelector("[data-admin-profile-status]"),
-  profileReloadBtn: document.querySelector("[data-admin-reload-profile]"),
-  profileLogoutBtn: document.querySelector("[data-admin-logout]")
+  profileReloadBtn: document.querySelector("[data-admin-reload-profile]")
 };
 
 /* =========================================================
@@ -548,6 +549,32 @@ function fullName(record) {
   return name || firstValue(record, ["name"], "N/A");
 }
 
+function profileInitials(record, fallback = "PA") {
+  const first = firstValue(record, ["first_name"], "").trim();
+  const last = firstValue(record, ["last_name"], "").trim();
+  const joined = `${first} ${last}`.trim();
+  if (joined) {
+    const parts = joined.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.charAt(0) || "";
+    const b = parts[1]?.charAt(0) || "";
+    return (a + b || a).toUpperCase() || fallback;
+  }
+  const email = firstValue(record, ["email"], "").trim();
+  if (email) return email.charAt(0).toUpperCase();
+  return fallback;
+}
+
+function accountProfileCompletion(record) {
+  if (!record || typeof record !== "object") return "--";
+  const required = [
+    firstValue(record, ["first_name"], ""),
+    firstValue(record, ["last_name"], ""),
+    firstValue(record, ["email"], ""),
+  ];
+  const completed = required.filter((value) => String(value || "").trim() !== "").length;
+  return `${Math.round((completed / required.length) * 100)}%`;
+}
+
 function setProfileStatus(text, type) {
   if (!ui.profileStatus) return;
   ui.profileStatus.textContent = text || "";
@@ -567,22 +594,26 @@ function setProfileStatus(text, type) {
 function renderProfilePanel() {
   const profile = adminState.currentProfile;
   if (!profile) {
+    if (ui.profileAvatar) ui.profileAvatar.textContent = "PA";
     if (ui.profileName) ui.profileName.textContent = "N/A";
     if (ui.profileEmail) ui.profileEmail.textContent = "N/A";
     if (ui.profileRole) ui.profileRole.textContent = "N/A";
     if (ui.profileCompany) ui.profileCompany.textContent = "N/A";
     if (ui.profileLastLogin) ui.profileLastLogin.textContent = "N/A";
+    if (ui.profileCompletion) ui.profileCompletion.textContent = "--";
     if (ui.profileEditFirstName) ui.profileEditFirstName.value = "";
     if (ui.profileEditLastName) ui.profileEditLastName.value = "";
     if (ui.profileEditEmail) ui.profileEditEmail.value = "";
     return;
   }
 
+  if (ui.profileAvatar) ui.profileAvatar.textContent = profileInitials(profile, "PA");
   if (ui.profileName) ui.profileName.textContent = fullName(profile);
   if (ui.profileEmail) ui.profileEmail.textContent = firstValue(profile, ["email"], "N/A");
   if (ui.profileRole) ui.profileRole.textContent = firstValue(profile, ["role"], "N/A");
   if (ui.profileCompany) ui.profileCompany.textContent = firstValue(profile, ["company_id"], "N/A");
   if (ui.profileLastLogin) ui.profileLastLogin.textContent = formatDateTime(firstValue(profile, ["last_login_at"], ""));
+  if (ui.profileCompletion) ui.profileCompletion.textContent = accountProfileCompletion(profile);
   if (ui.profileEditFirstName) ui.profileEditFirstName.value = firstValue(profile, ["first_name"], "");
   if (ui.profileEditLastName) ui.profileEditLastName.value = firstValue(profile, ["last_name"], "");
   if (ui.profileEditEmail) ui.profileEditEmail.value = firstValue(profile, ["email"], "");
@@ -1900,13 +1931,6 @@ function bindActionButtons() {
   if (ui.profileReloadBtn) {
     ui.profileReloadBtn.addEventListener("click", async () => {
       await reloadAdminProfile();
-    });
-  }
-
-  if (ui.profileLogoutBtn) {
-    ui.profileLogoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to log out?")) return;
-      await performLogout();
     });
   }
 

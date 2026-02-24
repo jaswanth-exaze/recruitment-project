@@ -299,53 +299,67 @@
           </section>
 
           <section data-cand-view="profile" class="d-none profile-view">
+            <section class="table-card p-3 p-md-4 mb-3 profile-panel profile-hero-panel">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="profile-identity">
+                  <div class="profile-avatar" data-cand-profile-avatar>CU</div>
+                  <div>
+                    <p class="profile-kicker mb-1">Candidate Profile</p>
+                    <h2 class="h4 mb-1" data-cand-profile-name>N/A</h2>
+                    <p class="profile-subtext mb-0" data-cand-profile-email>N/A</p>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-outline-brand profile-reload-btn" data-cand-reload-profile>
+                  <i class="bi bi-arrow-clockwise"></i>
+                  Reload Profile
+                </button>
+              </div>
+
+              <div class="profile-highlight-grid mt-3">
+                <article class="profile-highlight-item">
+                  <span>Role</span>
+                  <strong data-cand-profile-role>N/A</strong>
+                </article>
+                <article class="profile-highlight-item">
+                  <span>Last Login</span>
+                  <strong data-cand-profile-last-login>N/A</strong>
+                </article>
+                <article class="profile-highlight-item">
+                  <span>Profile Completion</span>
+                  <strong data-cand-profile-completion>--</strong>
+                </article>
+                <article class="profile-highlight-item">
+                  <span>Verification</span>
+                  <strong data-cand-cp-verified>N/A</strong>
+                </article>
+              </div>
+              <p class="profile-status-note mt-3 mb-0" data-cand-profile-status></p>
+            </section>
+
             <div class="row g-3">
               <div class="col-lg-6">
                 <section class="table-card p-3 p-md-4 h-100 profile-panel">
                   <div class="profile-head mb-3">
-                    <p class="profile-kicker mb-1">Account</p>
-                    <h2 class="h5 mb-1">Account Profile</h2>
-                    <p class="profile-subtext mb-0">Keep your login profile details accurate.</p>
-                  </div>
-                  <div class="table-responsive profile-facts mb-3">
-                    <table class="table align-middle mb-0">
-                      <tbody>
-                        <tr>
-                          <th>Name</th>
-                          <td data-cand-profile-name>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Email</th>
-                          <td data-cand-profile-email>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Role</th>
-                          <td data-cand-profile-role>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Last Login</th>
-                          <td data-cand-profile-last-login>N/A</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                    <p class="profile-kicker mb-1">Account Details</p>
+                    <h3 class="h5 mb-1">Edit Account Information</h3>
+                    <p class="profile-subtext mb-0">Keep your login name and email up to date.</p>
                   </div>
                   <div class="profile-form-block">
-                    <h3 class="h6 mb-3">Edit Account Profile</h3>
                     <form class="row g-3" data-cand-profile-form>
                       <div class="col-md-6">
                         <label class="form-label" for="candFirstName">First Name</label>
-                        <input id="candFirstName" type="text" class="form-control" data-cand-edit-first-name required />
+                        <input id="candFirstName" type="text" class="form-control" placeholder="First name" data-cand-edit-first-name required />
                       </div>
                       <div class="col-md-6">
                         <label class="form-label" for="candLastName">Last Name</label>
-                        <input id="candLastName" type="text" class="form-control" data-cand-edit-last-name required />
+                        <input id="candLastName" type="text" class="form-control" placeholder="Last name" data-cand-edit-last-name required />
                       </div>
                       <div class="col-12">
                         <label class="form-label" for="candEmail">Email</label>
-                        <input id="candEmail" type="email" class="form-control" data-cand-edit-email required />
+                        <input id="candEmail" type="email" class="form-control" placeholder="you@example.com" data-cand-edit-email required />
                       </div>
                       <div class="col-12">
-                        <button type="submit" class="btn btn-brand" data-cand-profile-save>Save Account Profile</button>
+                        <button type="submit" class="btn btn-brand w-100" data-cand-profile-save>Save Account Profile</button>
                       </div>
                     </form>
                   </div>
@@ -355,75 +369,52 @@
               <div class="col-lg-6">
                 <section class="table-card p-3 p-md-4 h-100 profile-panel">
                   <div class="profile-head mb-3">
-                    <p class="profile-kicker mb-1">Candidate</p>
-                    <h2 class="h5 mb-1">Candidate Profile</h2>
-                    <p class="profile-subtext mb-0">Update your public candidate profile and resume details.</p>
+                    <p class="profile-kicker mb-1">Candidate Details</p>
+                    <h3 class="h5 mb-1">Edit Candidate Information</h3>
+                    <p class="profile-subtext mb-0">Manage contact, resume, and structured profile metadata.</p>
                   </div>
-                  <div class="table-responsive profile-facts mb-3">
-                    <table class="table align-middle mb-0">
-                      <tbody>
-                        <tr>
-                          <th>Phone</th>
-                          <td data-cand-cp-phone>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Address</th>
-                          <td data-cand-cp-address>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Resume</th>
-                          <td data-cand-cp-resume>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Verified</th>
-                          <td data-cand-cp-verified>N/A</td>
-                        </tr>
-                      </tbody>
-                    </table>
+
+                  <div class="profile-facts-grid mb-3">
+                    <div class="profile-fact-chip">
+                      <span>Phone</span>
+                      <strong data-cand-cp-phone>N/A</strong>
+                    </div>
+                    <div class="profile-fact-chip">
+                      <span>Address</span>
+                      <strong data-cand-cp-address>N/A</strong>
+                    </div>
+                    <div class="profile-fact-chip profile-fact-chip-wide">
+                      <span>Resume</span>
+                      <strong data-cand-cp-resume>N/A</strong>
+                    </div>
                   </div>
+
                   <div class="profile-form-block">
                     <form class="row g-3" data-cand-cp-form>
                       <div class="col-md-6">
                         <label class="form-label" for="candCpPhone">Phone</label>
-                        <input id="candCpPhone" type="text" class="form-control" data-cand-cp-edit-phone />
+                        <input id="candCpPhone" type="text" class="form-control" placeholder="+91 98765 43210" data-cand-cp-edit-phone />
                       </div>
                       <div class="col-md-6">
                         <label class="form-label" for="candCpAddress">Address</label>
-                        <input id="candCpAddress" type="text" class="form-control" data-cand-cp-edit-address />
+                        <input id="candCpAddress" type="text" class="form-control" placeholder="City, State" data-cand-cp-edit-address />
                       </div>
                       <div class="col-12">
                         <label class="form-label" for="candCpData">Profile Data (JSON)</label>
-                        <textarea id="candCpData" rows="4" class="form-control" data-cand-cp-edit-data></textarea>
+                        <textarea id="candCpData" rows="4" class="form-control" placeholder="{ &quot;skills&quot;: [&quot;Node.js&quot;, &quot;SQL&quot;] }" data-cand-cp-edit-data></textarea>
                       </div>
-                      <div class="col-md-9">
+                      <div class="col-md-8">
                         <label class="form-label" for="candCpResume">Resume URL</label>
-                        <input id="candCpResume" type="url" class="form-control" data-cand-cp-resume-url />
+                        <input id="candCpResume" type="url" class="form-control" placeholder="https://..." data-cand-cp-resume-url />
                       </div>
-                      <div class="col-md-3 d-flex align-items-end">
+                      <div class="col-md-4 d-flex align-items-end">
                         <button type="button" class="btn btn-outline-brand w-100" data-cand-cp-upload-resume>Update Resume</button>
                       </div>
                       <div class="col-12">
-                        <button type="submit" class="btn btn-brand">Save Candidate Profile</button>
+                        <button type="submit" class="btn btn-brand w-100">Save Candidate Profile</button>
                       </div>
                     </form>
                   </div>
-                </section>
-              </div>
-            </div>
-
-            <div class="row g-3 mt-1">
-              <div class="col-12">
-                <section class="table-card p-3 p-md-4 profile-panel profile-actions-panel">
-                  <div class="profile-head mb-3">
-                    <p class="profile-kicker mb-1">Security</p>
-                    <h2 class="h5 mb-1">Session Actions</h2>
-                    <p class="profile-subtext mb-0">Reload profile data or log out securely.</p>
-                  </div>
-                  <div class="d-grid gap-2 profile-actions">
-                    <button type="button" class="btn btn-outline-brand" data-cand-reload-profile>Reload Profile</button>
-                    <button type="button" class="btn btn-danger" data-cand-logout>Logout</button>
-                  </div>
-                  <p class="profile-status-note mt-3 mb-0" data-cand-profile-status></p>
                 </section>
               </div>
             </div>

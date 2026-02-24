@@ -107,9 +107,11 @@ const ui = {
   offerMsg: document.querySelector("[data-cand-offer-msg]"),
 
   profileName: document.querySelector("[data-cand-profile-name]"),
+  profileAvatar: document.querySelector("[data-cand-profile-avatar]"),
   profileEmail: document.querySelector("[data-cand-profile-email]"),
   profileRole: document.querySelector("[data-cand-profile-role]"),
   profileLastLogin: document.querySelector("[data-cand-profile-last-login]"),
+  profileCompletion: document.querySelector("[data-cand-profile-completion]"),
   profileForm: document.querySelector("[data-cand-profile-form]"),
   profileFirstName: document.querySelector("[data-cand-edit-first-name]"),
   profileLastName: document.querySelector("[data-cand-edit-last-name]"),
@@ -129,7 +131,6 @@ const ui = {
   cpUploadResumeBtn: document.querySelector("[data-cand-cp-upload-resume]"),
 
   reloadProfileBtn: document.querySelector("[data-cand-reload-profile]"),
-  logoutBtn: document.querySelector("[data-cand-logout]"),
 
   applyModalEl: document.querySelector("[data-cand-apply-modal]"),
   applyForm: document.querySelector("[data-cand-apply-form]"),
@@ -307,6 +308,21 @@ function fullName(user) {
   const last = getValue(user, ["last_name"], "");
   const name = `${first} ${last}`.trim();
   return name || getValue(user, ["name"], "N/A");
+}
+
+function profileInitials(user) {
+  const first = getValue(user, ["first_name"], "").trim();
+  const last = getValue(user, ["last_name"], "").trim();
+  const joined = `${first} ${last}`.trim();
+  if (joined) {
+    const parts = joined.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.charAt(0) || "";
+    const b = parts[1]?.charAt(0) || "";
+    return (a + b || a).toUpperCase() || "CU";
+  }
+  const email = getValue(user, ["email"], "").trim();
+  if (email) return email.charAt(0).toUpperCase();
+  return "CU";
 }
 
 function getStoredToken() {
@@ -495,6 +511,7 @@ function ensureRole(profile) {
 function renderAccountProfile() {
   const p = candState.currentProfile;
   if (!p) {
+    setText(ui.profileAvatar, "CU");
     setText(ui.profileName, "N/A");
     setText(ui.profileEmail, "N/A");
     setText(ui.profileRole, "N/A");
@@ -504,6 +521,7 @@ function renderAccountProfile() {
     if (ui.profileEditEmail) ui.profileEditEmail.value = "";
     return;
   }
+  setText(ui.profileAvatar, profileInitials(p));
   setText(ui.profileName, fullName(p));
   setText(ui.profileEmail, getValue(p, ["email"], "N/A"));
   setText(ui.profileRole, getValue(p, ["role"], "N/A"));
@@ -520,6 +538,7 @@ function renderCandidateProfile(profile) {
     setText(ui.cpAddress, "N/A");
     setText(ui.cpResume, "N/A");
     setText(ui.cpVerified, "N/A");
+    setText(ui.profileCompletion, "--");
     if (ui.cpEditPhone) ui.cpEditPhone.value = "";
     if (ui.cpEditAddress) ui.cpEditAddress.value = "";
     if (ui.cpEditData) ui.cpEditData.value = "";
@@ -549,6 +568,7 @@ function renderCandidateProfile(profile) {
   if (ui.cpEditAddress) ui.cpEditAddress.value = candidateField(profile, "address", "");
   if (ui.cpEditData) ui.cpEditData.value = safeJsonString(profile.profile_data);
   if (ui.cpResumeUrl) ui.cpResumeUrl.value = resume;
+  setText(ui.profileCompletion, profileCompletion(profile));
 }
 
 function setSelectedJob(job) {
@@ -1588,12 +1608,6 @@ function bindActions() {
   if (ui.cpForm) ui.cpForm.addEventListener("submit", submitCandidateProfileUpdate);
   if (ui.cpUploadResumeBtn) ui.cpUploadResumeBtn.addEventListener("click", submitResumeUpdate);
   if (ui.reloadProfileBtn) ui.reloadProfileBtn.addEventListener("click", reloadProfile);
-  if (ui.logoutBtn) {
-    ui.logoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to log out?")) return;
-      await performLogout();
-    });
-  }
 }
 
 // 6) Init.

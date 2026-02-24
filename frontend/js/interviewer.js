@@ -97,18 +97,19 @@ const ui = {
   scorecardMsg: document.querySelector("[data-int-scorecard-msg]"),
 
   profileName: document.querySelector("[data-int-profile-name]"),
+  profileAvatar: document.querySelector("[data-int-profile-avatar]"),
   profileEmail: document.querySelector("[data-int-profile-email]"),
   profileRole: document.querySelector("[data-int-profile-role]"),
   profileCompany: document.querySelector("[data-int-profile-company]"),
   profileLastLogin: document.querySelector("[data-int-profile-last-login]"),
+  profileCompletion: document.querySelector("[data-int-profile-completion]"),
   profileForm: document.querySelector("[data-int-profile-form]"),
   profileFirstName: document.querySelector("[data-int-edit-first-name]"),
   profileLastName: document.querySelector("[data-int-edit-last-name]"),
   profileEditEmail: document.querySelector("[data-int-edit-email]"),
   profileSaveBtn: document.querySelector("[data-int-profile-save]"),
   profileStatus: document.querySelector("[data-int-profile-status]"),
-  reloadProfileBtn: document.querySelector("[data-int-reload-profile]"),
-  logoutBtn: document.querySelector("[data-int-logout]")
+  reloadProfileBtn: document.querySelector("[data-int-reload-profile]")
 };
 
 /* SHARED HELPERS */
@@ -295,6 +296,32 @@ function fullName(record) {
   const last = firstValue(record, ["last_name"], "");
   const name = `${first} ${last}`.trim();
   return name || firstValue(record, ["name"], "N/A");
+}
+
+function profileInitials(record, fallback = "IN") {
+  const first = firstValue(record, ["first_name"], "").trim();
+  const last = firstValue(record, ["last_name"], "").trim();
+  const joined = `${first} ${last}`.trim();
+  if (joined) {
+    const parts = joined.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.charAt(0) || "";
+    const b = parts[1]?.charAt(0) || "";
+    return (a + b || a).toUpperCase() || fallback;
+  }
+  const email = firstValue(record, ["email"], "").trim();
+  if (email) return email.charAt(0).toUpperCase();
+  return fallback;
+}
+
+function accountProfileCompletion(record) {
+  if (!record || typeof record !== "object") return "--";
+  const required = [
+    firstValue(record, ["first_name"], ""),
+    firstValue(record, ["last_name"], ""),
+    firstValue(record, ["email"], ""),
+  ];
+  const completed = required.filter((value) => String(value || "").trim() !== "").length;
+  return `${Math.round((completed / required.length) * 100)}%`;
 }
 
 /* API + AUTH CORE */
@@ -975,11 +1002,13 @@ function renderProfilePanel() {
   const profile = intState.currentProfile;
 
   if (!profile) {
+    setText(ui.profileAvatar, "IN");
     setText(ui.profileName, "N/A");
     setText(ui.profileEmail, "N/A");
     setText(ui.profileRole, "N/A");
     setText(ui.profileCompany, "N/A");
     setText(ui.profileLastLogin, "N/A");
+    setText(ui.profileCompletion, "--");
     if (ui.profileFirstName) ui.profileFirstName.value = "";
     if (ui.profileLastName) ui.profileLastName.value = "";
     if (ui.profileEditEmail) ui.profileEditEmail.value = "";
@@ -987,11 +1016,13 @@ function renderProfilePanel() {
     return;
   }
 
+  setText(ui.profileAvatar, profileInitials(profile, "IN"));
   setText(ui.profileName, fullName(profile));
   setText(ui.profileEmail, firstValue(profile, ["email"], "N/A"));
   setText(ui.profileRole, firstValue(profile, ["role"], "N/A"));
   setText(ui.profileCompany, firstValue(profile, ["company_id"], "N/A"));
   setText(ui.profileLastLogin, formatDateTime(firstValue(profile, ["last_login_at"], "")));
+  setText(ui.profileCompletion, accountProfileCompletion(profile));
 
   if (ui.profileFirstName) ui.profileFirstName.value = firstValue(profile, ["first_name"], "");
   if (ui.profileLastName) ui.profileLastName.value = firstValue(profile, ["last_name"], "");
@@ -1188,13 +1219,6 @@ function bindActions() {
 
   if (ui.reloadProfileBtn) {
     ui.reloadProfileBtn.addEventListener("click", reloadProfile);
-  }
-
-  if (ui.logoutBtn) {
-    ui.logoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to log out?")) return;
-      await performLogout();
-    });
   }
 }
 

@@ -720,77 +720,72 @@
           </section>
 
           <section data-hr-view="profile" class="d-none profile-view">
+            <section class="table-card p-3 p-md-4 mb-3 profile-panel profile-hero-panel">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="profile-identity">
+                  <div class="profile-avatar" data-hr-profile-avatar>HR</div>
+                  <div>
+                    <p class="profile-kicker mb-1">HR Recruiter Profile</p>
+                    <h2 class="h4 mb-1" data-hr-profile-name>N/A</h2>
+                    <p class="profile-subtext mb-0" data-hr-profile-email>N/A</p>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-outline-brand profile-reload-btn" data-hr-reload-profile>
+                  <i class="bi bi-arrow-clockwise"></i>
+                  Reload Profile
+                </button>
+              </div>
+
+              <div class="profile-highlight-grid mt-3">
+                <article class="profile-highlight-item">
+                  <span>Role</span>
+                  <strong data-hr-profile-role>N/A</strong>
+                </article>
+                <article class="profile-highlight-item">
+                  <span>Company ID</span>
+                  <strong data-hr-profile-company>N/A</strong>
+                </article>
+                <article class="profile-highlight-item">
+                  <span>Last Login</span>
+                  <strong data-hr-profile-last-login>N/A</strong>
+                </article>
+                <article class="profile-highlight-item">
+                  <span>Account Completion</span>
+                  <strong data-hr-profile-completion>--</strong>
+                </article>
+              </div>
+              <p class="profile-status-note mt-3 mb-0" data-hr-profile-status></p>
+            </section>
+
             <div class="row g-3">
-              <div class="col-xl-8">
+              <div class="col-12">
                 <section class="table-card p-3 p-md-4 h-100 profile-panel">
                   <div class="profile-head mb-3">
-                    <p class="profile-kicker mb-1">Account</p>
-                    <h2 class="h5 mb-1">My Profile</h2>
+                    <p class="profile-kicker mb-1">Account Details</p>
+                    <h3 class="h5 mb-1">Edit HR Recruiter Profile</h3>
                     <p class="profile-subtext mb-0">
-                      Keep recruiter account details updated for candidate communication.
+                      Keep your recruiter details current for candidate communication.
                     </p>
                   </div>
-                  <div class="table-responsive profile-facts mb-3">
-                    <table class="table align-middle mb-0">
-                      <tbody>
-                        <tr>
-                          <th>Name</th>
-                          <td data-hr-profile-name>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Email</th>
-                          <td data-hr-profile-email>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Role</th>
-                          <td data-hr-profile-role>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Company ID</th>
-                          <td data-hr-profile-company>N/A</td>
-                        </tr>
-                        <tr>
-                          <th>Last Login</th>
-                          <td data-hr-profile-last-login>N/A</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
                   <div class="profile-form-block">
-                    <h3 class="h6 mb-3">Edit Profile</h3>
                     <form class="row g-3" data-hr-profile-form>
-                      <div class="col-md-6">
+                      <div class="col-md-4">
                         <label class="form-label" for="hrProfileFirstName">First Name</label>
-                        <input id="hrProfileFirstName" type="text" class="form-control" data-hr-edit-first-name required />
+                        <input id="hrProfileFirstName" type="text" class="form-control" placeholder="First name" data-hr-edit-first-name required />
                       </div>
-                      <div class="col-md-6">
+                      <div class="col-md-4">
                         <label class="form-label" for="hrProfileLastName">Last Name</label>
-                        <input id="hrProfileLastName" type="text" class="form-control" data-hr-edit-last-name required />
+                        <input id="hrProfileLastName" type="text" class="form-control" placeholder="Last name" data-hr-edit-last-name required />
                       </div>
-                      <div class="col-12">
+                      <div class="col-md-4">
                         <label class="form-label" for="hrProfileEmail">Email</label>
-                        <input id="hrProfileEmail" type="email" class="form-control" data-hr-edit-email required />
+                        <input id="hrProfileEmail" type="email" class="form-control" placeholder="you@example.com" data-hr-edit-email required />
                       </div>
                       <div class="col-12">
-                        <button type="submit" class="btn btn-brand" data-hr-profile-save>Save Profile</button>
+                        <button type="submit" class="btn btn-brand w-100" data-hr-profile-save>Save Profile</button>
                       </div>
                     </form>
                   </div>
-                </section>
-              </div>
-
-              <div class="col-xl-4">
-                <section class="table-card p-3 p-md-4 h-100 profile-panel profile-actions-panel">
-                  <div class="profile-head mb-3">
-                    <p class="profile-kicker mb-1">Security</p>
-                    <h2 class="h5 mb-1">Session Actions</h2>
-                    <p class="profile-subtext mb-0">Sync recruiter profile data or log out securely.</p>
-                  </div>
-                  <div class="d-grid gap-2 profile-actions">
-                    <button type="button" class="btn btn-outline-brand" data-hr-reload-profile>Reload Profile</button>
-                    <button type="button" class="btn btn-danger" data-hr-logout>Logout</button>
-                  </div>
-                  <p class="profile-status-note mt-3 mb-0" data-hr-profile-status></p>
                 </section>
               </div>
             </div>

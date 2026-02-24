@@ -214,18 +214,19 @@ const ui = {
   offerSendMsg: document.querySelector("[data-hr-offer-send-msg]"),
 
   profileName: document.querySelector("[data-hr-profile-name]"),
+  profileAvatar: document.querySelector("[data-hr-profile-avatar]"),
   profileEmail: document.querySelector("[data-hr-profile-email]"),
   profileRole: document.querySelector("[data-hr-profile-role]"),
   profileCompany: document.querySelector("[data-hr-profile-company]"),
   profileLastLogin: document.querySelector("[data-hr-profile-last-login]"),
+  profileCompletion: document.querySelector("[data-hr-profile-completion]"),
   profileForm: document.querySelector("[data-hr-profile-form]"),
   profileFirstName: document.querySelector("[data-hr-edit-first-name]"),
   profileLastName: document.querySelector("[data-hr-edit-last-name]"),
   profileEditEmail: document.querySelector("[data-hr-edit-email]"),
   profileSaveBtn: document.querySelector("[data-hr-profile-save]"),
   profileStatus: document.querySelector("[data-hr-profile-status]"),
-  reloadProfileBtn: document.querySelector("[data-hr-reload-profile]"),
-  profileLogoutBtn: document.querySelector("[data-hr-logout]")
+  reloadProfileBtn: document.querySelector("[data-hr-reload-profile]")
 };
 
 // 2) Shared helpers.
@@ -302,6 +303,32 @@ function fullName(record) {
   const last = firstValue(record, ["last_name"], "");
   const name = `${first} ${last}`.trim();
   return name || firstValue(record, ["name"], "N/A");
+}
+
+function profileInitials(record, fallback = "HR") {
+  const first = firstValue(record, ["first_name"], "").trim();
+  const last = firstValue(record, ["last_name"], "").trim();
+  const joined = `${first} ${last}`.trim();
+  if (joined) {
+    const parts = joined.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.charAt(0) || "";
+    const b = parts[1]?.charAt(0) || "";
+    return (a + b || a).toUpperCase() || fallback;
+  }
+  const email = firstValue(record, ["email"], "").trim();
+  if (email) return email.charAt(0).toUpperCase();
+  return fallback;
+}
+
+function accountProfileCompletion(record) {
+  if (!record || typeof record !== "object") return "--";
+  const required = [
+    firstValue(record, ["first_name"], ""),
+    firstValue(record, ["last_name"], ""),
+    firstValue(record, ["email"], ""),
+  ];
+  const completed = required.filter((value) => String(value || "").trim() !== "").length;
+  return `${Math.round((completed / required.length) * 100)}%`;
 }
 
 function isValidEmail(email) {
@@ -752,11 +779,13 @@ function ensureRole(profile) {
 function renderProfilePanel() {
   const profile = hrState.currentProfile;
   if (!profile) {
+    setText(ui.profileAvatar, "HR");
     setText(ui.profileName, "N/A");
     setText(ui.profileEmail, "N/A");
     setText(ui.profileRole, "N/A");
     setText(ui.profileCompany, "N/A");
     setText(ui.profileLastLogin, "N/A");
+    setText(ui.profileCompletion, "--");
     if (ui.profileFirstName) ui.profileFirstName.value = "";
     if (ui.profileLastName) ui.profileLastName.value = "";
     if (ui.profileEditEmail) ui.profileEditEmail.value = "";
@@ -764,11 +793,13 @@ function renderProfilePanel() {
     return;
   }
 
+  setText(ui.profileAvatar, profileInitials(profile, "HR"));
   setText(ui.profileName, fullName(profile));
   setText(ui.profileEmail, firstValue(profile, ["email"], "N/A"));
   setText(ui.profileRole, firstValue(profile, ["role"], "N/A"));
   setText(ui.profileCompany, firstValue(profile, ["company_id"], "N/A"));
   setText(ui.profileLastLogin, formatDateTime(firstValue(profile, ["last_login_at"], "")));
+  setText(ui.profileCompletion, accountProfileCompletion(profile));
 
   if (ui.profileFirstName) ui.profileFirstName.value = firstValue(profile, ["first_name"], "");
   if (ui.profileLastName) ui.profileLastName.value = firstValue(profile, ["last_name"], "");
@@ -2535,12 +2566,6 @@ function bindActions() {
 
   if (ui.profileForm) ui.profileForm.addEventListener("submit", submitProfileUpdate);
   if (ui.reloadProfileBtn) ui.reloadProfileBtn.addEventListener("click", reloadProfile);
-  if (ui.profileLogoutBtn) {
-    ui.profileLogoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to log out?")) return;
-      await performLogout();
-    });
-  }
 }
 
 // 7) Init.

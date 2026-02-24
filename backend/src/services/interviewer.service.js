@@ -240,7 +240,7 @@ exports.finalizeScorecard = async (id, interviewerId, companyId) => {
         err.code === "ER_TRUNCATED_WRONG_VALUE_FOR_FIELD")
     ) {
       throw new Error(
-        "applications.status must include 'interview score submited' before finalizing scorecards",
+        "applications.status must include 'interview score submitted' before finalizing scorecards",
       );
     }
     throw err;

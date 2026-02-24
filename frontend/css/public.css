@@ -1,3 +1,12 @@
+/*
+ * Legacy public page stylesheet used by selected pages/components.
+ *
+ * Beginner Reading Guide:
+ * 1) Header and hero layout rules.
+ * 2) Typography and action button styles.
+ * 3) Section-level layout helpers.
+ * 4) Responsive behavior at smaller breakpoints.
+ */
 .site-header {
   position: sticky;
   top: 0;

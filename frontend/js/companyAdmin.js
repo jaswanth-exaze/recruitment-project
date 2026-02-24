@@ -1,12 +1,21 @@
 /**
  * Company Admin dashboard script.
  * Handles section switching, profile updates, and company admin APIs.
+ *
+ * Beginner Reading Guide:
+ * 1) `COMPANY_ADMIN_CONFIG` defines endpoint map and API base.
+ * 2) `companyState` stores current section data and selected rows.
+ * 3) Helper functions format data, build URLs, and show messages.
+ * 4) `apiRequest()` is the central HTTP helper with fallback handling.
+ * 5) Domain sections are grouped as users, jobs, applications, offers, activity.
+ * 6) `open*` functions control section loading.
+ * 7) `initCompanyAdminDashboard()` starts everything.
  */
 
 // 1) Config and state.
 const COMPANY_ADMIN_CONFIG = {
   useApi: true,
-  apiBase: String(window.COMPANY_ADMIN_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(
+  apiBase: String(window.COMPANY_ADMIN_API_BASE_URL || window.API_BASE || window.location.origin || "http://localhost:3000").replace(
     /\/+$/,
     "",
   ),
@@ -59,6 +68,7 @@ const companyState = {
   selectedJob: null,
   applicationRows: [],
   currentApplicationJobId: "",
+  activeApplicationId: "",
   offerRows: [],
   currentOfferApplicationId: "",
   auditRows: [],
@@ -163,8 +173,19 @@ const ui = {
   appList: document.querySelector("[data-company-app-list]"),
   appStats: document.querySelector("[data-company-app-stats]"),
   appMsg: document.querySelector("[data-company-app-msg]"),
+  appActionId: document.querySelector("[data-company-app-action-id]"),
+  appMoveStatus: document.querySelector("[data-company-app-move-status]"),
+  appMoveStage: document.querySelector("[data-company-app-move-stage]"),
+  appMoveApplyBtn: document.querySelector("[data-company-app-move-apply]"),
+  appScreenInterviewBtn: document.querySelector("[data-company-app-screen-interview]"),
+  appScreenRejectBtn: document.querySelector("[data-company-app-screen-reject]"),
+  appFinalSelectBtn: document.querySelector("[data-company-app-final-select]"),
+  appFinalRejectBtn: document.querySelector("[data-company-app-final-reject]"),
+  appRecommendBtn: document.querySelector("[data-company-app-recommend]"),
+  appActionClearBtn: document.querySelector("[data-company-app-action-clear]"),
 
   offerCreateForm: document.querySelector("[data-company-offer-create-form]"),
+  offerCreateBtn: document.querySelector("[data-company-offer-create-btn]"),
   offerCreateMsg: document.querySelector("[data-company-offer-create-msg]"),
   offerApplicationIdInput: document.querySelector("[data-company-offer-application-id]"),
   offerLoadBtn: document.querySelector("[data-company-offer-load]"),
@@ -173,6 +194,7 @@ const ui = {
   offerSendId: document.querySelector("[data-company-offer-send-id]"),
   offerSendDocument: document.querySelector("[data-company-offer-send-document]"),
   offerSendEsign: document.querySelector("[data-company-offer-send-esign]"),
+  offerSendBtn: document.querySelector("[data-company-offer-send-btn]"),
   offerSendMsg: document.querySelector("[data-company-offer-send-msg]"),
 
   auditEntityInput: document.querySelector("[data-company-audit-entity]"),
@@ -448,6 +470,15 @@ function fullName(record) {
 function setText(element, value) {
   if (!element) return;
   element.textContent = value === undefined || value === null || value === "" ? "N/A" : String(value);
+}
+
+function displayStatusLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = raw.toLowerCase();
+  if (normalized === "interview score submited") return "interview score submitted";
+  if (normalized === "offer accecepted") return "offer accepted";
+  return raw.replace(/_/g, " ");
 }
 
 function setMessage(element, text, type = "info") {
@@ -1588,7 +1619,12 @@ function parseJobPayload(formData) {
     requirements: String(formData.get("requirements") || "").trim(),
     location: String(formData.get("location") || "").trim(),
     employment_type: String(formData.get("employment_type") || "Full-time").trim() || "Full-time",
-    positions_count: toNumber(formData.get("positions_count")) || 1
+    positions_count: toNumber(formData.get("positions_count")) || 1,
+    department: String(formData.get("department") || "").trim(),
+    experience_level: String(formData.get("experience_level") || "").trim(),
+    salary_min: toNumber(formData.get("salary_min")),
+    salary_max: toNumber(formData.get("salary_max")),
+    application_deadline: String(formData.get("application_deadline") || "").trim(),
   };
 }
 
@@ -1680,11 +1716,7 @@ async function submitEditJob(event) {
 
 function getApproverId() {
   const inputValue = String(ui.jobApproverId?.value || "").trim();
-  if (inputValue) return toNumber(inputValue);
-
-  const prompted = window.prompt("Enter approver id for submit action:");
-  if (!prompted) return null;
-  return toNumber(prompted.trim());
+  return inputValue ? toNumber(inputValue) : null;
 }
 
 async function runJobAction(action, jobId) {
@@ -1762,7 +1794,7 @@ function renderApplicationStats(rows) {
     li.className = "list-group-item px-0 d-flex justify-content-between align-items-center";
     const status = firstValue(row, ["status"], "unknown");
     const count = firstValue(row, ["count"], "0");
-    li.innerHTML = `<span>${status}</span><span class="badge text-bg-primary rounded-pill">${count}</span>`;
+    li.innerHTML = `<span>${displayStatusLabel(status)}</span><span class="badge text-bg-primary rounded-pill">${count}</span>`;
     ui.appStats.appendChild(li);
   });
 }
@@ -1796,7 +1828,7 @@ function renderApplicationRows(rows) {
     tr.appendChild(candidateCell);
 
     const statusCell = document.createElement("td");
-    statusCell.textContent = firstValue(application, ["status"], "N/A");
+    statusCell.textContent = displayStatusLabel(firstValue(application, ["status"], "N/A"));
     tr.appendChild(statusCell);
 
     const stageCell = document.createElement("td");
@@ -1929,6 +1961,107 @@ async function loadApplicationsAndStats() {
   }
 }
 
+function clearApplicationActionContext() {
+  companyState.activeApplicationId = "";
+  if (ui.appActionId) ui.appActionId.value = "";
+  if (ui.appMoveStage) ui.appMoveStage.value = "";
+}
+
+function setApplicationActionContext(applicationId, currentStatus = "", currentStage = "") {
+  companyState.activeApplicationId = String(applicationId || "").trim();
+  if (ui.appActionId) ui.appActionId.value = companyState.activeApplicationId;
+  if (ui.appMoveStatus) {
+    const fallback = currentStatus || "interview";
+    const hasOption = Array.from(ui.appMoveStatus.options).some((option) => option.value === fallback);
+    ui.appMoveStatus.value = hasOption ? fallback : "interview";
+  }
+  if (ui.appMoveStage) ui.appMoveStage.value = currentStage || "";
+}
+
+function selectedApplicationId() {
+  return String(ui.appActionId?.value || companyState.activeApplicationId || "").trim();
+}
+
+async function runMoveActionFromPanel() {
+  const applicationId = selectedApplicationId();
+  if (!applicationId) {
+    setMessage(ui.appMsg, "Select an application using Move/Screen/Final in the table first.", "error");
+    return;
+  }
+
+  const status = String(ui.appMoveStatus?.value || "").trim();
+  if (!status) {
+    setMessage(ui.appMsg, "Select a move status.", "error");
+    return;
+  }
+
+  const stageRaw = String(ui.appMoveStage?.value || "").trim();
+  const stageId = stageRaw ? toNumber(stageRaw) : null;
+  if (stageRaw && stageId === null) {
+    setMessage(ui.appMsg, "Stage id must be a valid number.", "error");
+    return;
+  }
+
+  try {
+    await companyAdminApi.moveApplicationStage(applicationId, {
+      status,
+      current_stage_id: stageId
+    });
+    setMessage(ui.appMsg, `Application #${applicationId} moved to "${status}".`, "success");
+    await loadApplicationsAndStats();
+  } catch (error) {
+    setMessage(ui.appMsg, error.message || "Failed to move application.", "error");
+  }
+}
+
+async function runScreenActionFromPanel(status) {
+  const applicationId = selectedApplicationId();
+  if (!applicationId) {
+    setMessage(ui.appMsg, "Select an application using Screen in the table first.", "error");
+    return;
+  }
+
+  try {
+    await companyAdminApi.screenDecision(applicationId, status);
+    setMessage(ui.appMsg, `Application #${applicationId} marked as "${status}".`, "success");
+    await loadApplicationsAndStats();
+  } catch (error) {
+    setMessage(ui.appMsg, error.message || "Failed to update screen decision.", "error");
+  }
+}
+
+async function runFinalActionFromPanel(status) {
+  const applicationId = selectedApplicationId();
+  if (!applicationId) {
+    setMessage(ui.appMsg, "Select an application using Final in the table first.", "error");
+    return;
+  }
+
+  try {
+    await companyAdminApi.finalDecision(applicationId, status);
+    setMessage(ui.appMsg, `Application #${applicationId} final decision set to "${status}".`, "success");
+    await loadApplicationsAndStats();
+  } catch (error) {
+    setMessage(ui.appMsg, error.message || "Failed to update final decision.", "error");
+  }
+}
+
+async function runRecommendActionFromPanel() {
+  const applicationId = selectedApplicationId();
+  if (!applicationId) {
+    setMessage(ui.appMsg, "Select an application using Recommend in the table first.", "error");
+    return;
+  }
+
+  try {
+    await companyAdminApi.recommendOffer(applicationId);
+    setMessage(ui.appMsg, `Offer recommendation marked for application #${applicationId}.`, "success");
+    await loadApplicationsAndStats();
+  } catch (error) {
+    setMessage(ui.appMsg, error.message || "Failed to recommend offer.", "error");
+  }
+}
+
 async function handleApplicationAction(action, applicationId, currentStatus, currentStage, offerRecommended) {
   if (!applicationId) return;
   const allowedActions = getCompanyApplicationActions(currentStatus, offerRecommended)
@@ -1942,42 +2075,27 @@ async function handleApplicationAction(action, applicationId, currentStatus, cur
     return;
   }
 
-  try {
-    if (action === "move") {
-      const status = window.prompt("Enter new status for move-stage:", currentStatus || "interview");
-      if (!status) return;
-      const stageInput = window.prompt("Enter current_stage_id (optional):", currentStage || "");
-      const stageId = stageInput ? toNumber(stageInput) : null;
+  if (action === "move") {
+    setApplicationActionContext(applicationId, currentStatus, currentStage);
+    setMessage(ui.appMsg, `Application #${applicationId} selected. Choose status/stage and click Apply Move.`, "info");
+    return;
+  }
 
-      await companyAdminApi.moveApplicationStage(applicationId, {
-        status: status.trim(),
-        current_stage_id: stageId
-      });
-      setMessage(ui.appMsg, "Application stage updated.", "success");
-    }
+  if (action === "screen") {
+    setApplicationActionContext(applicationId, currentStatus || "interview", currentStage);
+    setMessage(ui.appMsg, `Application #${applicationId} selected. Use Screen: Interview or Screen: Reject.`, "info");
+    return;
+  }
 
-    if (action === "screen") {
-      const status = window.prompt("Screen decision status (interview/rejected):", "interview");
-      if (!status) return;
-      await companyAdminApi.screenDecision(applicationId, status.trim());
-      setMessage(ui.appMsg, "Screening decision updated.", "success");
-    }
+  if (action === "final") {
+    setApplicationActionContext(applicationId, currentStatus, currentStage);
+    setMessage(ui.appMsg, `Application #${applicationId} selected. Use Final: Select or Final: Reject.`, "info");
+    return;
+  }
 
-    if (action === "final") {
-      const status = window.prompt("Final decision status (selected/rejected):", "selected");
-      if (!status) return;
-      await companyAdminApi.finalDecision(applicationId, status.trim());
-      setMessage(ui.appMsg, "Final decision updated.", "success");
-    }
-
-    if (action === "recommend") {
-      await companyAdminApi.recommendOffer(applicationId);
-      setMessage(ui.appMsg, "Offer recommendation marked.", "success");
-    }
-
-    await loadApplicationsAndStats();
-  } catch (error) {
-    setMessage(ui.appMsg, error.message || "Failed to update application.", "error");
+  if (action === "recommend") {
+    setApplicationActionContext(applicationId, currentStatus, currentStage);
+    await runRecommendActionFromPanel();
   }
 }
 
@@ -2036,7 +2154,7 @@ function renderOfferRows(rows) {
     tr.appendChild(applicationCell);
 
     const statusCell = document.createElement("td");
-    statusCell.textContent = firstValue(offer, ["status"], "N/A");
+    statusCell.textContent = displayStatusLabel(firstValue(offer, ["status"], "N/A"));
     tr.appendChild(statusCell);
 
     const detailsCell = document.createElement("td");
@@ -2083,7 +2201,7 @@ async function loadOffersByApplication() {
 }
 
 async function submitCreateOfferDraft(event) {
-  event.preventDefault();
+  if (event?.preventDefault) event.preventDefault();
   if (!COMPANY_ADMIN_CONFIG.useApi || !ui.offerCreateForm) return;
 
   const formData = new FormData(ui.offerCreateForm);
@@ -2118,6 +2236,20 @@ async function submitCreateOfferDraft(event) {
     ui.offerCreateForm.reset();
     setMessage(ui.offerCreateMsg, result?.message || "Offer draft created.", "success");
 
+    const createdOfferId = firstValue(result, ["id"], "");
+    if (createdOfferId && ui.offerSendId) {
+      ui.offerSendId.value = createdOfferId;
+    }
+    if (ui.offerSendDocument) {
+      ui.offerSendDocument.value = firstValue(result, ["document_url"], "");
+    }
+    if (ui.offerSendEsign) {
+      ui.offerSendEsign.value = firstValue(result, ["esign_link"], "");
+    }
+    if (ui.offerSendMsg && (ui.offerSendDocument?.value || ui.offerSendEsign?.value)) {
+      setMessage(ui.offerSendMsg, "Offer ID, document URL, and e-sign URL auto-filled from draft.", "info");
+    }
+
     if (ui.offerApplicationIdInput) {
       ui.offerApplicationIdInput.value = String(applicationId);
     }
@@ -2133,7 +2265,7 @@ function prepareSendOffer(offerId) {
 }
 
 async function submitSendOffer(event) {
-  event.preventDefault();
+  if (event?.preventDefault) event.preventDefault();
   if (!COMPANY_ADMIN_CONFIG.useApi) return;
 
   const offerId = String(ui.offerSendId?.value || "").trim();
@@ -2142,8 +2274,8 @@ async function submitSendOffer(event) {
     return;
   }
 
-  const initialText = document.querySelector("[data-company-offer-send-btn]")?.textContent || "Send Offer";
-  const sendButton = document.querySelector("[data-company-offer-send-btn]");
+  const initialText = ui.offerSendBtn?.textContent || "Send Offer";
+  const sendButton = ui.offerSendBtn;
   if (sendButton) {
     sendButton.disabled = true;
     sendButton.textContent = "Sending...";
@@ -2369,7 +2501,7 @@ async function openProfile() {
 // 5) Navigation and event bindings.
 async function handleLogoutClick(event) {
   event.preventDefault();
-  if (!window.confirm("Do you want to logout?")) return;
+  if (!window.confirm("Do you want to log out?")) return;
   await performLogout();
 }
 
@@ -2499,6 +2631,19 @@ function bindActionButtons() {
     });
   }
 
+  if (ui.appMoveApplyBtn) ui.appMoveApplyBtn.addEventListener("click", runMoveActionFromPanel);
+  if (ui.appScreenInterviewBtn) ui.appScreenInterviewBtn.addEventListener("click", () => runScreenActionFromPanel("interview"));
+  if (ui.appScreenRejectBtn) ui.appScreenRejectBtn.addEventListener("click", () => runScreenActionFromPanel("rejected"));
+  if (ui.appFinalSelectBtn) ui.appFinalSelectBtn.addEventListener("click", () => runFinalActionFromPanel("selected"));
+  if (ui.appFinalRejectBtn) ui.appFinalRejectBtn.addEventListener("click", () => runFinalActionFromPanel("rejected"));
+  if (ui.appRecommendBtn) ui.appRecommendBtn.addEventListener("click", runRecommendActionFromPanel);
+  if (ui.appActionClearBtn) {
+    ui.appActionClearBtn.addEventListener("click", () => {
+      clearApplicationActionContext();
+      setMessage(ui.appMsg, "Application action panel cleared.", "info");
+    });
+  }
+
   if (ui.appList) {
     ui.appList.addEventListener("click", (event) => {
       handleApplicationTableAction(event);
@@ -2507,6 +2652,9 @@ function bindActionButtons() {
 
   if (ui.offerCreateForm) {
     ui.offerCreateForm.addEventListener("submit", submitCreateOfferDraft);
+  }
+  if (ui.offerCreateBtn) {
+    ui.offerCreateBtn.addEventListener("click", submitCreateOfferDraft);
   }
 
   if (ui.offerLoadBtn) {
@@ -2530,6 +2678,9 @@ function bindActionButtons() {
   if (ui.offerSendForm) {
     ui.offerSendForm.addEventListener("submit", submitSendOffer);
   }
+  if (ui.offerSendBtn) {
+    ui.offerSendBtn.addEventListener("click", submitSendOffer);
+  }
 
   if (ui.profileForm) {
     ui.profileForm.addEventListener("submit", submitProfileUpdate);
@@ -2543,7 +2694,7 @@ function bindActionButtons() {
 
   if (ui.profileLogoutBtn) {
     ui.profileLogoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to logout?")) return;
+      if (!window.confirm("Do you want to log out?")) return;
       await performLogout();
     });
   }

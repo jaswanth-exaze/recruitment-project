@@ -1,11 +1,20 @@
 /**
  * Interviewer dashboard script.
  * Handles dashboard KPIs, interviews, scorecards, profile management, and logout.
+ *
+ * Beginner Reading Guide:
+ * 1) `INTERVIEWER_CONFIG` maps backend endpoints.
+ * 2) `intState` keeps dashboard/interview/scorecard data.
+ * 3) Utility functions format text, status, and numeric fields.
+ * 4) `apiRequest()` handles backend communication.
+ * 5) Section loaders (`openDashboard`, `openInterviews`, `openScorecards`) refresh UI.
+ * 6) Form handlers submit interview updates and scorecards.
+ * 7) `initInterviewerDashboard()` is the startup function.
  */
 
 const INTERVIEWER_CONFIG = {
   useApi: true,
-  apiBase: String(window.INTERVIEWER_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(/\/+$/, ""),
+  apiBase: String(window.INTERVIEWER_API_BASE_URL || window.API_BASE || window.location.origin || "http://localhost:3000").replace(/\/+$/, ""),
   tryApiPrefixFallback: false,
   tokenKeys: ["token", "accessToken", "authToken", "jwtToken"],
   endpoints: {
@@ -71,6 +80,11 @@ const ui = {
   interviewsLoadBtn: document.querySelector("[data-int-interviews-load]"),
   interviewList: document.querySelector("[data-int-interview-list]"),
   interviewMsg: document.querySelector("[data-int-interview-msg]"),
+  interviewUpdateForm: document.querySelector("[data-int-interview-update-form]"),
+  interviewUpdateId: document.querySelector("[data-int-update-interview-id]"),
+  interviewUpdateStatus: document.querySelector("[data-int-update-status]"),
+  interviewUpdateNotes: document.querySelector("[data-int-update-notes]"),
+  interviewUpdateClearBtn: document.querySelector("[data-int-update-clear]"),
 
   scorecardCreateForm: document.querySelector("[data-int-scorecard-create-form]"),
   scorecardCreateMsg: document.querySelector("[data-int-scorecard-create-msg]"),
@@ -128,6 +142,15 @@ function toNumber(value) {
 function setText(element, value) {
   if (!element) return;
   element.textContent = value === undefined || value === null || value === "" ? "N/A" : String(value);
+}
+
+function displayStatusLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = raw.toLowerCase();
+  if (normalized === "interview score submited") return "interview score submitted";
+  if (normalized === "offer accecepted") return "offer accepted";
+  return raw.replace(/_/g, " ");
 }
 
 function setMessage(element, text, type = "info") {
@@ -650,7 +673,7 @@ function renderInterviewRows(rows) {
     tr.appendChild(roleCell);
 
     const statusCell = document.createElement("td");
-    statusCell.textContent = firstValue(row, ["status"], "N/A");
+    statusCell.textContent = displayStatusLabel(firstValue(row, ["status"], "N/A"));
     tr.appendChild(statusCell);
 
     const scheduledCell = document.createElement("td");
@@ -691,15 +714,39 @@ async function loadInterviews() {
   }
 }
 
-async function updateInterviewByPrompt(interviewId, currentStatus, currentNotes) {
-  const status = window.prompt("Interview status:", currentStatus || "completed");
-  if (!status) return;
+function clearInterviewUpdateForm() {
+  if (ui.interviewUpdateId) ui.interviewUpdateId.value = "";
+  if (ui.interviewUpdateStatus) ui.interviewUpdateStatus.value = "completed";
+  if (ui.interviewUpdateNotes) ui.interviewUpdateNotes.value = "";
+}
 
-  const notes = window.prompt("Interview notes:", currentNotes || "") || "";
+function prepareInterviewUpdate(interviewId, currentStatus, currentNotes) {
+  const id = String(interviewId || "").trim();
+  if (!id) return;
+  if (ui.interviewUpdateId) ui.interviewUpdateId.value = id;
+  if (ui.interviewUpdateStatus) ui.interviewUpdateStatus.value = currentStatus || "completed";
+  if (ui.interviewUpdateNotes) ui.interviewUpdateNotes.value = currentNotes || "";
+  setMessage(ui.interviewMsg, `Interview #${id} loaded into update form.`, "info");
+}
+
+async function submitInterviewUpdate(event) {
+  event.preventDefault();
+  const interviewId = String(ui.interviewUpdateId?.value || "").trim();
+  const status = String(ui.interviewUpdateStatus?.value || "").trim();
+  const notes = String(ui.interviewUpdateNotes?.value || "").trim();
+
+  if (!interviewId) {
+    setMessage(ui.interviewMsg, "Select an interview from the table before updating.", "error");
+    return;
+  }
+  if (!status) {
+    setMessage(ui.interviewMsg, "Interview status is required.", "error");
+    return;
+  }
 
   try {
-    await interviewerApi.updateInterview(interviewId, status.trim(), notes.trim());
-    setMessage(ui.interviewMsg, "Interview updated.", "success");
+    await interviewerApi.updateInterview(interviewId, status, notes);
+    setMessage(ui.interviewMsg, `Interview #${interviewId} updated successfully.`, "success");
     await loadInterviews();
   } catch (error) {
     setMessage(ui.interviewMsg, error.message || "Failed to update interview.", "error");
@@ -907,7 +954,7 @@ async function finalizeScorecard(scorecardId) {
 
   try {
     await interviewerApi.finalizeScorecard(scorecardId);
-    setMessage(ui.scorecardMsg, "Scorecard finalized. Application moved to interview score submited.", "success");
+    setMessage(ui.scorecardMsg, "Scorecard finalized. Application moved to interview score submitted.", "success");
     await loadPendingScorecardInterviews();
     await loadScorecards();
   } catch (error) {
@@ -1060,7 +1107,7 @@ async function openProfile() {
 /* EVENT BINDINGS */
 async function handleLogoutClick(event) {
   event.preventDefault();
-  if (!window.confirm("Do you want to logout?")) return;
+  if (!window.confirm("Do you want to log out?")) return;
   await performLogout();
 }
 
@@ -1102,8 +1149,16 @@ function bindActions() {
       const interviewId = String(button.dataset.interviewId || "").trim();
       const status = String(button.dataset.interviewStatus || "").trim();
       const notes = String(button.dataset.interviewNotes || "").trim();
-      updateInterviewByPrompt(interviewId, status, notes);
+      prepareInterviewUpdate(interviewId, status, notes);
     });
+  }
+
+  if (ui.interviewUpdateForm) {
+    ui.interviewUpdateForm.addEventListener("submit", submitInterviewUpdate);
+  }
+
+  if (ui.interviewUpdateClearBtn) {
+    ui.interviewUpdateClearBtn.addEventListener("click", clearInterviewUpdateForm);
   }
 
   if (ui.scorecardCreateForm) {
@@ -1137,7 +1192,7 @@ function bindActions() {
 
   if (ui.logoutBtn) {
     ui.logoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to logout?")) return;
+      if (!window.confirm("Do you want to log out?")) return;
       await performLogout();
     });
   }

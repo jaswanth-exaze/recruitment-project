@@ -1,3 +1,12 @@
+/**
+ * Public website script (landing, navigation, counters, contact form).
+ *
+ * Beginner Reading Guide:
+ * 1) Cache DOM nodes used by the public pages.
+ * 2) Enable navbar/back-to-top/scroll helper behavior.
+ * 3) Animate counters and section reveals.
+ * 4) Handle contact form submission with API fallback.
+ */
 (function initApp() {
   // 1) Cache DOM references.
   const body = document.body;
@@ -139,7 +148,7 @@
     const messageInput = form.querySelector("#message");
     const agreeInput = form.querySelector("#agreeTerms");
 
-    const API_BASE = String(window.PUBLIC_API_BASE || window.API_BASE || "http://localhost:3000").replace(/\/+$/, "");
+    const API_BASE = String(window.PUBLIC_API_BASE || window.API_BASE || window.location.origin || "http://localhost:3000").replace(/\/+$/, "");
     const CONTACT_PATH = "/contact-requests";
 
     const buildEndpoints = () => {

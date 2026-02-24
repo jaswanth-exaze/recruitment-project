@@ -1,6 +1,12 @@
 /**
  * About page enhancements.
  * Keeps behavior isolated from the generic site script.
+ *
+ * Beginner Reading Guide:
+ * 1) Find elements on the About page.
+ * 2) Add small animation delays for timeline/cards.
+ * 3) Add hover effect for CTA buttons.
+ * 4) Exit safely when the page does not contain these elements.
  */
 
 (function initAboutPage() {

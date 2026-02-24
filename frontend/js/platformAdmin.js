@@ -1,6 +1,15 @@
 /**
  * Platform Admin dashboard script.
  * Handles section switching, KPI loading, companies, users, audit logs, and auth session flow.
+ *
+ * Beginner Reading Guide:
+ * 1) `PLATFORM_ADMIN_CONFIG` defines endpoint map and platform roles.
+ * 2) `adminState` stores current section rows, pages, and profile.
+ * 3) Shared helpers provide formatting, pagination, and auth handling.
+ * 4) `apiRequest()` is the centralized backend API wrapper.
+ * 5) Feature blocks: dashboard, companies, users, activity, contacts, profile.
+ * 6) `open*` functions switch sections and load data.
+ * 7) `initPlatformAdminDashboard()` starts the page.
  */
 
 /* =========================================================
@@ -13,7 +22,7 @@
 
 const PLATFORM_ADMIN_CONFIG = {
   useApi: true,
-  apiBase: String(window.PLATFORM_ADMIN_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(
+  apiBase: String(window.PLATFORM_ADMIN_API_BASE_URL || window.API_BASE || window.location.origin || "http://localhost:3000").replace(
     /\/+$/,
     "",
   ),
@@ -583,8 +592,14 @@ function showCompanyStatus(text, type) {
   if (!ui.companyMsg) return;
 
   ui.companyMsg.textContent = text;
-  ui.companyMsg.classList.remove("d-none", "text-success", "text-danger");
-  ui.companyMsg.classList.add(type === "error" ? "text-danger" : "text-success");
+  ui.companyMsg.classList.remove("d-none", "text-success", "text-danger", "text-secondary");
+  if (type === "error") {
+    ui.companyMsg.classList.add("text-danger");
+  } else if (type === "info") {
+    ui.companyMsg.classList.add("text-secondary");
+  } else {
+    ui.companyMsg.classList.add("text-success");
+  }
 
   if (adminState.companyMsgTimer) {
     window.clearTimeout(adminState.companyMsgTimer);
@@ -599,8 +614,14 @@ function showUserStatus(text, type) {
   if (!ui.userMsg) return;
 
   ui.userMsg.textContent = text;
-  ui.userMsg.classList.remove("d-none", "text-success", "text-danger");
-  ui.userMsg.classList.add(type === "error" ? "text-danger" : "text-success");
+  ui.userMsg.classList.remove("d-none", "text-success", "text-danger", "text-secondary");
+  if (type === "error") {
+    ui.userMsg.classList.add("text-danger");
+  } else if (type === "info") {
+    ui.userMsg.classList.add("text-secondary");
+  } else {
+    ui.userMsg.classList.add("text-success");
+  }
 
   if (adminState.userMsgTimer) {
     window.clearTimeout(adminState.userMsgTimer);
@@ -1153,9 +1174,21 @@ async function handleCompanyActionClick(event) {
   const row = button.closest("tr");
   const companyName = String(row?.children?.[1]?.textContent || "").trim() || `Company #${companyId}`;
   const actionVerb = nextState === "deactivate" ? "deactivate" : "activate";
-  if (!window.confirm(`Do you want to ${actionVerb} ${companyName}?`)) return;
+  const defaultLabel = nextState === "deactivate" ? "Deactivate" : "Activate";
+  if (button.dataset.inlineConfirm !== "1") {
+    button.dataset.inlineConfirm = "1";
+    button.textContent = `Confirm ${defaultLabel}`;
+    showCompanyStatus(`Click again to ${actionVerb} ${companyName}.`, "info");
+    window.setTimeout(() => {
+      if (!button.isConnected) return;
+      if (button.dataset.inlineConfirm !== "1") return;
+      button.dataset.inlineConfirm = "";
+      button.textContent = defaultLabel;
+    }, 4500);
+    return;
+  }
 
-  const initialText = button.textContent || "";
+  button.dataset.inlineConfirm = "";
   button.disabled = true;
   button.textContent = nextState === "deactivate" ? "Deactivating..." : "Activating...";
 
@@ -1178,7 +1211,7 @@ async function handleCompanyActionClick(event) {
     showCompanyStatus(error.message || "Failed to update company status.", "error");
   } finally {
     button.disabled = false;
-    button.textContent = initialText;
+    button.textContent = defaultLabel;
   }
 }
 
@@ -1385,9 +1418,21 @@ async function handleUserActionClick(event) {
   const row = button.closest("tr");
   const userName = String(row?.children?.[1]?.textContent || "").trim() || `User #${userId}`;
   const actionVerb = nextState === "deactivate" ? "deactivate" : "activate";
-  if (!window.confirm(`Do you want to ${actionVerb} ${userName}?`)) return;
+  const defaultLabel = nextState === "deactivate" ? "Deactivate" : "Activate";
+  if (button.dataset.inlineConfirm !== "1") {
+    button.dataset.inlineConfirm = "1";
+    button.textContent = `Confirm ${defaultLabel}`;
+    showUserStatus(`Click again to ${actionVerb} ${userName}.`, "info");
+    window.setTimeout(() => {
+      if (!button.isConnected) return;
+      if (button.dataset.inlineConfirm !== "1") return;
+      button.dataset.inlineConfirm = "";
+      button.textContent = defaultLabel;
+    }, 4500);
+    return;
+  }
 
-  const initialText = button.textContent || "";
+  button.dataset.inlineConfirm = "";
   button.disabled = true;
   button.textContent = nextState === "deactivate" ? "Deactivating..." : "Activating...";
 
@@ -1409,7 +1454,7 @@ async function handleUserActionClick(event) {
     showUserStatus(error.message || "Failed to update user status.", "error");
   } finally {
     button.disabled = false;
-    button.textContent = initialText;
+    button.textContent = defaultLabel;
   }
 }
 
@@ -1727,7 +1772,7 @@ async function openProfile() {
 
 async function handleLogoutClick(event) {
   event.preventDefault();
-  if (!window.confirm("Do you want to logout?")) return;
+  if (!window.confirm("Do you want to log out?")) return;
   await performLogout();
 }
 
@@ -1860,7 +1905,7 @@ function bindActionButtons() {
 
   if (ui.profileLogoutBtn) {
     ui.profileLogoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to logout?")) return;
+      if (!window.confirm("Do you want to log out?")) return;
       await performLogout();
     });
   }

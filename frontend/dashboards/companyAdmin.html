@@ -24,6 +24,7 @@
     <link rel="icon" type="image/svg+xml" href="../public/assets/images/favicon.svg" />
   </head>
   <body class="dashboard-body">
+    <!-- Page Structure Guide: Header/Topbar -> Main Sections -> Footer/Actions. JavaScript binds to data-* attributes in this page. -->
     <div class="dashboard-layout">
       <aside class="dash-sidebar d-flex flex-column">
         <a class="d-inline-flex align-items-center fw-semibold text-white" href="../public/index.html">
@@ -56,14 +57,6 @@
             <i class="bi bi-clock-history"></i>
             <span class="sidebar-label">Activity</span>
           </a>
-          <a class="dash-nav-link" href="#" data-company-nav="profile">
-            <i class="bi bi-person-circle"></i>
-            <span class="sidebar-label">Profile</span>
-          </a>
-          <a class="dash-nav-link" href="../public/login.html" data-company-nav="logout">
-            <i class="bi bi-box-arrow-right"></i>
-            <span class="sidebar-label">Logout</span>
-          </a>
         </nav>
 
         <div class="mt-auto sidebar-footnote small text-white-50">
@@ -86,14 +79,14 @@
                 <p class="dash-company-name mb-0" data-company-top-company>Company: N/A</p>
               </div>
             </div>
-            <div class="search-box">
-              <i class="bi bi-search"></i>
-              <input
-                type="search"
-                class="form-control"
-                placeholder="Search jobs, users, or applications"
-                data-company-search
-              />
+            <div class="dash-topbar-actions">
+              <button type="button" class="btn btn-outline-brand btn-sm" data-company-nav="profile">
+                <i class="bi bi-person-circle"></i>
+                Profile
+              </button>
+              <button type="button" class="btn btn-logout-soft btn-sm" data-company-nav="logout">
+                Logout
+              </button>
             </div>
           </div>
         </header>
@@ -424,6 +417,32 @@
                         <option value="Contract">Contract</option>
                       </select>
                     </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyJobDepartment">Department</label>
+                      <input id="companyJobDepartment" name="department" type="text" class="form-control" placeholder="Engineering" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyJobExperience">Experience Level</label>
+                      <select id="companyJobExperience" name="experience_level" class="form-select">
+                        <option value="">Select level</option>
+                        <option value="Entry">Entry</option>
+                        <option value="Mid" selected>Mid</option>
+                        <option value="Senior">Senior</option>
+                        <option value="Lead">Lead</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyJobSalaryMin">Salary Min</label>
+                      <input id="companyJobSalaryMin" name="salary_min" type="number" min="0" class="form-control" placeholder="600000" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyJobSalaryMax">Salary Max</label>
+                      <input id="companyJobSalaryMax" name="salary_max" type="number" min="0" class="form-control" placeholder="1200000" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="companyJobDeadline">Application Deadline</label>
+                      <input id="companyJobDeadline" name="application_deadline" type="date" class="form-control" />
+                    </div>
                     <div class="col-12">
                       <label class="form-label" for="companyJobPositions">Positions</label>
                       <input
@@ -627,6 +646,48 @@
                     <li><strong>Final:</strong> set selected or rejected.</li>
                     <li><strong>Recommend:</strong> mark offer recommended.</li>
                   </ul>
+                  <hr class="my-3" />
+                  <h3 class="h6 mb-3">Application Action Panel</h3>
+                  <div class="row g-2">
+                    <div class="col-12">
+                      <label class="form-label small mb-1" for="companyActionApplicationId">Application ID</label>
+                      <input
+                        id="companyActionApplicationId"
+                        type="number"
+                        min="1"
+                        class="form-control form-control-sm"
+                        data-company-app-action-id
+                        readonly
+                      />
+                    </div>
+                    <div class="col-md-7">
+                      <label class="form-label small mb-1" for="companyActionMoveStatus">Move Status</label>
+                      <select id="companyActionMoveStatus" class="form-select form-select-sm" data-company-app-move-status>
+                        <option value="applied">applied</option>
+                        <option value="screening">screening</option>
+                        <option value="interview" selected>interview</option>
+                        <option value="interview score submited">interview score submitted</option>
+                        <option value="selected">selected</option>
+                        <option value="rejected">rejected</option>
+                        <option value="offer_letter_sent">offer_letter_sent</option>
+                        <option value="offer accecepted">offer accepted</option>
+                        <option value="hired">hired</option>
+                      </select>
+                    </div>
+                    <div class="col-md-5">
+                      <label class="form-label small mb-1" for="companyActionMoveStage">Stage ID</label>
+                      <input id="companyActionMoveStage" type="number" min="1" class="form-control form-control-sm" data-company-app-move-stage />
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-2 mt-1">
+                      <button type="button" class="btn btn-outline-brand btn-sm" data-company-app-move-apply>Apply Move</button>
+                      <button type="button" class="btn btn-outline-success btn-sm" data-company-app-screen-interview>Screen: Interview</button>
+                      <button type="button" class="btn btn-outline-danger btn-sm" data-company-app-screen-reject>Screen: Reject</button>
+                      <button type="button" class="btn btn-outline-success btn-sm" data-company-app-final-select>Final: Select</button>
+                      <button type="button" class="btn btn-outline-danger btn-sm" data-company-app-final-reject>Final: Reject</button>
+                      <button type="button" class="btn btn-outline-warning btn-sm" data-company-app-recommend>Recommend</button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" data-company-app-action-clear>Clear</button>
+                    </div>
+                  </div>
                 </section>
               </div>
             </div>
@@ -636,7 +697,7 @@
               <div class="col-lg-5">
                 <section class="table-card p-3 h-100">
                   <h2 class="h6 mb-3">Create Offer Draft</h2>
-                  <form class="row g-3" data-company-offer-create-form>
+                  <form class="row g-3" data-company-offer-create-form action="#" onsubmit="return false;">
                     <div class="col-12">
                       <label class="form-label" for="companyOfferApplicationId">Application ID</label>
                       <input
@@ -659,7 +720,9 @@
                       ></textarea>
                     </div>
                     <div class="col-12">
-                      <button type="submit" class="btn btn-brand w-100">Create Draft</button>
+                      <button type="button" class="btn btn-brand w-100" data-company-offer-create-btn>
+                        Create Draft
+                      </button>
                     </div>
                   </form>
                   <p class="small mb-0 mt-3 text-secondary" data-company-offer-create-msg></p>
@@ -711,7 +774,7 @@
               <div class="col-12">
                 <section class="table-card p-3">
                   <h2 class="h6 mb-3">Send Offer</h2>
-                  <form class="row g-3" data-company-offer-send-form>
+                  <form class="row g-3" data-company-offer-send-form action="#" onsubmit="return false;">
                     <div class="col-md-2">
                       <label class="form-label" for="companySendOfferId">Offer ID</label>
                       <input
@@ -742,7 +805,7 @@
                       />
                     </div>
                     <div class="col-12">
-                      <button type="submit" class="btn btn-brand" data-company-offer-send-btn>Send Offer</button>
+                      <button type="button" class="btn btn-brand" data-company-offer-send-btn>Send Offer</button>
                     </div>
                   </form>
                   <p class="small mb-0 mt-3 text-secondary" data-company-offer-send-msg></p>
@@ -920,7 +983,10 @@
       crossorigin="anonymous"
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    <script src="../js/script.js"></script>
-    <script src="../js/companyAdmin.js"></script>
+    <script src="../js/runtime-config.js"></script>
+    <script src="../js/script.js?v=20260224-3"></script>
+    <script src="../js/companyAdmin.js?v=20260224-3"></script>
   </body>
 </html>
+
+

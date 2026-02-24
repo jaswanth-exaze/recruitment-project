@@ -158,7 +158,7 @@ exports.acceptOffer = async (req, res) => {
     const affected = await service.acceptOffer(req.params.id);
     if (!affected) return res.status(404).json({ message: "Offer not found" });
     return res.json({
-      message: "Offer accepted. Application moved to offer accecepted and sent to Hiring Manager for final approval",
+      message: "Offer accepted. Application moved to offer accepted and sent to Hiring Manager for final approval",
     });
   } catch (err) {
     return handleError(res, err);

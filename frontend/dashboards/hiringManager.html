@@ -24,6 +24,7 @@
     <link rel="icon" type="image/svg+xml" href="../public/assets/images/favicon.svg" />
   </head>
   <body class="dashboard-body">
+    <!-- Page Structure Guide: Header/Topbar -> Main Sections -> Footer/Actions. JavaScript binds to data-* attributes in this page. -->
     <div class="dashboard-layout">
       <aside class="dash-sidebar d-flex flex-column">
         <a class="d-inline-flex align-items-center fw-semibold text-white" href="../public/index.html">
@@ -48,14 +49,6 @@
             <i class="bi bi-clipboard-check"></i>
             <span class="sidebar-label">Final Decisions</span>
           </a>
-          <a class="dash-nav-link" href="#" data-hm-nav="profile">
-            <i class="bi bi-person-circle"></i>
-            <span class="sidebar-label">Profile</span>
-          </a>
-          <a class="dash-nav-link" href="../public/login.html" data-hm-nav="logout">
-            <i class="bi bi-box-arrow-right"></i>
-            <span class="sidebar-label">Logout</span>
-          </a>
         </nav>
 
         <div class="mt-auto sidebar-footnote small text-white-50">
@@ -78,9 +71,14 @@
                 <p class="dash-company-name mb-0" data-hm-top-company>Company: N/A</p>
               </div>
             </div>
-            <div class="search-box">
-              <i class="bi bi-search"></i>
-              <input type="search" class="form-control" placeholder="Search approvals or jobs" data-hm-search />
+            <div class="dash-topbar-actions">
+              <button type="button" class="btn btn-outline-brand btn-sm" data-hm-nav="profile">
+                <i class="bi bi-person-circle"></i>
+                Profile
+              </button>
+              <button type="button" class="btn btn-logout-soft btn-sm" data-hm-nav="logout">
+                Logout
+              </button>
             </div>
           </div>
         </header>
@@ -141,6 +139,19 @@
                   <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
                     <h2 class="h6 mb-0">Pending Job Approvals</h2>
                     <button type="button" class="btn btn-outline-brand btn-sm" data-hm-approval-load>Load</button>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label small mb-1" for="hmApprovalComments">
+                      Approval Comments (optional)
+                    </label>
+                    <textarea
+                      id="hmApprovalComments"
+                      rows="2"
+                      class="form-control form-control-sm"
+                      data-hm-approval-comments
+                      placeholder="Comments are sent when you approve or reject."
+                    ></textarea>
                   </div>
 
                   <div class="table-responsive">
@@ -377,7 +388,10 @@
       crossorigin="anonymous"
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="../js/runtime-config.js"></script>
     <script src="../js/script.js"></script>
     <script src="../js/hiringManager.js"></script>
   </body>
 </html>
+
+

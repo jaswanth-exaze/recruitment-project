@@ -140,7 +140,27 @@ exports.listJobs = async ({ company_id, company, location } = {}) => {
 
   const whereSql = `WHERE ${where.join(" AND ")}`;
   const [rows] = await db.promise().query(
-    `SELECT j.id, j.title, j.description, j.location, j.employment_type, j.status, j.positions_count, j.created_at, c.name AS company_name FROM job_requisitions j JOIN companies c ON j.company_id = c.id ${whereSql} ORDER BY j.created_at DESC`,
+    `
+      SELECT
+        j.id,
+        j.title,
+        j.description,
+        j.location,
+        j.employment_type,
+        j.department,
+        j.experience_level,
+        j.salary_min,
+        j.salary_max,
+        j.application_deadline,
+        j.status,
+        j.positions_count,
+        j.created_at,
+        c.name AS company_name
+      FROM job_requisitions j
+      JOIN companies c ON j.company_id = c.id
+      ${whereSql}
+      ORDER BY j.created_at DESC
+    `,
     params,
   );
   return rows;

@@ -1,10 +1,13 @@
 const db = require("../config/db");
+const fs = require("fs/promises");
 const { notifyApplicationStatusChange } = require("./applicationStatusNotification.service");
 const {
   sendInterviewAssignedEmail,
   sendCandidateInterviewInvitationEmail,
   sendJobApprovalRequestEmail,
+  sendOfferLetterSentToCandidateEmail,
 } = require("./recruitmentEmail.service");
+const { generateOfferLetterPdf, buildOfferLetterLinks } = require("../utils/offerLetterPdf.util");
 
 function parseJsonField(value) {
   if (value === null || value === undefined) return null;
@@ -16,6 +19,18 @@ function parseJsonField(value) {
     }
   }
   return value;
+}
+
+function normalizeOfferDetails(value) {
+  if (value === null || value === undefined || value === "") return null;
+  return parseJsonField(value);
+}
+
+function fullName(firstName, lastName, fallback = "N/A") {
+  const first = String(firstName || "").trim();
+  const last = String(lastName || "").trim();
+  const combined = `${first} ${last}`.trim();
+  return combined || fallback;
 }
 
 async function getUserProfileById(userId) {
@@ -81,7 +96,21 @@ exports.listJobs = async ({ status, company_id }, companyId) => {
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const [rows] = await db.promise().query(
     `
-      SELECT j.id, j.title, j.description, j.location, j.employment_type, j.status, j.positions_count, j.created_at, c.name AS company_name
+      SELECT
+        j.id,
+        j.title,
+        j.description,
+        j.location,
+        j.employment_type,
+        j.department,
+        j.experience_level,
+        j.salary_min,
+        j.salary_max,
+        j.application_deadline,
+        j.status,
+        j.positions_count,
+        j.created_at,
+        c.name AS company_name
       FROM job_requisitions j
       JOIN companies c ON j.company_id = c.id
       ${whereSql}
@@ -117,6 +146,11 @@ exports.createJobDraft = async (payload) => {
     requirements,
     location,
     employment_type,
+    department,
+    experience_level,
+    salary_min,
+    salary_max,
+    application_deadline,
     positions_count,
   } = payload;
 
@@ -126,8 +160,25 @@ exports.createJobDraft = async (payload) => {
 
   const [result] = await db.promise().query(
     `
-      INSERT INTO job_requisitions (company_id, created_by, title, description, requirements, location, employment_type, status, positions_count, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', ?, NOW(), NOW())
+      INSERT INTO job_requisitions (
+        company_id,
+        created_by,
+        title,
+        description,
+        requirements,
+        location,
+        employment_type,
+        department,
+        experience_level,
+        salary_min,
+        salary_max,
+        application_deadline,
+        status,
+        positions_count,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, NOW(), NOW())
     `,
     [
       company_id,
@@ -137,6 +188,11 @@ exports.createJobDraft = async (payload) => {
       requirements || null,
       location || null,
       employment_type || "Full-time",
+      department || null,
+      experience_level || null,
+      salary_min || null,
+      salary_max || null,
+      application_deadline || null,
       positions_count || 1,
     ],
   );
@@ -145,11 +201,35 @@ exports.createJobDraft = async (payload) => {
 
 exports.updateJob = async (id, payload, companyId) => {
   if (!companyId) throw new Error("company_id is required");
-  const { title, description, requirements, location, employment_type, positions_count } = payload;
+  const {
+    title,
+    description,
+    requirements,
+    location,
+    employment_type,
+    department,
+    experience_level,
+    salary_min,
+    salary_max,
+    application_deadline,
+    positions_count,
+  } = payload;
   const [result] = await db.promise().query(
     `
       UPDATE job_requisitions
-      SET title = ?, description = ?, requirements = ?, location = ?, employment_type = ?, positions_count = ?, updated_at = NOW()
+      SET
+        title = ?,
+        description = ?,
+        requirements = ?,
+        location = ?,
+        employment_type = ?,
+        department = ?,
+        experience_level = ?,
+        salary_min = ?,
+        salary_max = ?,
+        application_deadline = ?,
+        positions_count = ?,
+        updated_at = NOW()
       WHERE id = ? AND company_id = ? AND status IN ('draft', 'pending')
     `,
     [
@@ -158,6 +238,11 @@ exports.updateJob = async (id, payload, companyId) => {
       requirements || null,
       location || null,
       employment_type || "Full-time",
+      department || null,
+      experience_level || null,
+      salary_min || null,
+      salary_max || null,
+      application_deadline || null,
       positions_count || 1,
       id,
       companyId,
@@ -669,30 +754,139 @@ exports.listOfferEligibleApplications = async ({ job_id }, companyId) => {
 };
 
 exports.createOfferDraft = async (payload, companyId) => {
-  const { application_id, created_by, offer_details } = payload;
+  const { application_id, created_by } = payload;
+  const offerDetails = normalizeOfferDetails(payload.offer_details);
+
   if (!application_id || !created_by) {
     throw new Error("application_id and created_by are required");
   }
   if (!companyId) throw new Error("company_id is required");
-  const [result] = await db.promise().query(
-    `
-      INSERT INTO offers (application_id, created_by, status, offer_details, created_at, updated_at)
-      SELECT a.id, ?, 'draft', ?, NOW(), NOW()
-      FROM applications a
-      JOIN job_requisitions j ON a.job_id = j.id
-      WHERE a.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')
-    `,
-    [created_by, offer_details ? JSON.stringify(offer_details) : null, application_id, companyId],
-  );
-  if (!result.affectedRows) {
-    throw new Error("Only interview score submited/selected applications from your company can receive offers");
+
+  const connection = await db.promise().getConnection();
+  let generatedPdfPath = null;
+
+  try {
+    await connection.beginTransaction();
+
+    const [contextRows] = await connection.query(
+      `
+        SELECT
+          a.id AS application_id,
+          a.status AS application_status,
+          c.name AS company_name,
+          c.domain AS company_domain,
+          j.title AS job_title,
+          j.location AS job_location,
+          j.employment_type,
+          j.department,
+          candidate.first_name AS candidate_first_name,
+          candidate.last_name AS candidate_last_name,
+          candidate.email AS candidate_email,
+          recruiter.first_name AS recruiter_first_name,
+          recruiter.last_name AS recruiter_last_name,
+          recruiter.email AS recruiter_email
+        FROM applications a
+        JOIN job_requisitions j ON a.job_id = j.id
+        JOIN companies c ON j.company_id = c.id
+        JOIN users candidate ON a.candidate_id = candidate.id
+        LEFT JOIN users recruiter ON recruiter.id = ? AND recruiter.company_id = j.company_id
+        WHERE a.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')
+        LIMIT 1
+      `,
+      [created_by, application_id, companyId],
+    );
+
+    const context = contextRows[0];
+    if (!context) {
+      throw new Error("Only interview score submitted/selected applications from your company can receive offers");
+    }
+
+    const [insertResult] = await connection.query(
+      `
+        INSERT INTO offers (application_id, created_by, status, offer_details, created_at, updated_at)
+        SELECT a.id, ?, 'draft', ?, NOW(), NOW()
+        FROM applications a
+        JOIN job_requisitions j ON a.job_id = j.id
+        WHERE a.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')
+      `,
+      [created_by, offerDetails === null ? null : JSON.stringify(offerDetails), application_id, companyId],
+    );
+
+    if (!insertResult.affectedRows) {
+      throw new Error("Only interview score submitted/selected applications from your company can receive offers");
+    }
+
+    const offerId = insertResult.insertId;
+    const { absolutePath, relativePath } = await generateOfferLetterPdf({
+      offerId,
+      companyName: context.company_name,
+      companyDomain: context.company_domain,
+      candidateName: fullName(context.candidate_first_name, context.candidate_last_name, "Candidate"),
+      candidateEmail: context.candidate_email,
+      recruiterName: fullName(context.recruiter_first_name, context.recruiter_last_name, "HR Team"),
+      recruiterEmail: context.recruiter_email,
+      jobTitle: context.job_title,
+      jobLocation: context.job_location,
+      employmentType: context.employment_type,
+      department: context.department,
+      offerDetails: offerDetails && typeof offerDetails === "object" ? offerDetails : {},
+    });
+    generatedPdfPath = absolutePath;
+
+    const { documentUrl, esignLink } = buildOfferLetterLinks(relativePath, offerId);
+
+    await connection.query(
+      `
+        UPDATE offers
+        SET document_url = ?, esign_link = ?, updated_at = NOW()
+        WHERE id = ?
+      `,
+      [documentUrl, esignLink, offerId],
+    );
+
+    await connection.commit();
+    return {
+      id: offerId,
+      document_url: documentUrl,
+      esign_link: esignLink,
+    };
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    if (generatedPdfPath) {
+      await fs.unlink(generatedPdfPath).catch(() => {});
+    }
+    throw error;
+  } finally {
+    connection.release();
   }
-  return { id: result.insertId };
 };
 
 exports.sendOffer = async (id, payload, companyId) => {
-  const { document_url, esign_link } = payload;
+  const providedDocumentUrl = String(payload?.document_url || "").trim();
+  const providedEsignLink = String(payload?.esign_link || "").trim();
+
   if (!companyId) throw new Error("company_id is required");
+
+  const [existingRows] = await db.promise().query(
+    `
+      SELECT o.document_url, o.esign_link
+      FROM offers o
+      JOIN applications a ON o.application_id = a.id
+      JOIN job_requisitions j ON a.job_id = j.id
+      WHERE o.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')
+      LIMIT 1
+    `,
+    [id, companyId],
+  );
+
+  if (!existingRows.length) return 0;
+
+  const finalDocumentUrl = providedDocumentUrl || existingRows[0].document_url || null;
+  const finalEsignLink =
+    providedEsignLink
+    || existingRows[0].esign_link
+    || (finalDocumentUrl ? `${finalDocumentUrl}#candidate-esign-${id}` : null);
+
   const [result] = await db.promise().query(
     `
       UPDATE offers o
@@ -708,30 +902,15 @@ exports.sendOffer = async (id, payload, companyId) => {
         a.updated_at = NOW()
       WHERE o.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')
     `,
-    [document_url || null, esign_link || null, id, companyId],
+    [finalDocumentUrl, finalEsignLink, id, companyId],
   );
 
   if (result.affectedRows) {
-    const [rows] = await db.promise().query(
-      `
-        SELECT a.id AS application_id
-        FROM offers o
-        JOIN applications a ON o.application_id = a.id
-        JOIN job_requisitions j ON a.job_id = j.id
-        WHERE o.id = ? AND j.company_id = ?
-        LIMIT 1
-      `,
-      [id, companyId],
-    );
-    const applicationId = rows[0]?.application_id;
-    if (applicationId) {
-      await notifyApplicationStatusChange({
-        applicationId,
-        companyId,
-        status: "offer_letter_sent",
-        triggeredBy: "HR Recruiter",
-      });
-    }
+    await sendOfferLetterSentToCandidateEmail({
+      offerId: id,
+      companyId,
+      triggeredBy: "HR Recruiter",
+    });
   }
 
   return result.affectedRows;

@@ -1,3 +1,12 @@
+/*
+ * Shared visual theme variables and utility classes.
+ *
+ * Beginner Reading Guide:
+ * 1) Color and spacing variables are declared in :root.
+ * 2) Base typography and container helpers are defined next.
+ * 3) Button and surface styles build consistent UI blocks.
+ * 4) This file supports both public and dashboard experiences.
+ */
 :root {
   --bg: #0b1220;
   --bg-soft: #111a2d;

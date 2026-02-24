@@ -24,6 +24,7 @@
     <link rel="icon" type="image/svg+xml" href="../public/assets/images/favicon.svg" />
   </head>
   <body class="dashboard-body">
+    <!-- Page Structure Guide: Header/Topbar -> Main Sections -> Footer/Actions. JavaScript binds to data-* attributes in this page. -->
     <div class="dashboard-layout">
       <aside class="dash-sidebar d-flex flex-column">
         <a class="d-inline-flex align-items-center fw-semibold text-white" href="../public/index.html">
@@ -43,14 +44,6 @@
           <a class="dash-nav-link" href="#" data-int-nav="scorecards">
             <i class="bi bi-ui-checks-grid"></i>
             <span class="sidebar-label">Scorecards</span>
-          </a>
-          <a class="dash-nav-link" href="#" data-int-nav="profile">
-            <i class="bi bi-person-circle"></i>
-            <span class="sidebar-label">Profile</span>
-          </a>
-          <a class="dash-nav-link" href="../public/login.html" data-int-nav="logout">
-            <i class="bi bi-box-arrow-right"></i>
-            <span class="sidebar-label">Logout</span>
           </a>
         </nav>
 
@@ -74,9 +67,14 @@
                 <p class="dash-company-name mb-0" data-int-top-company>Company: N/A</p>
               </div>
             </div>
-            <div class="search-box">
-              <i class="bi bi-search"></i>
-              <input type="search" class="form-control" placeholder="Search interviews or candidates" data-int-search />
+            <div class="dash-topbar-actions">
+              <button type="button" class="btn btn-outline-brand btn-sm" data-int-nav="profile">
+                <i class="bi bi-person-circle"></i>
+                Profile
+              </button>
+              <button type="button" class="btn btn-logout-soft btn-sm" data-int-nav="logout">
+                Logout
+              </button>
             </div>
           </div>
         </header>
@@ -156,6 +154,40 @@
                     </table>
                   </div>
                   <p class="small mt-3 mb-0 text-secondary" data-int-interview-msg></p>
+
+                  <hr class="my-3" />
+
+                  <h3 class="h6 mb-3">Update Interview (No Popup)</h3>
+                  <form class="row g-3" data-int-interview-update-form>
+                    <div class="col-md-4">
+                      <label class="form-label" for="intUpdateInterviewId">Interview ID</label>
+                      <input
+                        id="intUpdateInterviewId"
+                        type="number"
+                        min="1"
+                        class="form-control"
+                        data-int-update-interview-id
+                        readonly
+                      />
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label" for="intUpdateInterviewStatus">Status</label>
+                      <select id="intUpdateInterviewStatus" class="form-select" data-int-update-status>
+                        <option value="scheduled">scheduled</option>
+                        <option value="completed" selected>completed</option>
+                        <option value="rescheduled">rescheduled</option>
+                        <option value="cancelled">cancelled</option>
+                      </select>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="intUpdateInterviewNotes">Notes</label>
+                      <textarea id="intUpdateInterviewNotes" rows="3" class="form-control" data-int-update-notes></textarea>
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-2">
+                      <button type="submit" class="btn btn-outline-brand">Update Interview</button>
+                      <button type="button" class="btn btn-outline-secondary" data-int-update-clear>Clear</button>
+                    </div>
+                  </form>
                 </section>
               </div>
             </div>
@@ -376,7 +408,10 @@
       crossorigin="anonymous"
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="../js/runtime-config.js"></script>
     <script src="../js/script.js"></script>
     <script src="../js/interviewer.js"></script>
   </body>
 </html>
+
+

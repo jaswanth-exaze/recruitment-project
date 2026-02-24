@@ -1,12 +1,21 @@
 /**
  * Hiring Manager dashboard script.
  * Handles approvals, jobs, final candidate decisions, profile, and auth flow.
+ *
+ * Beginner Reading Guide:
+ * 1) `HM_CONFIG` holds endpoint paths and auth storage keys.
+ * 2) `hmState` stores currently loaded approvals/jobs/decisions/profile.
+ * 3) Helpers normalize API payloads and render message/status text.
+ * 4) `apiRequest()` is the only function that talks to backend APIs.
+ * 5) Section loaders (`openApprovals`, `openJobs`, `openDecisions`) populate UI.
+ * 6) Binders connect nav and form/button actions.
+ * 7) `initHiringManagerDashboard()` is the entry point.
  */
 
 // 1) Config and state.
 const HM_CONFIG = {
   useApi: true,
-  apiBase: String(window.HIRING_MANAGER_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(
+  apiBase: String(window.HIRING_MANAGER_API_BASE_URL || window.API_BASE || window.location.origin || "http://localhost:3000").replace(
     /\/+$/,
     "",
   ),
@@ -83,6 +92,7 @@ const ui = {
   approvalLoadBtn: document.querySelector("[data-hm-approval-load]"),
   approvalList: document.querySelector("[data-hm-approval-list]"),
   approvalMsg: document.querySelector("[data-hm-approval-msg]"),
+  approvalComments: document.querySelector("[data-hm-approval-comments]"),
 
   jobsLoadBtn: document.querySelector("[data-hm-jobs-load]"),
   jobList: document.querySelector("[data-hm-job-list]"),
@@ -184,6 +194,8 @@ function toStatusLabel(status) {
     .trim()
     .toLowerCase()
     .replace(/_/g, " ")
+    .replace(/interview score submited/g, "interview score submitted")
+    .replace(/offer accecepted/g, "offer accepted")
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
@@ -669,7 +681,7 @@ function renderApprovalRows(rows) {
     tr.appendChild(requesterCell);
 
     const statusCell = document.createElement("td");
-    statusCell.textContent = firstValue(row, ["status"], "N/A");
+    statusCell.textContent = toStatusLabel(firstValue(row, ["status"], "N/A"));
     tr.appendChild(statusCell);
 
     const createdCell = document.createElement("td");
@@ -727,7 +739,7 @@ function decisionCandidateLabel(row) {
 function renderDecisionRows(rows) {
   if (!ui.decisionList) return;
   if (!rows.length) {
-    showTableMessage(ui.decisionList, 8, "No offer accecepted applications found");
+    showTableMessage(ui.decisionList, 8, "No offer accepted applications found");
     return;
   }
 
@@ -743,7 +755,7 @@ function renderDecisionRows(rows) {
       firstValue(row, ["job_title", "title"], "N/A"),
       decisionCandidateLabel(row),
       firstValue(row, ["openings_left", "positions_count"], "N/A"),
-      firstValue(row, ["status"], "N/A"),
+      toStatusLabel(firstValue(row, ["status"], "N/A")),
       formatDateTime(firstValue(row, ["updated_at"], ""))
     ];
 
@@ -773,14 +785,14 @@ async function loadDecisionApplications(silent = false) {
 
   try {
     if (!silent) {
-      setMessage(ui.finalDecisionMsg, "Loading offer accecepted applications...", "info");
+      setMessage(ui.finalDecisionMsg, "Loading offer accepted applications...", "info");
     }
     const rows = normalizeArrayResponse(await hmApi.listApplications(query));
     hmState.decisionsRows = rows;
     hmState.decisionsLoaded = true;
     renderDecisionRows(rows);
     if (!silent) {
-      setMessage(ui.finalDecisionMsg, `Loaded ${rows.length} offer accecepted application(s).`, "success");
+      setMessage(ui.finalDecisionMsg, `Loaded ${rows.length} offer accepted application(s).`, "success");
     }
   } catch (error) {
     hmState.decisionsRows = [];
@@ -1061,7 +1073,7 @@ async function openDecisions() {
     renderDecisionRows(hmState.decisionsRows);
     setMessage(
       ui.finalDecisionMsg,
-      `Loaded ${hmState.decisionsRows.length} offer accecepted application(s).`,
+      `Loaded ${hmState.decisionsRows.length} offer accepted application(s).`,
       "success",
     );
     return;
@@ -1077,7 +1089,7 @@ async function openProfile() {
 
 async function handleLogoutClick(event) {
   event.preventDefault();
-  if (!window.confirm("Do you want to logout?")) return;
+  if (!window.confirm("Do you want to log out?")) return;
   await performLogout();
 }
 
@@ -1130,7 +1142,7 @@ function bindActions() {
         return;
       }
 
-      const comments = window.prompt(`Comments for ${action}:`, "") || "";
+      const comments = String(ui.approvalComments?.value || "").trim();
       await runApprovalAction(action, jobId, comments);
     });
   }
@@ -1184,7 +1196,7 @@ function bindActions() {
 
   if (ui.logoutBtn) {
     ui.logoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to logout?")) return;
+      if (!window.confirm("Do you want to log out?")) return;
       await performLogout();
     });
   }
@@ -1199,7 +1211,7 @@ async function initHiringManagerDashboard() {
   setSelectedJob(null);
   if (ui.approvalList) showTableMessage(ui.approvalList, 6, "Load approvals to see records");
   if (ui.jobList) showTableMessage(ui.jobList, 7, "Open jobs to load records");
-  if (ui.decisionList) showTableMessage(ui.decisionList, 8, "Open decisions to load offer accecepted applications");
+  if (ui.decisionList) showTableMessage(ui.decisionList, 8, "Open decisions to load offer accepted applications");
 
   const sessionReady = await loadAuthProfile();
   if (!sessionReady) return;

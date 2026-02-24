@@ -764,3 +764,101 @@ exports.sendOfferAcceptedToHiringManagersEmail = async ({ applicationId, company
     return false;
   }
 };
+
+exports.sendOfferLetterSentToCandidateEmail = async ({ offerId, companyId, triggeredBy }) => {
+  if (!offerId || !companyId) return false;
+  try {
+    const [rows] = await db.promise().query(
+      `
+        SELECT
+          o.id AS offer_id,
+          o.document_url,
+          o.esign_link,
+          o.sent_at,
+          a.id AS application_id,
+          candidate.email AS candidate_email,
+          candidate.first_name AS candidate_first_name,
+          candidate.last_name AS candidate_last_name,
+          j.title AS job_title,
+          c.name AS company_name
+        FROM offers o
+        JOIN applications a ON o.application_id = a.id
+        JOIN users candidate ON a.candidate_id = candidate.id
+        JOIN job_requisitions j ON a.job_id = j.id
+        LEFT JOIN companies c ON c.id = j.company_id
+        WHERE o.id = ? AND j.company_id = ?
+        LIMIT 1
+      `,
+      [offerId, companyId],
+    );
+
+    const context = rows[0];
+    if (!context || !context.candidate_email) return false;
+
+    const candidateName = fullName(
+      context.candidate_first_name,
+      context.candidate_last_name,
+      "Candidate",
+    );
+    const companyName = context.company_name || "your company";
+    const subject = `Offer Letter Sent: Application #${context.application_id}`;
+    const sentAtText = formatDateTime(context.sent_at);
+    const byText = triggeredBy ? `Sent by: ${triggeredBy}` : "";
+
+    const lines = [
+      `Hello ${candidateName},`,
+      "",
+      `Congratulations! Your offer letter for "${context.job_title || "the selected role"}" is now available.`,
+      `Application ID: ${context.application_id}`,
+      `Offer ID: ${context.offer_id}`,
+      context.document_url ? `Offer Letter: ${context.document_url}` : "",
+      context.esign_link ? `E-sign Link: ${context.esign_link}` : "",
+      sentAtText !== "N/A" ? `Sent At: ${sentAtText}` : "",
+      byText,
+      "",
+      "Please review the letter and complete the acceptance steps from your candidate dashboard.",
+      "",
+      "Best regards,",
+      `${companyName} Hiring Team`,
+    ].filter(Boolean);
+    const text = lines.join("\n");
+
+    const login = loginUrl();
+    const ctaUrl = canUseCta(context.document_url) ? context.document_url : login;
+    const ctaLabel = canUseCta(context.document_url)
+      ? "Open Offer Letter"
+      : (canUseCta(login) ? "Open Candidate Dashboard" : "");
+
+    const html = buildRecruitmentEmailHtml({
+      preheader: `Offer letter sent for Application #${context.application_id}`,
+      title: "Offer Letter Sent",
+      subtitle: "Your next hiring step is ready",
+      greeting: `Hello ${candidateName},`,
+      summary: `Congratulations! Your offer letter for "${context.job_title || "the selected role"}" is now available.`,
+      details: [
+        { label: "Application ID", value: context.application_id },
+        { label: "Offer ID", value: context.offer_id },
+        { label: "Job", value: context.job_title || "N/A" },
+        ...(context.document_url ? [{ label: "Offer Letter", value: context.document_url }] : []),
+        ...(context.esign_link ? [{ label: "E-sign Link", value: context.esign_link }] : []),
+        ...(sentAtText !== "N/A" ? [{ label: "Sent At", value: sentAtText }] : []),
+        ...(byText ? [{ label: "Sent By", value: triggeredBy }] : []),
+      ],
+      highlights: [
+        "Review your offer letter carefully.",
+        "Complete acceptance/e-sign steps from your candidate portal.",
+      ],
+      tone: "success",
+      statusLabel: "Offer Letter Sent",
+      companyName,
+      footerText: `Best regards,\n${companyName} Hiring Team`,
+      ctaLabel,
+      ctaUrl: canUseCta(ctaUrl) ? ctaUrl : "",
+    });
+
+    return sendEmail({ to: context.candidate_email, subject, text, html });
+  } catch (err) {
+    console.error("Failed to send offer-letter email to candidate:", err.message);
+    return false;
+  }
+};

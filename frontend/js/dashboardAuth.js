@@ -1,13 +1,20 @@
 /**
  * Frontend auth helpers.
  * Basic token/session handling with simple refresh-on-401 behavior.
+ *
+ * Beginner Reading Guide:
+ * 1) Read and store JWT tokens from browser storage.
+ * 2) Wrap fetch() to auto-add bearer token for protected API calls.
+ * 3) On unauthorized responses, try refresh token once.
+ * 4) If refresh fails, clear auth state and redirect to login.
+ * 5) Provide small helpers for dashboard nav logout/profile actions.
  */
 
 const SESSION_EXPIRED_KEY = "sessionExpiredMessage";
 let alreadyRedirected = false;
 
 const API_BASE_URL = String(
-  window.AUTH_API_BASE || window.API_BASE || window.API_BASE_URL || "http://localhost:3000",
+  window.AUTH_API_BASE || window.API_BASE || window.API_BASE_URL || window.location.origin || "http://localhost:3000",
 ).replace(/\/+$/, "");
 
 const LOGIN_PATH = "../public/login.html";
@@ -213,12 +220,43 @@ async function logout() {
 }
 
 // 5) Optional navbar bindings.
+function showAuthNotice(message, type = "info") {
+  const text = String(message || "").trim();
+  if (!text) return;
+
+  let notice = document.querySelector("[data-auth-inline-notice]");
+  if (!notice) {
+    notice = document.createElement("div");
+    notice.setAttribute("data-auth-inline-notice", "true");
+    notice.style.position = "fixed";
+    notice.style.top = "1rem";
+    notice.style.right = "1rem";
+    notice.style.maxWidth = "min(92vw, 360px)";
+    notice.style.zIndex = "1090";
+    notice.style.padding = "0.7rem 0.9rem";
+    notice.style.borderRadius = "0.7rem";
+    notice.style.boxShadow = "0 10px 24px rgba(0, 0, 0, 0.14)";
+    notice.style.whiteSpace = "pre-wrap";
+    notice.style.fontSize = "0.86rem";
+    notice.style.lineHeight = "1.45";
+    document.body.appendChild(notice);
+  }
+
+  notice.style.background = type === "error" ? "#fde8e8" : "#e8f1ff";
+  notice.style.border = type === "error" ? "1px solid #f3b4b4" : "1px solid #b7cff8";
+  notice.style.color = type === "error" ? "#8f1d1d" : "#173d84";
+  notice.textContent = text;
+  window.setTimeout(() => {
+    if (notice && notice.isConnected) notice.remove();
+  }, 4200);
+}
+
 function bindDashboardAuthNav() {
   const logoutNav = document.querySelector('[data-auth-nav="logout"]');
   if (logoutNav) {
     logoutNav.addEventListener("click", async (event) => {
       event.preventDefault();
-      if (!window.confirm("Do you want to logout?")) return;
+      if (!window.confirm("Do you want to log out?")) return;
       await logout();
     });
   }
@@ -236,11 +274,12 @@ function bindDashboardAuthNav() {
         const payload = await res.json().catch(() => null);
         const profile = payload?.profile || payload || {};
         const name = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "N/A";
-        window.alert(
+        showAuthNotice(
           `Name: ${name}\nEmail: ${profile.email || "N/A"}\nRole: ${profile.role || "N/A"}`,
+          "info",
         );
       } catch (error) {
-        window.alert(error.message || "Unable to load profile.");
+        showAuthNotice(error.message || "Unable to load profile.", "error");
       }
     });
   }

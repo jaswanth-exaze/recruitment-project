@@ -1,11 +1,20 @@
 
 /**
  * Candidate dashboard script.
+ *
+ * Beginner Reading Guide:
+ * 1) `CANDIDATE_CONFIG` defines API endpoints and token keys.
+ * 2) `candState` keeps all dashboard runtime state in one place.
+ * 3) Utility helpers normalize API payloads and UI text.
+ * 4) `api()` is the single network entry point for candidate APIs.
+ * 5) View functions (`openDashboard`, `openJobs`, etc.) load each section.
+ * 6) `bindNavigation` + `bindActions` wire all button/form events.
+ * 7) `initCandidateDashboard()` is the startup entry point.
  */
 
 // 1) Config and state.
 const CANDIDATE_CONFIG = {
-  apiBase: String(window.CANDIDATE_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(/\/+$/, ""),
+  apiBase: String(window.CANDIDATE_API_BASE_URL || window.API_BASE || window.location.origin || "http://localhost:3000").replace(/\/+$/, ""),
   tryApiPrefixFallback: false,
   tokenKeys: ["token", "accessToken", "authToken", "jwtToken"],
   endpoints: {
@@ -169,6 +178,15 @@ function buildPath(path, id) {
 function setText(el, value) {
   if (!el) return;
   el.textContent = value === undefined || value === null || value === "" ? "N/A" : String(value);
+}
+
+function displayStatusLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = raw.toLowerCase();
+  if (normalized === "interview score submited") return "interview score submitted";
+  if (normalized === "offer accecepted") return "offer accepted";
+  return raw.replace(/_/g, " ");
 }
 
 function setMsg(el, text, type = "info") {
@@ -1091,7 +1109,7 @@ function renderOfferRows(rows) {
     tr.appendChild(jobTd);
 
     const statusTd = document.createElement("td");
-    statusTd.textContent = status || "N/A";
+    statusTd.textContent = displayStatusLabel(status || "N/A");
     tr.appendChild(statusTd);
 
     const detailsTd = document.createElement("td");
@@ -1443,7 +1461,7 @@ async function openProfile() {
 
 async function handleLogoutClick(event) {
   event.preventDefault();
-  if (!window.confirm("Do you want to logout?")) return;
+  if (!window.confirm("Do you want to log out?")) return;
   await performLogout();
 }
 
@@ -1572,7 +1590,7 @@ function bindActions() {
   if (ui.reloadProfileBtn) ui.reloadProfileBtn.addEventListener("click", reloadProfile);
   if (ui.logoutBtn) {
     ui.logoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to logout?")) return;
+      if (!window.confirm("Do you want to log out?")) return;
       await performLogout();
     });
   }

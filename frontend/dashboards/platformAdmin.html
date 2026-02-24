@@ -28,6 +28,7 @@
     />
   </head>
   <body class="dashboard-body">
+    <!-- Page Structure Guide: Header/Topbar -> Main Sections -> Footer/Actions. JavaScript binds to data-* attributes in this page. -->
     <div class="dashboard-layout">
       <aside class="dash-sidebar d-flex flex-column">
         <a
@@ -63,18 +64,6 @@
             <i class="bi bi-envelope"></i>
             <span class="sidebar-label">Contact Requests</span>
           </a>
-          <a class="dash-nav-link" href="#" data-admin-nav="profile">
-            <i class="bi bi-person-circle"></i>
-            <span class="sidebar-label">Profile</span>
-          </a>
-          <a
-            class="dash-nav-link"
-            href="../public/login.html"
-            data-admin-nav="logout"
-          >
-            <i class="bi bi-box-arrow-right"></i>
-            <span class="sidebar-label">Logout</span>
-          </a>
         </nav>
 
         <div class="mt-auto sidebar-footnote small text-white-50">
@@ -105,14 +94,14 @@
                 </p>
               </div>
             </div>
-            <div class="search-box">
-              <i class="bi bi-search"></i>
-              <input
-                type="search"
-                class="form-control"
-                placeholder="Search companies or users"
-                data-admin-search
-              />
+            <div class="dash-topbar-actions">
+              <button type="button" class="btn btn-outline-brand btn-sm" data-admin-nav="profile">
+                <i class="bi bi-person-circle"></i>
+                Profile
+              </button>
+              <button type="button" class="btn btn-logout-soft btn-sm" data-admin-nav="logout">
+                Logout
+              </button>
             </div>
           </div>
         </header>
@@ -878,7 +867,10 @@
       crossorigin="anonymous"
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="../js/runtime-config.js"></script>
     <script src="../js/script.js"></script>
     <script src="../js/platformAdmin.js"></script>
   </body>
 </html>
+
+

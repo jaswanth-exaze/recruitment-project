@@ -24,6 +24,7 @@
     <link rel="icon" type="image/svg+xml" href="../public/assets/images/favicon.svg" />
   </head>
   <body class="dashboard-body">
+    <!-- Page Structure Guide: Header/Topbar -> Main Sections -> Footer/Actions. JavaScript binds to data-* attributes in this page. -->
     <div class="dashboard-layout">
       <aside class="dash-sidebar d-flex flex-column">
         <a class="d-inline-flex align-items-center fw-semibold text-white" href="../public/index.html">
@@ -56,14 +57,6 @@
             <i class="bi bi-envelope-open"></i>
             <span class="sidebar-label">Offers</span>
           </a>
-          <a class="dash-nav-link" href="#" data-hr-nav="profile">
-            <i class="bi bi-person-circle"></i>
-            <span class="sidebar-label">Profile</span>
-          </a>
-          <a class="dash-nav-link" href="../public/login.html" data-hr-nav="logout">
-            <i class="bi bi-box-arrow-right"></i>
-            <span class="sidebar-label">Logout</span>
-          </a>
         </nav>
 
         <div class="mt-auto sidebar-footnote small text-white-50">
@@ -86,14 +79,14 @@
                 <p class="dash-company-name mb-0" data-hr-top-company>Company: N/A</p>
               </div>
             </div>
-            <div class="search-box">
-              <i class="bi bi-search"></i>
-              <input
-                type="search"
-                class="form-control"
-                placeholder="Search jobs or candidates"
-                data-hr-search
-              />
+            <div class="dash-topbar-actions">
+              <button type="button" class="btn btn-outline-brand btn-sm" data-hr-nav="profile">
+                <i class="bi bi-person-circle"></i>
+                Profile
+              </button>
+              <button type="button" class="btn btn-logout-soft btn-sm" data-hr-nav="logout">
+                Logout
+              </button>
             </div>
           </div>
         </header>
@@ -176,6 +169,32 @@
                         <option value="Part-time">Part-time</option>
                         <option value="Contract">Contract</option>
                       </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hrJobDepartment">Department</label>
+                      <input id="hrJobDepartment" name="department" type="text" class="form-control" placeholder="Engineering" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hrJobExperience">Experience Level</label>
+                      <select id="hrJobExperience" name="experience_level" class="form-select">
+                        <option value="">Select level</option>
+                        <option value="Entry">Entry</option>
+                        <option value="Mid" selected>Mid</option>
+                        <option value="Senior">Senior</option>
+                        <option value="Lead">Lead</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hrJobSalaryMin">Salary Min</label>
+                      <input id="hrJobSalaryMin" name="salary_min" type="number" min="0" class="form-control" placeholder="600000" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hrJobSalaryMax">Salary Max</label>
+                      <input id="hrJobSalaryMax" name="salary_max" type="number" min="0" class="form-control" placeholder="1200000" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hrJobDeadline">Application Deadline</label>
+                      <input id="hrJobDeadline" name="application_deadline" type="date" class="form-control" />
                     </div>
                     <div class="col-12">
                       <label class="form-label" for="hrJobPositions">Positions</label>
@@ -322,6 +341,46 @@
                     <li><strong>Recommend:</strong> mark offer recommended.</li>
                     <li>Use Candidate section for profile updates.</li>
                   </ul>
+                  <hr class="my-3" />
+                  <h3 class="h6 mb-3">Application Action Panel</h3>
+                  <div class="row g-2">
+                    <div class="col-12">
+                      <label class="form-label small mb-1" for="hrActionApplicationId">Application ID</label>
+                      <input
+                        id="hrActionApplicationId"
+                        type="number"
+                        min="1"
+                        class="form-control form-control-sm"
+                        data-hr-app-action-id
+                        readonly
+                      />
+                    </div>
+                    <div class="col-md-7">
+                      <label class="form-label small mb-1" for="hrActionMoveStatus">Move Status</label>
+                      <select id="hrActionMoveStatus" class="form-select form-select-sm" data-hr-app-move-status>
+                        <option value="applied">applied</option>
+                        <option value="screening">screening</option>
+                        <option value="interview" selected>interview</option>
+                        <option value="interview score submited">interview score submitted</option>
+                        <option value="selected">selected</option>
+                        <option value="rejected">rejected</option>
+                        <option value="offer_letter_sent">offer_letter_sent</option>
+                        <option value="offer accecepted">offer accepted</option>
+                        <option value="hired">hired</option>
+                      </select>
+                    </div>
+                    <div class="col-md-5">
+                      <label class="form-label small mb-1" for="hrActionMoveStage">Stage ID</label>
+                      <input id="hrActionMoveStage" type="number" min="1" class="form-control form-control-sm" data-hr-app-move-stage />
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-2 mt-1">
+                      <button type="button" class="btn btn-outline-brand btn-sm" data-hr-app-move-apply>Apply Move</button>
+                      <button type="button" class="btn btn-outline-success btn-sm" data-hr-app-screen-interview>Screen: Interview</button>
+                      <button type="button" class="btn btn-outline-danger btn-sm" data-hr-app-screen-reject>Screen: Reject</button>
+                      <button type="button" class="btn btn-outline-warning btn-sm" data-hr-app-recommend>Recommend</button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" data-hr-app-action-clear>Clear</button>
+                    </div>
+                  </div>
                 </section>
               </div>
             </div>
@@ -481,6 +540,33 @@
                     </div>
                   </form>
                   <p class="small mt-3 mb-0 text-secondary" data-hr-interview-create-msg></p>
+
+                  <hr class="my-3" />
+
+                  <h3 class="h6 mb-3">Update Interview (No Popup)</h3>
+                  <form class="row g-3" data-hr-interview-update-form>
+                    <div class="col-md-4">
+                      <label class="form-label" for="hrInterviewUpdateId">Interview ID</label>
+                      <input id="hrInterviewUpdateId" type="number" min="1" class="form-control" data-hr-interview-update-id readonly />
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label" for="hrInterviewUpdateStatus">Status</label>
+                      <select id="hrInterviewUpdateStatus" class="form-select" data-hr-interview-update-status>
+                        <option value="scheduled">scheduled</option>
+                        <option value="completed" selected>completed</option>
+                        <option value="rescheduled">rescheduled</option>
+                        <option value="cancelled">cancelled</option>
+                      </select>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="hrInterviewUpdateNotes">Notes</label>
+                      <textarea id="hrInterviewUpdateNotes" class="form-control" rows="3" data-hr-interview-update-notes></textarea>
+                    </div>
+                    <div class="col-12 d-flex flex-wrap gap-2">
+                      <button type="submit" class="btn btn-outline-brand">Update Interview</button>
+                      <button type="button" class="btn btn-outline-secondary" data-hr-interview-update-clear>Clear</button>
+                    </div>
+                  </form>
                 </section>
               </div>
 
@@ -532,7 +618,7 @@
               <div class="col-lg-6">
                 <section class="table-card p-3 h-100">
                   <h2 class="h6 mb-3">Create Offer Draft</h2>
-                  <form class="row g-3" data-hr-offer-create-form>
+                  <form class="row g-3" data-hr-offer-create-form action="javascript:void(0)">
                     <div class="col-md-9">
                       <label class="form-label" for="hrOfferApplicationId">Offer Ready Application</label>
                       <select
@@ -542,7 +628,7 @@
                         data-hr-offer-application-select
                         required
                       >
-                        <option value="">Select interview score submited/selected application</option>
+                        <option value="">Select interview score submitted/selected application</option>
                       </select>
                     </div>
                     <div class="col-md-3 d-grid">
@@ -550,10 +636,42 @@
                     </div>
                     <div class="col-12">
                       <label class="form-label" for="hrOfferDetails">Offer Details (JSON)</label>
-                      <textarea id="hrOfferDetails" name="offer_details" rows="6" class="form-control" placeholder='{"ctc":"20LPA"}'></textarea>
+                      <textarea
+                        id="hrOfferDetails"
+                        name="offer_details"
+                        rows="4"
+                        class="form-control"
+                        placeholder='{"equity":"0.2%","relocation":"Provided"}'
+                      ></textarea>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hrOfferJoiningDate">Joining Date</label>
+                      <input id="hrOfferJoiningDate" name="joining_date" type="date" class="form-control" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hrOfferCtc">Offered CTC</label>
+                      <input id="hrOfferCtc" name="offered_ctc" type="text" class="form-control" placeholder="20 LPA" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hrOfferBonus">Joining Bonus</label>
+                      <input id="hrOfferBonus" name="bonus" type="text" class="form-control" placeholder="2 Lakh" />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="hrOfferProbation">Probation (Months)</label>
+                      <input id="hrOfferProbation" name="probation_months" type="number" min="0" class="form-control" value="3" />
                     </div>
                     <div class="col-12">
-                      <button type="submit" class="btn btn-brand">Create Offer Draft</button>
+                      <label class="form-label" for="hrOfferWorkLocation">Work Location</label>
+                      <input id="hrOfferWorkLocation" name="work_location" type="text" class="form-control" placeholder="Hyderabad / Remote" />
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label" for="hrOfferNotes">Offer Notes</label>
+                      <textarea id="hrOfferNotes" name="offer_notes" rows="2" class="form-control"></textarea>
+                    </div>
+                    <div class="col-12">
+                      <button type="button" class="btn btn-brand" data-hr-offer-create-btn>
+                        Create Offer Draft
+                      </button>
                     </div>
                   </form>
                   <p class="small mt-2 mb-0 text-secondary" data-hr-offer-eligible-msg></p>
@@ -578,7 +696,7 @@
               <div class="col-lg-6">
                 <section class="table-card p-3 h-100">
                   <h2 class="h6 mb-3">Send Offer</h2>
-                  <form class="row g-3" data-hr-offer-send-form>
+                  <form class="row g-3" data-hr-offer-send-form action="javascript:void(0)">
                     <div class="col-12">
                       <label class="form-label" for="hrOfferId">Offer ID</label>
                       <input id="hrOfferId" type="number" min="1" class="form-control" data-hr-offer-send-id required />
@@ -592,7 +710,7 @@
                       <input id="hrOfferEsign" type="url" class="form-control" data-hr-offer-send-esign />
                     </div>
                     <div class="col-12">
-                      <button type="submit" class="btn btn-outline-brand" data-hr-offer-send-btn>Send Offer</button>
+                      <button type="button" class="btn btn-outline-brand" data-hr-offer-send-btn>Send Offer</button>
                     </div>
                   </form>
                   <p class="small mt-3 mb-0 text-secondary" data-hr-offer-send-msg></p>
@@ -691,7 +809,10 @@
       crossorigin="anonymous"
     ></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    <script src="../js/script.js"></script>
-    <script src="../js/hrRecruiter.js"></script>
+    <script src="../js/runtime-config.js"></script>
+    <script src="../js/script.js?v=20260224-4"></script>
+    <script src="../js/hrRecruiter.js?v=20260224-4"></script>
   </body>
 </html>
+
+

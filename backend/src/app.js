@@ -14,15 +14,30 @@ const interviewerRoutes = require("./routes/interviewer.routes");
 const candidateRoutes = require("./routes/candidate.routes");
 const contactRequestRoutes = require("./routes/contactRequest.routes");
 
+const allowedOrigins = String(process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    if (!allowedOrigins.length) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
 app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  }),
+  cors(corsOptions),
 );
 app.use(express.json());
 app.use(cookieParser());
 app.use(auditMutationMiddleware);
+app.set("trust proxy", 1);
 
 app.use("/auth", authRoutes);
 app.use("/platform-admin", platformAdminRoutes);
@@ -37,7 +52,9 @@ app.get("/health", (req, res) => {
 });
 
 const frontendRoot = path.resolve(__dirname, "../../frontend");
+const generatedRoot = path.resolve(__dirname, "../generated");
 app.use("/frontend", express.static(frontendRoot));
+app.use("/generated", express.static(generatedRoot));
 app.use("/", express.static(path.join(frontendRoot, "public")));
 
 module.exports = app;

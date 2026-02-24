@@ -159,7 +159,7 @@ exports.finalDecision = async (req, res) => {
   try {
     const affected = await service.finalDecision(req.params.id, req.body.status, req.user.company_id);
     if (!affected) {
-      return res.status(404).json({ message: "Application not found or not interview score submited" });
+      return res.status(404).json({ message: "Application not found or not interview score submitted" });
     }
     return res.json({ message: "Final decision updated" });
   } catch (err) {

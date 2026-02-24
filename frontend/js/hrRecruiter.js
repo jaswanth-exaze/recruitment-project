@@ -1,12 +1,21 @@
 /**
  * HR Recruiter dashboard script.
  * Covers jobs, applications, candidates, interviews, offers, profile, and session flows.
+ *
+ * Beginner Reading Guide:
+ * 1) `HR_CONFIG` stores API base + endpoint map.
+ * 2) `hrState` stores all loaded records and selected entities.
+ * 3) Utility helpers normalize status, format dates, and parse JSON fields.
+ * 4) `apiRequest()` is the common backend request helper.
+ * 5) Feature sections are grouped as jobs/applications/candidates/interviews/offers.
+ * 6) `open*` functions render and load each section.
+ * 7) `initHrDashboard()` wires events and starts the page.
  */
 
 // 1) Config and state.
 const HR_CONFIG = {
   useApi: true,
-  apiBase: String(window.HR_API_BASE_URL || window.API_BASE || "http://localhost:3000").replace(/\/+$/, ""),
+  apiBase: String(window.HR_API_BASE_URL || window.API_BASE || window.location.origin || "http://localhost:3000").replace(/\/+$/, ""),
   tryApiPrefixFallback: false,
   tokenKeys: ["token", "accessToken", "authToken", "jwtToken"],
   endpoints: {
@@ -38,6 +47,11 @@ const HR_CONFIG = {
   }
 };
 
+const HR_STORAGE_KEYS = {
+  currentView: "hf_hr_current_view",
+  lastCreatedOfferDraft: "hf_hr_last_created_offer_draft"
+};
+
 const hrState = {
   currentView: "dashboard",
   currentProfile: null,
@@ -55,6 +69,7 @@ const hrState = {
   currentCandidateJobId: "",
   currentCandidateId: "",
   currentCandidate: null,
+  activeApplicationId: "",
   interviewsRows: [],
   interviewerRows: [],
   offerEligibleRows: [],
@@ -136,6 +151,14 @@ const ui = {
   appLoadBtn: document.querySelector("[data-hr-app-load]"),
   appList: document.querySelector("[data-hr-app-list]"),
   appMsg: document.querySelector("[data-hr-app-msg]"),
+  appActionId: document.querySelector("[data-hr-app-action-id]"),
+  appMoveStatus: document.querySelector("[data-hr-app-move-status]"),
+  appMoveStage: document.querySelector("[data-hr-app-move-stage]"),
+  appMoveApplyBtn: document.querySelector("[data-hr-app-move-apply]"),
+  appScreenInterviewBtn: document.querySelector("[data-hr-app-screen-interview]"),
+  appScreenRejectBtn: document.querySelector("[data-hr-app-screen-reject]"),
+  appRecommendBtn: document.querySelector("[data-hr-app-recommend]"),
+  appActionClearBtn: document.querySelector("[data-hr-app-action-clear]"),
 
   candidateJobIdInput: document.querySelector("[data-hr-candidate-job-id]"),
   candidateListLoadBtn: document.querySelector("[data-hr-candidate-list-load]"),
@@ -164,13 +187,25 @@ const ui = {
   interviewLoadBtn: document.querySelector("[data-hr-interview-load]"),
   interviewList: document.querySelector("[data-hr-interview-list]"),
   interviewMsg: document.querySelector("[data-hr-interview-msg]"),
+  interviewUpdateForm: document.querySelector("[data-hr-interview-update-form]"),
+  interviewUpdateId: document.querySelector("[data-hr-interview-update-id]"),
+  interviewUpdateStatus: document.querySelector("[data-hr-interview-update-status]"),
+  interviewUpdateNotes: document.querySelector("[data-hr-interview-update-notes]"),
+  interviewUpdateClearBtn: document.querySelector("[data-hr-interview-update-clear]"),
 
   offerCreateForm: document.querySelector("[data-hr-offer-create-form]"),
   offerApplicationSelect: document.querySelector("[data-hr-offer-application-select]"),
   offerEligibleLoadBtn: document.querySelector("[data-hr-offer-eligible-load]"),
   offerEligibleList: document.querySelector("[data-hr-offer-eligible-list]"),
   offerEligibleMsg: document.querySelector("[data-hr-offer-eligible-msg]"),
+  offerCreateBtn: document.querySelector("[data-hr-offer-create-btn]"),
   offerCreateMsg: document.querySelector("[data-hr-offer-create-msg]"),
+  offerJoiningDate: document.querySelector("[name='joining_date']"),
+  offerCtc: document.querySelector("[name='offered_ctc']"),
+  offerBonus: document.querySelector("[name='bonus']"),
+  offerProbationMonths: document.querySelector("[name='probation_months']"),
+  offerWorkLocation: document.querySelector("[name='work_location']"),
+  offerNotes: document.querySelector("[name='offer_notes']"),
   offerSendForm: document.querySelector("[data-hr-offer-send-form]"),
   offerSendId: document.querySelector("[data-hr-offer-send-id]"),
   offerSendDoc: document.querySelector("[data-hr-offer-send-doc]"),
@@ -233,6 +268,15 @@ function setText(element, value) {
   element.textContent = value === undefined || value === null || value === "" ? "N/A" : String(value);
 }
 
+function displayStatusLabel(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = raw.toLowerCase();
+  if (normalized === "interview score submited") return "interview score submitted";
+  if (normalized === "offer accecepted") return "offer accepted";
+  return raw.replace(/_/g, " ");
+}
+
 function setMessage(element, text, type = "info") {
   if (!element) return;
   element.textContent = text || "";
@@ -262,6 +306,58 @@ function fullName(record) {
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+}
+
+function setStoredCurrentView(viewKey) {
+  if (!viewKey) return;
+  sessionStorage.setItem(HR_STORAGE_KEYS.currentView, String(viewKey));
+}
+
+function getStoredCurrentView() {
+  const value = String(sessionStorage.getItem(HR_STORAGE_KEYS.currentView) || "").trim();
+  if (!value) return "";
+  if (!Object.prototype.hasOwnProperty.call(hrViewMeta, value)) return "";
+  return value;
+}
+
+function storeLastCreatedOfferDraft(payload) {
+  if (!payload || typeof payload !== "object") return;
+  sessionStorage.setItem(HR_STORAGE_KEYS.lastCreatedOfferDraft, JSON.stringify(payload));
+}
+
+function loadLastCreatedOfferDraft() {
+  const raw = String(sessionStorage.getItem(HR_STORAGE_KEYS.lastCreatedOfferDraft) || "").trim();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function applyOfferDraftToSendForm(draft, showInfoMessage = false) {
+  if (!draft || typeof draft !== "object") return false;
+
+  const offerId = firstValue(draft, ["id", "offer_id"], "");
+  const documentUrl = firstValue(draft, ["document_url"], "");
+  const esignLink = firstValue(draft, ["esign_link"], "");
+  const hasAny = Boolean(offerId || documentUrl || esignLink);
+  if (!hasAny) return false;
+
+  if (ui.offerSendId && offerId) ui.offerSendId.value = offerId;
+  if (ui.offerSendDoc && documentUrl) ui.offerSendDoc.value = documentUrl;
+  if (ui.offerSendEsign && esignLink) ui.offerSendEsign.value = esignLink;
+
+  if (showInfoMessage && ui.offerSendMsg) {
+    setMessage(
+      ui.offerSendMsg,
+      "Offer ID, document URL, and e-sign URL are ready in Send Offer.",
+      "info",
+    );
+  }
+
+  return true;
 }
 
 function getStoredToken() {
@@ -635,6 +731,7 @@ function showSection(viewKey) {
 
   setActiveNav(viewKey);
   hrState.currentView = viewKey;
+  setStoredCurrentView(viewKey);
 
   const meta = hrViewMeta[viewKey];
   if (!meta) return;
@@ -741,7 +838,7 @@ function createStatusBadge(status) {
 
   const badge = document.createElement("span");
   badge.className = `badge ${cls}`;
-  badge.textContent = status || "unknown";
+  badge.textContent = displayStatusLabel(status || "unknown");
   return badge;
 }
 
@@ -836,7 +933,7 @@ function renderDashboardCharts(applications) {
       statusMap[status] += 1;
     });
 
-    const labels = Object.keys(statusMap).map((status) => status.replace(/_/g, " "));
+    const labels = Object.keys(statusMap).map((status) => displayStatusLabel(status));
     const values = Object.values(statusMap);
 
     destroyChart(hrState.pipelineChart);
@@ -1034,7 +1131,12 @@ function jobCreatePayloadFromForm(form) {
     requirements: String(formData.get("requirements") || "").trim(),
     location: String(formData.get("location") || "").trim(),
     employment_type: String(formData.get("employment_type") || "Full-time").trim() || "Full-time",
-    positions_count: toNumber(formData.get("positions_count")) || 1
+    positions_count: toNumber(formData.get("positions_count")) || 1,
+    department: String(formData.get("department") || "").trim(),
+    experience_level: String(formData.get("experience_level") || "").trim(),
+    salary_min: toNumber(formData.get("salary_min")),
+    salary_max: toNumber(formData.get("salary_max")),
+    application_deadline: String(formData.get("application_deadline") || "").trim(),
   };
 }
 
@@ -1120,10 +1222,7 @@ async function submitEditJob(event) {
 
 function getApproverId() {
   const fromInput = String(ui.jobApproverId?.value || "").trim();
-  if (fromInput) return toNumber(fromInput);
-  const prompted = window.prompt("Enter approver id:");
-  if (!prompted) return null;
-  return toNumber(prompted.trim());
+  return fromInput ? toNumber(fromInput) : null;
 }
 
 async function submitJobForApproval(jobId) {
@@ -1173,6 +1272,93 @@ async function handleJobListClick(event) {
   }
 }
 
+function clearApplicationActionContext() {
+  hrState.activeApplicationId = "";
+  if (ui.appActionId) ui.appActionId.value = "";
+  if (ui.appMoveStage) ui.appMoveStage.value = "";
+}
+
+function setApplicationActionContext(appId, currentStatus = "", currentStage = "") {
+  hrState.activeApplicationId = String(appId || "").trim();
+  if (ui.appActionId) ui.appActionId.value = hrState.activeApplicationId;
+  if (ui.appMoveStatus) {
+    const fallback = currentStatus || "interview";
+    const hasOption = Array.from(ui.appMoveStatus.options).some(
+      (option) => option.value === fallback,
+    );
+    ui.appMoveStatus.value = hasOption ? fallback : "interview";
+  }
+  if (ui.appMoveStage) ui.appMoveStage.value = currentStage || "";
+}
+
+function selectedApplicationId() {
+  return String(ui.appActionId?.value || hrState.activeApplicationId || "").trim();
+}
+
+async function runMoveActionFromPanel() {
+  const appId = selectedApplicationId();
+  if (!appId) {
+    setMessage(ui.appMsg, "Select an application using Move/Screen from the table first.", "error");
+    return;
+  }
+
+  const status = String(ui.appMoveStatus?.value || "").trim();
+  if (!status) {
+    setMessage(ui.appMsg, "Select a target status for move action.", "error");
+    return;
+  }
+
+  const stageRaw = String(ui.appMoveStage?.value || "").trim();
+  const stageId = stageRaw ? toNumber(stageRaw) : null;
+  if (stageRaw && stageId === null) {
+    setMessage(ui.appMsg, "Stage id must be a valid number.", "error");
+    return;
+  }
+
+  try {
+    await hrApi.moveApplicationStage(appId, {
+      status,
+      current_stage_id: stageId
+    });
+    setMessage(ui.appMsg, `Application #${appId} moved to "${status}".`, "success");
+    await loadApplications();
+  } catch (error) {
+    setMessage(ui.appMsg, error.message || "Failed to move application.", "error");
+  }
+}
+
+async function runScreenActionFromPanel(status) {
+  const appId = selectedApplicationId();
+  if (!appId) {
+    setMessage(ui.appMsg, "Select an application using Screen from the table first.", "error");
+    return;
+  }
+
+  try {
+    await hrApi.screenDecision(appId, status);
+    setMessage(ui.appMsg, `Application #${appId} marked as "${status}".`, "success");
+    await loadApplications();
+  } catch (error) {
+    setMessage(ui.appMsg, error.message || "Failed to update screen decision.", "error");
+  }
+}
+
+async function runRecommendActionFromPanel() {
+  const appId = selectedApplicationId();
+  if (!appId) {
+    setMessage(ui.appMsg, "Select an application using Recommend from the table first.", "error");
+    return;
+  }
+
+  try {
+    await hrApi.recommendOffer(appId);
+    setMessage(ui.appMsg, `Offer recommendation marked for application #${appId}.`, "success");
+    await loadApplications();
+  } catch (error) {
+    setMessage(ui.appMsg, error.message || "Failed to recommend offer.", "error");
+  }
+}
+
 function renderApplicationRows(rows) {
   if (!ui.appList) return;
   if (!rows.length) {
@@ -1201,7 +1387,7 @@ function renderApplicationRows(rows) {
     tr.appendChild(candidateCell);
 
     const statusCell = document.createElement("td");
-    statusCell.textContent = firstValue(app, ["status"], "N/A");
+    statusCell.textContent = displayStatusLabel(firstValue(app, ["status"], "N/A"));
     tr.appendChild(statusCell);
 
     const stageCell = document.createElement("td");
@@ -1331,34 +1517,21 @@ async function handleApplicationAction(action, appId, currentStatus, currentStag
     return;
   }
 
-  try {
-    if (action === "move") {
-      const status = window.prompt("Enter status:", currentStatus || "interview");
-      if (!status) return;
-      const stageInput = window.prompt("Enter stage id:", currentStage || "");
-      const stageId = stageInput ? toNumber(stageInput) : null;
-      await hrApi.moveApplicationStage(appId, {
-        status: status.trim(),
-        current_stage_id: stageId
-      });
-      setMessage(ui.appMsg, "Application moved to new stage.", "success");
-    }
+  if (action === "move") {
+    setApplicationActionContext(appId, currentStatus, currentStage);
+    setMessage(ui.appMsg, `Application #${appId} selected. Choose status/stage and click Apply Move.`, "info");
+    return;
+  }
 
-    if (action === "screen") {
-      const status = window.prompt("Screen status (interview/rejected):", "interview");
-      if (!status) return;
-      await hrApi.screenDecision(appId, status.trim());
-      setMessage(ui.appMsg, "Screen decision updated.", "success");
-    }
+  if (action === "screen") {
+    setApplicationActionContext(appId, currentStatus || "interview", currentStage);
+    setMessage(ui.appMsg, `Application #${appId} selected. Use Screen: Interview or Screen: Reject.`, "info");
+    return;
+  }
 
-    if (action === "recommend") {
-      await hrApi.recommendOffer(appId);
-      setMessage(ui.appMsg, "Offer recommendation marked.", "success");
-    }
-
-    await loadApplications();
-  } catch (error) {
-    setMessage(ui.appMsg, error.message || "Failed to update application.", "error");
+  if (action === "recommend") {
+    setApplicationActionContext(appId, currentStatus, currentStage);
+    await runRecommendActionFromPanel();
   }
 }
 
@@ -1829,14 +2002,39 @@ async function submitScheduleInterview(event) {
   }
 }
 
-async function updateInterviewByPrompt(interviewId, currentStatus, currentNotes) {
-  const status = window.prompt("Interview status:", currentStatus || "completed");
-  if (!status) return;
-  const notes = window.prompt("Interview notes:", currentNotes || "") || "";
+function prepareInterviewUpdate(interviewId, currentStatus, currentNotes) {
+  const id = String(interviewId || "").trim();
+  if (!id) return;
+  if (ui.interviewUpdateId) ui.interviewUpdateId.value = id;
+  if (ui.interviewUpdateStatus) ui.interviewUpdateStatus.value = currentStatus || "completed";
+  if (ui.interviewUpdateNotes) ui.interviewUpdateNotes.value = currentNotes || "";
+  setMessage(ui.interviewMsg, `Interview #${id} loaded into update form.`, "info");
+}
+
+function clearInterviewUpdateForm() {
+  if (ui.interviewUpdateId) ui.interviewUpdateId.value = "";
+  if (ui.interviewUpdateStatus) ui.interviewUpdateStatus.value = "completed";
+  if (ui.interviewUpdateNotes) ui.interviewUpdateNotes.value = "";
+}
+
+async function submitInterviewUpdate(event) {
+  event.preventDefault();
+  const interviewId = String(ui.interviewUpdateId?.value || "").trim();
+  const status = String(ui.interviewUpdateStatus?.value || "").trim();
+  const notes = String(ui.interviewUpdateNotes?.value || "").trim();
+
+  if (!interviewId) {
+    setMessage(ui.interviewMsg, "Select an interview from the table before updating.", "error");
+    return;
+  }
+  if (!status) {
+    setMessage(ui.interviewMsg, "Interview status is required.", "error");
+    return;
+  }
 
   try {
-    await hrApi.updateInterview(interviewId, status.trim(), notes.trim());
-    setMessage(ui.interviewMsg, "Interview updated.", "success");
+    await hrApi.updateInterview(interviewId, status, notes);
+    setMessage(ui.interviewMsg, `Interview #${interviewId} updated successfully.`, "success");
     await loadInterviews();
   } catch (error) {
     setMessage(ui.interviewMsg, error.message || "Failed to update interview.", "error");
@@ -1847,8 +2045,6 @@ async function decideInterviewApplication(applicationId, status) {
   if (!applicationId || !status) return;
 
   const label = status === "selected" ? "selected" : "rejected";
-  const confirmed = window.confirm(`Mark application #${applicationId} as ${label}?`);
-  if (!confirmed) return;
 
   try {
     await hrApi.finalDecision(applicationId, status);
@@ -1868,7 +2064,7 @@ function renderOfferApplicationOptions(rows) {
   const placeholder = document.createElement("option");
   placeholder.value = "";
   placeholder.textContent = rows.length
-    ? "Select interview score submited/selected application"
+    ? "Select interview score submitted/selected application"
     : "No offer-ready applications";
   select.appendChild(placeholder);
 
@@ -1961,8 +2157,12 @@ async function loadOfferEligibleApplications() {
 }
 
 async function submitCreateOffer(event) {
-  event.preventDefault();
+  if (event?.preventDefault) event.preventDefault();
+  if (event?.stopPropagation) event.stopPropagation();
   if (!ui.offerCreateForm) return;
+  if (hrState.currentView !== "offers") {
+    showSection("offers");
+  }
 
   const formData = new FormData(ui.offerCreateForm);
   const applicationId = toNumber(formData.get("application_id"));
@@ -1986,6 +2186,27 @@ async function submitCreateOffer(event) {
     return;
   }
 
+  const structuredDetails = {
+    joining_date: String(formData.get("joining_date") || "").trim(),
+    offered_ctc: String(formData.get("offered_ctc") || "").trim(),
+    bonus: String(formData.get("bonus") || "").trim(),
+    probation_months: toNumber(formData.get("probation_months")),
+    work_location: String(formData.get("work_location") || "").trim(),
+    offer_notes: String(formData.get("offer_notes") || "").trim(),
+  };
+
+  const compactStructuredDetails = Object.fromEntries(
+    Object.entries(structuredDetails).filter(([, value]) => value !== "" && value !== null),
+  );
+
+  if (offerDetails && typeof offerDetails === "object" && !Array.isArray(offerDetails)) {
+    offerDetails = { ...offerDetails, ...compactStructuredDetails };
+  } else if (Object.keys(compactStructuredDetails).length) {
+    offerDetails = offerDetails === null
+      ? compactStructuredDetails
+      : { ...compactStructuredDetails, additional_details: offerDetails };
+  }
+
   try {
     setMessage(ui.offerCreateMsg, "Creating offer draft...", "info");
     const result = await hrApi.createOfferDraft({
@@ -1993,12 +2214,22 @@ async function submitCreateOffer(event) {
       created_by: createdBy,
       offer_details: offerDetails
     });
+    const offerRecord = result?.data && typeof result.data === "object" ? result.data : result;
 
     ui.offerCreateForm.reset();
     setMessage(ui.offerCreateMsg, result?.message || "Offer draft created.", "success");
 
-    const offerId = firstValue(result, ["id"], "");
-    if (offerId && ui.offerSendId) ui.offerSendId.value = offerId;
+    const draftSnapshot = {
+      id: firstValue(offerRecord, ["id", "offer_id"], ""),
+      application_id: applicationId,
+      document_url: firstValue(offerRecord, ["document_url"], ""),
+      esign_link: firstValue(offerRecord, ["esign_link"], ""),
+      created_at: new Date().toISOString(),
+    };
+    storeLastCreatedOfferDraft(draftSnapshot);
+    applyOfferDraftToSendForm(draftSnapshot, true);
+
+    showSection("offers");
     await loadOfferEligibleApplications();
   } catch (error) {
     setMessage(ui.offerCreateMsg, error.message || "Failed to create offer draft.", "error");
@@ -2006,7 +2237,8 @@ async function submitCreateOffer(event) {
 }
 
 async function submitSendOffer(event) {
-  event.preventDefault();
+  if (event?.preventDefault) event.preventDefault();
+  if (event?.stopPropagation) event.stopPropagation();
 
   const offerId = String(ui.offerSendId?.value || "").trim();
   if (!offerId) {
@@ -2141,6 +2373,7 @@ async function openInterviews() {
 
 async function openOffers() {
   showSection("offers");
+  applyOfferDraftToSendForm(loadLastCreatedOfferDraft(), true);
   await loadOfferEligibleApplications();
 }
 
@@ -2152,7 +2385,7 @@ async function openProfile() {
 
 async function handleLogoutClick(event) {
   event.preventDefault();
-  if (!window.confirm("Do you want to logout?")) return;
+  if (!window.confirm("Do you want to log out?")) return;
   await performLogout();
 }
 
@@ -2201,6 +2434,16 @@ function bindActions() {
   if (ui.jobClearBtn) ui.jobClearBtn.addEventListener("click", clearSelectedJob);
 
   if (ui.appLoadBtn) ui.appLoadBtn.addEventListener("click", loadApplications);
+  if (ui.appMoveApplyBtn) ui.appMoveApplyBtn.addEventListener("click", runMoveActionFromPanel);
+  if (ui.appScreenInterviewBtn) ui.appScreenInterviewBtn.addEventListener("click", () => runScreenActionFromPanel("interview"));
+  if (ui.appScreenRejectBtn) ui.appScreenRejectBtn.addEventListener("click", () => runScreenActionFromPanel("rejected"));
+  if (ui.appRecommendBtn) ui.appRecommendBtn.addEventListener("click", runRecommendActionFromPanel);
+  if (ui.appActionClearBtn) {
+    ui.appActionClearBtn.addEventListener("click", () => {
+      clearApplicationActionContext();
+      setMessage(ui.appMsg, "Application action panel cleared.", "info");
+    });
+  }
   if (ui.appList) {
     ui.appList.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-app-action]");
@@ -2221,6 +2464,8 @@ function bindActions() {
   if (ui.resumeForm) ui.resumeForm.addEventListener("submit", submitResumeUpdate);
 
   if (ui.interviewCreateForm) ui.interviewCreateForm.addEventListener("submit", submitScheduleInterview);
+  if (ui.interviewUpdateForm) ui.interviewUpdateForm.addEventListener("submit", submitInterviewUpdate);
+  if (ui.interviewUpdateClearBtn) ui.interviewUpdateClearBtn.addEventListener("click", clearInterviewUpdateForm);
   if (ui.interviewLoadBtn) ui.interviewLoadBtn.addEventListener("click", loadInterviews);
   if (ui.interviewList) {
     ui.interviewList.addEventListener("click", async (event) => {
@@ -2233,7 +2478,7 @@ function bindActions() {
       const applicationId = String(button.dataset.applicationId || "").trim();
 
       if (action === "update") {
-        await updateInterviewByPrompt(interviewId, status, notes);
+        prepareInterviewUpdate(interviewId, status, notes);
         return;
       }
 
@@ -2248,15 +2493,51 @@ function bindActions() {
     });
   }
 
-  if (ui.offerCreateForm) ui.offerCreateForm.addEventListener("submit", submitCreateOffer);
+  if (ui.offerCreateForm) {
+    ui.offerCreateForm.setAttribute("novalidate", "novalidate");
+    ui.offerCreateForm.addEventListener(
+      "submit",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        submitCreateOffer(event);
+      },
+      true,
+    );
+  }
+  if (ui.offerCreateBtn) {
+    ui.offerCreateBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      submitCreateOffer(event);
+    });
+  }
   if (ui.offerEligibleLoadBtn) ui.offerEligibleLoadBtn.addEventListener("click", loadOfferEligibleApplications);
-  if (ui.offerSendForm) ui.offerSendForm.addEventListener("submit", submitSendOffer);
+  if (ui.offerSendForm) {
+    ui.offerSendForm.setAttribute("novalidate", "novalidate");
+    ui.offerSendForm.addEventListener(
+      "submit",
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        submitSendOffer(event);
+      },
+      true,
+    );
+  }
+  if (ui.offerSendBtn) {
+    ui.offerSendBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      submitSendOffer(event);
+    });
+  }
 
   if (ui.profileForm) ui.profileForm.addEventListener("submit", submitProfileUpdate);
   if (ui.reloadProfileBtn) ui.reloadProfileBtn.addEventListener("click", reloadProfile);
   if (ui.profileLogoutBtn) {
     ui.profileLogoutBtn.addEventListener("click", async () => {
-      if (!window.confirm("Do you want to logout?")) return;
+      if (!window.confirm("Do you want to log out?")) return;
       await performLogout();
     });
   }
@@ -2274,6 +2555,31 @@ async function initHrDashboard() {
   const sessionReady = await loadAuthProfile();
   if (!sessionReady) return;
 
+  const initialView = getStoredCurrentView() || "dashboard";
+  if (initialView === "jobs") {
+    await openJobs();
+    return;
+  }
+  if (initialView === "applications") {
+    await openApplications();
+    return;
+  }
+  if (initialView === "candidates") {
+    await openCandidates();
+    return;
+  }
+  if (initialView === "interviews") {
+    await openInterviews();
+    return;
+  }
+  if (initialView === "offers") {
+    await openOffers();
+    return;
+  }
+  if (initialView === "profile") {
+    await openProfile();
+    return;
+  }
   await openDashboard();
 }
 

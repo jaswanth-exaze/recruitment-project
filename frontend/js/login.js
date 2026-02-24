@@ -1,3 +1,13 @@
+/**
+ * Login + signup page script.
+ *
+ * Beginner Reading Guide:
+ * 1) Detect whether current page has login form and/or signup form.
+ * 2) Build candidate backend endpoints with safe fallback ordering.
+ * 3) Submit credentials and parse API response.
+ * 4) Save token/role in storage and redirect to role dashboard.
+ * 5) Show clear status messages for loading/success/error.
+ */
 (function initLogin() {
   // 1) Collect all elements first.
   const loginForm = document.getElementById("loginForm");
@@ -18,33 +28,77 @@
 
   const SESSION_EXPIRED_KEY = "sessionExpiredMessage";
 
-  const hasLoginForm = Boolean(loginForm && emailInput && passwordInput && loginButton && loginMsg);
-  const hasSignupForm = Boolean(signupForm && signupFirstName && signupLastName && signupEmail && signupPassword && signupButton && signupMsg);
+  const hasLoginForm = Boolean(
+    loginForm && emailInput && passwordInput && loginButton && loginMsg,
+  );
+  const hasSignupForm = Boolean(
+    signupForm &&
+    signupFirstName &&
+    signupLastName &&
+    signupEmail &&
+    signupPassword &&
+    signupButton &&
+    signupMsg,
+  );
   if (!hasLoginForm && !hasSignupForm) return;
 
   // 2) Build API endpoints.
-  const API_BASE = String(window.AUTH_API_BASE || window.API_BASE || "http://localhost:3000").replace(/\/+$/, "");
+  function buildApiBaseCandidates() {
+    const candidates = [];
+    const add = (value) => {
+      const normalized = String(value || "").trim().replace(/\/+$/, "");
+      if (!normalized || candidates.includes(normalized)) return;
+      candidates.push(normalized);
+    };
 
-  function buildAuthEndpoints(baseUrl, path) {
+    add(window.AUTH_API_BASE);
+    add(window.API_BASE);
+    add(window.API_BASE_URL);
+    add(window.PUBLIC_API_BASE);
+
+    const locationOrigin = String(window.location?.origin || "").trim();
+    add(locationOrigin);
+
+    // Common local backend ports when frontend runs from Live Server (e.g. 5500).
+    try {
+      const parsed = new URL(locationOrigin);
+      add(`${parsed.protocol}//${parsed.hostname}:5000`);
+      add(`${parsed.protocol}//${parsed.hostname}:3000`);
+    } catch (error) {
+      // Ignore URL parse issues and keep static fallbacks below.
+    }
+
+    add("http://localhost:5000");
+    add("http://127.0.0.1:5000");
+    add("http://localhost:3000");
+    add("http://127.0.0.1:3000");
+
+    return candidates;
+  }
+
+  function buildAuthEndpoints(path) {
     const endpoints = [];
     const addEndpoint = (url) => {
       if (!endpoints.includes(url)) endpoints.push(url);
     };
 
-    addEndpoint(`${baseUrl}${path}`);
+    const baseCandidates = buildApiBaseCandidates();
+    for (let i = 0; i < baseCandidates.length; i += 1) {
+      const baseUrl = baseCandidates[i];
+      addEndpoint(`${baseUrl}${path}`);
 
-    if (baseUrl.endsWith("/api")) {
-      const noApiBase = baseUrl.replace(/\/api$/, "");
-      addEndpoint(`${noApiBase}${path}`);
-    } else {
-      addEndpoint(`${baseUrl}/api${path}`);
+      if (baseUrl.endsWith("/api")) {
+        addEndpoint(`${baseUrl.replace(/\/api$/, "")}${path}`);
+      } else {
+        addEndpoint(`${baseUrl}/api${path}`);
+      }
     }
 
     return endpoints;
   }
 
-  const LOGIN_ENDPOINTS = buildAuthEndpoints(API_BASE, "/auth/login");
-  const SIGNUP_ENDPOINTS = buildAuthEndpoints(API_BASE, "/auth/signup");
+  const LOGIN_ENDPOINTS = buildAuthEndpoints("/auth/login");
+  const SIGNUP_ENDPOINTS = buildAuthEndpoints("/auth/signup");
 
   // 3) Small UI helpers.
   function setMessage(element, text, type) {
@@ -57,7 +111,9 @@
   }
 
   function showStoredSessionMessage() {
-    const message = String(localStorage.getItem(SESSION_EXPIRED_KEY) || "").trim();
+    const message = String(
+      localStorage.getItem(SESSION_EXPIRED_KEY) || "",
+    ).trim();
     if (!message) return;
     setMessage(loginMsg, message, "error");
     localStorage.removeItem(SESSION_EXPIRED_KEY);
@@ -72,7 +128,9 @@
   function setSignupLoading(isLoading) {
     if (!signupButton) return;
     signupButton.disabled = isLoading;
-    signupButton.textContent = isLoading ? "Creating..." : "Create Candidate Account";
+    signupButton.textContent = isLoading
+      ? "Creating..."
+      : "Create Candidate Account";
   }
 
   // 4) Auth/session helpers.
@@ -85,12 +143,18 @@
 
   function getRedirectPathByRole(role) {
     const normalized = normalizeRole(role);
-    if (normalized === "platformadmin") return "../dashboards/platformAdmin.html";
+    if (normalized === "platformadmin")
+      return "../dashboards/platformAdmin.html";
     if (normalized === "companyadmin") return "../dashboards/companyAdmin.html";
-    if (normalized === "hr" || normalized === "hrrecruiter" || normalized === "hrmanager") {
+    if (
+      normalized === "hr" ||
+      normalized === "hrrecruiter" ||
+      normalized === "hrmanager"
+    ) {
       return "../dashboards/hrRecruiter.html";
     }
-    if (normalized === "hiringmanager") return "../dashboards/hiringManager.html";
+    if (normalized === "hiringmanager")
+      return "../dashboards/hiringManager.html";
     if (normalized === "interviewer") return "../dashboards/interviewer.html";
     if (normalized === "candidate") return "../dashboards/candidate.html";
     return "index.html";
@@ -115,7 +179,8 @@
       data = null;
     }
     if (!response.ok) {
-      const message = data?.message || `${fallbackLabel} failed (${response.status})`;
+      const message =
+        data?.message || `${fallbackLabel} failed (${response.status})`;
       const error = new Error(message);
       error.status = response.status;
       throw error;
@@ -125,6 +190,7 @@
 
   async function requestWithFallback(endpoints, payload, label) {
     let lastError = new Error(`Unable to reach ${label} endpoint`);
+    const retryableStatus = new Set([404, 405]);
 
     for (let i = 0; i < endpoints.length; i += 1) {
       const endpoint = endpoints[i];
@@ -136,15 +202,20 @@
           body: JSON.stringify(payload),
         });
 
-        if (response.status === 404) {
-          lastError = new Error(`${label} endpoint not found at ${endpoint}`);
+        if (retryableStatus.has(response.status)) {
+          lastError = new Error(
+            `${label} endpoint not available at ${endpoint} (${response.status})`,
+          );
           continue;
         }
 
         return await parseResponse(response, label);
       } catch (error) {
         lastError = error;
-        if (Number(error?.status || 0) && Number(error.status) !== 404) {
+        if (
+          Number(error?.status || 0) &&
+          !retryableStatus.has(Number(error.status))
+        ) {
           throw error;
         }
       }
@@ -169,19 +240,31 @@
       setMessage(loginMsg, "Authenticating...", "info");
 
       try {
-        const result = await requestWithFallback(LOGIN_ENDPOINTS, { email, password }, "Login");
+        const result = await requestWithFallback(
+          LOGIN_ENDPOINTS,
+          { email, password },
+          "Login",
+        );
         const token = result.token;
         const role = result.role;
         if (!token) throw new Error("Token missing in login response");
         persistAuth(token, role);
-        setMessage(loginMsg, result.message || "Login successful. Redirecting...", "success");
+        setMessage(
+          loginMsg,
+          result.message || "Login successful. Redirecting...",
+          "success",
+        );
         const redirectPath = getRedirectPathByRole(role);
         window.setTimeout(() => {
           window.location.href = redirectPath;
         }, 350);
       } catch (error) {
         console.error("Login error:", error);
-        setMessage(loginMsg, error.message || "Unable to login. Please try again.", "error");
+        setMessage(
+          loginMsg,
+          error.message || "Unable to login. Please try again.",
+          "error",
+        );
       } finally {
         setLoginLoading(false);
       }
@@ -200,11 +283,19 @@
       const address = String(signupAddress?.value || "").trim();
 
       if (!firstName || !lastName || !email || !password) {
-        setMessage(signupMsg, "first_name, last_name, email, and password are required.", "error");
+        setMessage(
+          signupMsg,
+          "first_name, last_name, email, and password are required.",
+          "error",
+        );
         return;
       }
       if (password.length < 8) {
-        setMessage(signupMsg, "Password must be at least 8 characters.", "error");
+        setMessage(
+          signupMsg,
+          "Password must be at least 8 characters.",
+          "error",
+        );
         return;
       }
 
@@ -226,13 +317,21 @@
         if (!token) throw new Error("Token missing in signup response");
 
         persistAuth(token, role);
-        setMessage(signupMsg, result.message || "Signup successful. Redirecting...", "success");
+        setMessage(
+          signupMsg,
+          result.message || "Signup successful. Redirecting...",
+          "success",
+        );
         window.setTimeout(() => {
           window.location.href = getRedirectPathByRole(role);
         }, 350);
       } catch (error) {
         console.error("Signup error:", error);
-        setMessage(signupMsg, error.message || "Unable to signup. Please try again.", "error");
+        setMessage(
+          signupMsg,
+          error.message || "Unable to signup. Please try again.",
+          "error",
+        );
       } finally {
         setSignupLoading(false);
       }

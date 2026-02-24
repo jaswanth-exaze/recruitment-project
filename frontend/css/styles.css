@@ -1,3 +1,13 @@
+/*
+ * HireFlow main frontend stylesheet.
+ *
+ * Beginner Reading Guide:
+ * 1) Root variables define colors, spacing, radius, and shadows.
+ * 2) Base element styles normalize typography and layout behavior.
+ * 3) Public page blocks define navbar/hero/section components.
+ * 4) Dashboard blocks define sidebar/topbar/cards/table patterns.
+ * 5) Utility + responsive sections handle small screen adjustments.
+ */
 :root {
   --brand-900: #0f1c58;
   --brand-800: #1f2f84;
@@ -123,6 +133,26 @@ img {
   border-color: var(--brand-700);
   color: var(--brand-700);
   background: rgba(65, 103, 223, 0.1);
+}
+
+.btn-logout-soft {
+  border: 1px solid #efbcc5;
+  color: #b4233f;
+  background: linear-gradient(180deg, #fff9fa 0%, #ffeef1 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  border-radius: 999px;
+  font-weight: 600;
+  transition: all var(--transition);
+}
+
+.btn-logout-soft:hover,
+.btn-logout-soft:focus {
+  color: #941b35;
+  border-color: #e18a99;
+  background: linear-gradient(180deg, #ffeef2 0%, #ffdfe6 100%);
 }
 
 .pill {
@@ -628,6 +658,28 @@ textarea.form-control {
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(246, 250, 255, 0.9));
 }
 
+.dash-topbar-actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.52rem;
+}
+
+.dash-topbar-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  min-height: 2rem;
+  min-width: 6.35rem;
+  padding: 0.36rem 0.84rem;
+  font-size: 0.875rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .dash-topbar h1 {
   color: var(--ink-900);
   font-weight: 700;
@@ -1093,6 +1145,11 @@ textarea.form-control {
     padding: 0.64rem 0.72rem;
   }
 
+  .dash-topbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
   .search-box {
     min-width: min(100%, 280px);
   }
@@ -1127,6 +1184,11 @@ textarea.form-control {
   .dash-topbar > .d-flex {
     border-radius: 0.85rem;
     padding: 0.58rem 0.62rem;
+  }
+
+  .dash-topbar-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .search-box {

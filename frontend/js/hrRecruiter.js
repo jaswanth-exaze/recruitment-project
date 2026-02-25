@@ -47,6 +47,12 @@ const HR_CONFIG = {
   }
 };
 
+const COMPANY_LOGO_FALLBACKS = {
+  infosys: "https://upload.wikimedia.org/wikipedia/commons/9/95/Infosys_logo.svg",
+  tcs: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/TCS_Logo_%28cropped%29.jpg/640px-TCS_Logo_%28cropped%29.jpg",
+  wipro: "https://upload.wikimedia.org/wikipedia/commons/a/a0/Wipro_Primary_Logo_Color_RGB.svg",
+};
+
 const HR_STORAGE_KEYS = {
   currentView: "hf_hr_current_view",
   lastCreatedOfferDraft: "hf_hr_last_created_offer_draft"
@@ -73,6 +79,8 @@ const hrState = {
   interviewsRows: [],
   interviewerRows: [],
   offerEligibleRows: [],
+  offerCreateSubmitting: false,
+  offerSendSubmitting: false,
   pipelineChart: null,
   sourceChart: null
 };
@@ -121,6 +129,7 @@ const ui = {
   headerTitle: document.querySelector("[data-hr-header-title]"),
   headerSubtitle: document.querySelector("[data-hr-header-subtitle]"),
   topCompanyName: document.querySelector("[data-hr-top-company]"),
+  topCompanyLogo: document.querySelector("[data-hr-brand-logo]"),
   searchInput: document.querySelector("[data-hr-search]"),
 
   kpiOpenJobs: document.querySelector("[data-hr-kpi-open-jobs]"),
@@ -746,9 +755,34 @@ function resolveCompanyName(profile) {
   return "N/A";
 }
 
+function resolveCompanyLogoUrl(profile) {
+  const direct = firstValue(profile || {}, ["company_logo_url", "logo_url"], "").trim();
+  if (direct) return direct;
+
+  const companyName = firstValue(profile || {}, ["company_name"], "").toLowerCase();
+  if (!companyName) return "";
+  if (companyName.includes("infosys")) return COMPANY_LOGO_FALLBACKS.infosys;
+  if (companyName.includes("wipro")) return COMPANY_LOGO_FALLBACKS.wipro;
+  if (companyName.includes("tcs")) return COMPANY_LOGO_FALLBACKS.tcs;
+  return "";
+}
+
 function renderTopCompanyName() {
-  if (!ui.topCompanyName) return;
-  ui.topCompanyName.textContent = `Company: ${resolveCompanyName(hrState.currentProfile)}`;
+  if (ui.topCompanyName) {
+    ui.topCompanyName.textContent = `Company: ${resolveCompanyName(hrState.currentProfile)}`;
+  }
+
+  if (!ui.topCompanyLogo) return;
+  const logoUrl = resolveCompanyLogoUrl(hrState.currentProfile);
+  if (!logoUrl) {
+    ui.topCompanyLogo.classList.add("d-none");
+    ui.topCompanyLogo.removeAttribute("src");
+    return;
+  }
+
+  ui.topCompanyLogo.src = logoUrl;
+  ui.topCompanyLogo.alt = `${resolveCompanyName(hrState.currentProfile)} logo`;
+  ui.topCompanyLogo.classList.remove("d-none");
 }
 
 function showSection(viewKey) {
@@ -2190,7 +2224,9 @@ async function loadOfferEligibleApplications() {
 async function submitCreateOffer(event) {
   if (event?.preventDefault) event.preventDefault();
   if (event?.stopPropagation) event.stopPropagation();
+  if (event?.stopImmediatePropagation) event.stopImmediatePropagation();
   if (!ui.offerCreateForm) return;
+  if (hrState.offerCreateSubmitting) return;
   if (hrState.currentView !== "offers") {
     showSection("offers");
   }
@@ -2239,6 +2275,11 @@ async function submitCreateOffer(event) {
   }
 
   try {
+    hrState.offerCreateSubmitting = true;
+    if (ui.offerCreateBtn) {
+      ui.offerCreateBtn.disabled = true;
+      ui.offerCreateBtn.textContent = "Creating...";
+    }
     setMessage(ui.offerCreateMsg, "Creating offer draft...", "info");
     const result = await hrApi.createOfferDraft({
       application_id: applicationId,
@@ -2264,12 +2305,21 @@ async function submitCreateOffer(event) {
     await loadOfferEligibleApplications();
   } catch (error) {
     setMessage(ui.offerCreateMsg, error.message || "Failed to create offer draft.", "error");
+    showSection("offers");
+  } finally {
+    hrState.offerCreateSubmitting = false;
+    if (ui.offerCreateBtn) {
+      ui.offerCreateBtn.disabled = false;
+      ui.offerCreateBtn.textContent = "Create Offer Draft";
+    }
   }
 }
 
 async function submitSendOffer(event) {
   if (event?.preventDefault) event.preventDefault();
   if (event?.stopPropagation) event.stopPropagation();
+  if (event?.stopImmediatePropagation) event.stopImmediatePropagation();
+  if (hrState.offerSendSubmitting) return;
 
   const offerId = String(ui.offerSendId?.value || "").trim();
   if (!offerId) {
@@ -2284,14 +2334,18 @@ async function submitSendOffer(event) {
   }
 
   try {
+    hrState.offerSendSubmitting = true;
     await hrApi.sendOffer(offerId, {
       document_url: String(ui.offerSendDoc?.value || "").trim(),
       esign_link: String(ui.offerSendEsign?.value || "").trim()
     });
     setMessage(ui.offerSendMsg, "Offer sent successfully.", "success");
+    showSection("offers");
   } catch (error) {
     setMessage(ui.offerSendMsg, error.message || "Failed to send offer.", "error");
+    showSection("offers");
   } finally {
+    hrState.offerSendSubmitting = false;
     if (ui.offerSendBtn) {
       ui.offerSendBtn.disabled = false;
       ui.offerSendBtn.textContent = initialText;
@@ -2536,13 +2590,6 @@ function bindActions() {
       true,
     );
   }
-  if (ui.offerCreateBtn) {
-    ui.offerCreateBtn.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      submitCreateOffer(event);
-    });
-  }
   if (ui.offerEligibleLoadBtn) ui.offerEligibleLoadBtn.addEventListener("click", loadOfferEligibleApplications);
   if (ui.offerSendForm) {
     ui.offerSendForm.setAttribute("novalidate", "novalidate");
@@ -2556,14 +2603,6 @@ function bindActions() {
       true,
     );
   }
-  if (ui.offerSendBtn) {
-    ui.offerSendBtn.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      submitSendOffer(event);
-    });
-  }
-
   if (ui.profileForm) ui.profileForm.addEventListener("submit", submitProfileUpdate);
   if (ui.reloadProfileBtn) ui.reloadProfileBtn.addEventListener("click", reloadProfile);
 }

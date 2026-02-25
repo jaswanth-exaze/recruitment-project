@@ -59,6 +59,12 @@ const PLATFORM_ADMIN_CONFIG = {
   }
 };
 
+const COMPANY_LOGO_FALLBACKS = {
+  infosys: "https://upload.wikimedia.org/wikipedia/commons/9/95/Infosys_logo.svg",
+  tcs: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/TCS_Logo_%28cropped%29.jpg/640px-TCS_Logo_%28cropped%29.jpg",
+  wipro: "https://upload.wikimedia.org/wikipedia/commons/a/a0/Wipro_Primary_Logo_Color_RGB.svg",
+};
+
 const adminState = {
   currentView: "dashboard",
   companiesLoaded: false,
@@ -121,6 +127,7 @@ const ui = {
   kpiActiveCompanies: document.querySelector("[data-kpi-active-companies]"),
   kpiActiveUsers: document.querySelector("[data-kpi-active-users]"),
   kpiPendingJobs: document.querySelector("[data-kpi-pending-jobs]"),
+  companySnapshotList: document.querySelector("[data-admin-company-snapshot]"),
 
   companyForm: document.querySelector("[data-company-form]"),
   companyList: document.querySelector("[data-company-list]"),
@@ -343,6 +350,31 @@ function createCompanyActionButton(company) {
   return button;
 }
 
+function resolveCompanyLogoUrl(company) {
+  const direct = firstValue(company, ["logo_url", "company_logo_url"], "").trim();
+  if (direct) return direct;
+
+  const companyName = firstValue(company, ["name", "company_name"], "").toLowerCase();
+  if (!companyName) return "";
+  if (companyName.includes("infosys")) return COMPANY_LOGO_FALLBACKS.infosys;
+  if (companyName.includes("wipro")) return COMPANY_LOGO_FALLBACKS.wipro;
+  if (companyName.includes("tcs")) return COMPANY_LOGO_FALLBACKS.tcs;
+  return "";
+}
+
+function buildCompanyLogoImage(company, className = "company-logo-thumb") {
+  const logoUrl = resolveCompanyLogoUrl(company);
+  if (!logoUrl) return null;
+
+  const image = document.createElement("img");
+  image.src = logoUrl;
+  image.alt = `${firstValue(company, ["name", "company_name"], "Company")} logo`;
+  image.className = className;
+  image.loading = "lazy";
+  image.referrerPolicy = "no-referrer";
+  return image;
+}
+
 function createCompanyTableRow(company) {
   const tr = document.createElement("tr");
 
@@ -353,6 +385,15 @@ function createCompanyTableRow(company) {
   const nameCell = document.createElement("td");
   nameCell.textContent = firstValue(company, ["name"], "N/A");
   tr.appendChild(nameCell);
+
+  const logoCell = document.createElement("td");
+  const logoImg = buildCompanyLogoImage(company, "company-logo-thumb");
+  if (logoImg) {
+    logoCell.appendChild(logoImg);
+  } else {
+    logoCell.textContent = "-";
+  }
+  tr.appendChild(logoCell);
 
   const domainCell = document.createElement("td");
   domainCell.textContent = firstValue(company, ["domain"], "N/A");
@@ -394,6 +435,34 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
+}
+
+function formatRelativeDateTime(value) {
+  if (!value) return "N/A";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return formatDateTime(value);
+
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+
+  return formatDateTime(value);
+}
+
+function normalizeCount(value, fallback = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  if (parsed < 0) return fallback;
+  return Math.trunc(parsed);
 }
 
 function destroyChart(chartInstance) {
@@ -512,6 +581,67 @@ function renderDashboardCharts(companies, users) {
       },
     });
   }
+}
+
+function renderCompanyActivitySnapshot(companies, errorMessage = "") {
+  if (!ui.companySnapshotList) return;
+
+  const rows = Array.isArray(companies)
+    ? companies.filter((company) => isActive(firstValue(company, ["is_active", "status"], 1)))
+    : [];
+  if (!rows.length) {
+    showTableMessage(ui.companySnapshotList, 4, errorMessage || "No active companies found");
+    return;
+  }
+
+  const rankedRows = [...rows].sort((left, right) => {
+    const leftValue = firstValue(left, ["last_activity_at", "updated_at", "created_at"], "");
+    const rightValue = firstValue(right, ["last_activity_at", "updated_at", "created_at"], "");
+
+    const leftTime = new Date(leftValue).getTime();
+    const rightTime = new Date(rightValue).getTime();
+
+    const safeLeft = Number.isNaN(leftTime) ? 0 : leftTime;
+    const safeRight = Number.isNaN(rightTime) ? 0 : rightTime;
+    return safeRight - safeLeft;
+  });
+
+  ui.companySnapshotList.innerHTML = "";
+
+  rankedRows.slice(0, 8).forEach((company) => {
+    const tr = document.createElement("tr");
+
+    const companyCell = document.createElement("td");
+    const logoWrap = document.createElement("div");
+    logoWrap.className = "company-name-inline";
+
+    const logoImg = buildCompanyLogoImage(company, "company-logo-chip");
+    if (logoImg) logoWrap.appendChild(logoImg);
+
+    const label = document.createElement("span");
+    label.textContent = firstValue(company, ["name"], "N/A");
+    logoWrap.appendChild(label);
+
+    companyCell.appendChild(logoWrap);
+    tr.appendChild(companyCell);
+
+    const domainCell = document.createElement("td");
+    domainCell.textContent = firstValue(company, ["domain"], "-");
+    tr.appendChild(domainCell);
+
+    const openRolesCell = document.createElement("td");
+    const openRoles = normalizeCount(firstValue(company, ["open_roles", "openRoles"], 0), 0);
+    openRolesCell.textContent = String(openRoles);
+    tr.appendChild(openRolesCell);
+
+    const activityCell = document.createElement("td");
+    const activityAt = firstValue(company, ["last_activity_at", "updated_at", "created_at"], "");
+    activityCell.textContent = formatRelativeDateTime(activityAt);
+    if (activityAt) activityCell.title = formatDateTime(activityAt);
+    tr.appendChild(activityCell);
+
+    ui.companySnapshotList.appendChild(tr);
+  });
 }
 
 function formatAuditAction(action) {
@@ -1064,6 +1194,9 @@ async function loadDashboardKpis() {
   const companies = companiesListResult.status === "fulfilled"
     ? normalizeArrayResponse(companiesListResult.value)
     : [];
+  const companiesError = companiesListResult.status === "rejected"
+    ? (companiesListResult.reason?.message || "Failed to load company activity")
+    : "";
 
   const users = usersRowsResult.status === "fulfilled"
     ? usersRowsResult.value
@@ -1089,6 +1222,7 @@ async function loadDashboardKpis() {
     setKpiText(ui.kpiPendingJobs, "--");
   }
 
+  renderCompanyActivitySnapshot(companies, companiesError);
   renderDashboardCharts(companies, users);
 }
 
@@ -1100,7 +1234,7 @@ function renderCompanyRows(companies) {
   if (!ui.companyList) return;
 
   if (!companies.length) {
-    showTableMessage(ui.companyList, 7, "No companies found");
+    showTableMessage(ui.companyList, 8, "No companies found");
     return;
   }
 
@@ -1130,7 +1264,7 @@ async function loadCompanies() {
     renderCompanyRows(normalizeArrayResponse(payload));
   } catch (error) {
     console.error("Companies load error:", error);
-    showTableMessage(ui.companyList, 7, error.message || "Failed to load companies");
+    showTableMessage(ui.companyList, 8, error.message || "Failed to load companies");
   }
 }
 
@@ -1141,6 +1275,7 @@ async function handleCreateCompanySubmit(event) {
   const formData = new FormData(ui.companyForm);
   const name = String(formData.get("name") || "").trim();
   const domain = String(formData.get("domain") || "").trim();
+  const logoUrl = String(formData.get("logo_url") || "").trim();
   const companyAdminEmail = String(formData.get("company_admin_email") || "").trim();
   const companyAdminPassword = String(formData.get("company_admin_password") || "").trim();
 
@@ -1153,7 +1288,8 @@ async function handleCreateCompanySubmit(event) {
     if (PLATFORM_ADMIN_CONFIG.useApi) {
       const companyResult = await platformAdminApi.createCompany({
         name,
-        domain: domain || null
+        domain: domain || null,
+        logo_url: logoUrl || null,
       });
 
       const companyId = Number(firstValue(companyResult, ["id"], ""));
@@ -1180,6 +1316,7 @@ async function handleCreateCompanySubmit(event) {
         id: `tmp-${Date.now()}`,
         name,
         domain,
+        logo_url: logoUrl || null,
         company_admin_email: companyAdminEmail,
         is_active: 1,
         created_at: new Date().toISOString()

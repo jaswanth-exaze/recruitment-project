@@ -33,6 +33,12 @@ function parseIsActiveFilter(value) {
   return null;
 }
 
+function parseOptionalUrl(value) {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text || null;
+}
+
 const AUDIT_LOG_SELECT_SQL = `
   SELECT
     al.id,
@@ -100,9 +106,52 @@ exports.listActiveCompanies = async ({ isActive = null } = {}) => {
         c.id,
         c.name,
         c.domain,
+        c.logo_url,
         c.is_active,
         c.created_at,
         c.updated_at,
+        (
+          SELECT COALESCE(SUM(COALESCE(j.positions_count, 1)), 0)
+          FROM job_requisitions j
+          WHERE j.company_id = c.id
+            AND j.status = 'published'
+        ) AS open_roles,
+        GREATEST(
+          COALESCE(c.updated_at, '1970-01-01 00:00:00'),
+          COALESCE(
+            (
+              SELECT MAX(u.updated_at)
+              FROM users u
+              WHERE u.company_id = c.id
+            ),
+            '1970-01-01 00:00:00'
+          ),
+          COALESCE(
+            (
+              SELECT MAX(u.last_login_at)
+              FROM users u
+              WHERE u.company_id = c.id
+            ),
+            '1970-01-01 00:00:00'
+          ),
+          COALESCE(
+            (
+              SELECT MAX(j.updated_at)
+              FROM job_requisitions j
+              WHERE j.company_id = c.id
+            ),
+            '1970-01-01 00:00:00'
+          ),
+          COALESCE(
+            (
+              SELECT MAX(a.updated_at)
+              FROM applications a
+              INNER JOIN job_requisitions j2 ON j2.id = a.job_id
+              WHERE j2.company_id = c.id
+            ),
+            '1970-01-01 00:00:00'
+          )
+        ) AS last_activity_at,
         (
           SELECT u.email
           FROM users u
@@ -121,7 +170,7 @@ exports.listActiveCompanies = async ({ isActive = null } = {}) => {
 
 exports.getCompanyById = async (id) => {
   const [rows] = await db.promise().query(
-    `SELECT id, name, domain, is_active, created_at, updated_at FROM companies WHERE id = ? LIMIT 1`,
+    `SELECT id, name, domain, logo_url, is_active, created_at, updated_at FROM companies WHERE id = ? LIMIT 1`,
     [id],
   );
   return rows[0] || null;
@@ -132,20 +181,20 @@ exports.countActiveCompanies = async () => {
   return rows[0];
 };
 
-exports.createCompany = async ({ name, domain }) => {
+exports.createCompany = async ({ name, domain, logo_url }) => {
   if (!name) throw new Error("name is required");
   const [result] = await db.promise().query(
-    `INSERT INTO companies (name, domain, is_active, created_at, updated_at) VALUES (?, ?, 1, NOW(), NOW())`,
-    [name, domain || null],
+    `INSERT INTO companies (name, domain, logo_url, is_active, created_at, updated_at) VALUES (?, ?, ?, 1, NOW(), NOW())`,
+    [name, domain || null, parseOptionalUrl(logo_url)],
   );
   return { id: result.insertId };
 };
 
-exports.updateCompany = async (id, { name, domain }) => {
+exports.updateCompany = async (id, { name, domain, logo_url }) => {
   if (!name) throw new Error("name is required");
   const [result] = await db.promise().query(
-    `UPDATE companies SET name = ?, domain = ?, updated_at = NOW() WHERE id = ?`,
-    [name, domain || null, id],
+    `UPDATE companies SET name = ?, domain = ?, logo_url = ?, updated_at = NOW() WHERE id = ?`,
+    [name, domain || null, parseOptionalUrl(logo_url), id],
   );
   return result.affectedRows;
 };

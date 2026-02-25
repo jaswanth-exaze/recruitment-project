@@ -30,6 +30,14 @@
         <a class="d-inline-flex align-items-center fw-semibold text-white" href="../public/index.html">
           <span class="brand-mark">H</span>
           <span class="dash-brand-text">HireFlow</span>
+          <img
+            src=""
+            alt="Company logo"
+            class="company-brand-logo d-none"
+            data-hr-brand-logo
+            loading="lazy"
+            referrerpolicy="no-referrer"
+          />
         </a>
 
         <nav class="mt-4">
@@ -76,7 +84,6 @@
                 <p class="mb-0 text-secondary small dash-subtitle" data-hr-header-subtitle>
                   Manage jobs, candidates, interview flow, and offers.
                 </p>
-                <p class="dash-company-name mb-0" data-hr-top-company>Company: N/A</p>
               </div>
             </div>
             <div class="dash-topbar-actions">
@@ -618,7 +625,7 @@
               <div class="col-lg-6">
                 <section class="table-card p-3 h-100">
                   <h2 class="h6 mb-3">Create Offer Draft</h2>
-                  <form class="row g-3" data-hr-offer-create-form action="javascript:void(0)">
+                  <form class="row g-3" data-hr-offer-create-form>
                     <div class="col-md-9">
                       <label class="form-label" for="hrOfferApplicationId">Offer Ready Application</label>
                       <select
@@ -669,7 +676,7 @@
                       <textarea id="hrOfferNotes" name="offer_notes" rows="2" class="form-control"></textarea>
                     </div>
                     <div class="col-12">
-                      <button type="button" class="btn btn-brand" data-hr-offer-create-btn>
+                      <button type="submit" class="btn btn-brand" data-hr-offer-create-btn>
                         Create Offer Draft
                       </button>
                     </div>
@@ -696,7 +703,7 @@
               <div class="col-lg-6">
                 <section class="table-card p-3 h-100">
                   <h2 class="h6 mb-3">Send Offer</h2>
-                  <form class="row g-3" data-hr-offer-send-form action="javascript:void(0)">
+                  <form class="row g-3" data-hr-offer-send-form>
                     <div class="col-12">
                       <label class="form-label" for="hrOfferId">Offer ID</label>
                       <input id="hrOfferId" type="number" min="1" class="form-control" data-hr-offer-send-id required />
@@ -710,7 +717,7 @@
                       <input id="hrOfferEsign" type="url" class="form-control" data-hr-offer-send-esign />
                     </div>
                     <div class="col-12">
-                      <button type="button" class="btn btn-outline-brand" data-hr-offer-send-btn>Send Offer</button>
+                      <button type="submit" class="btn btn-outline-brand" data-hr-offer-send-btn>Send Offer</button>
                     </div>
                   </form>
                   <p class="small mt-3 mb-0 text-secondary" data-hr-offer-send-msg></p>
@@ -806,7 +813,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script src="../js/runtime-config.js"></script>
     <script src="../js/script.js?v=20260224-4"></script>
-    <script src="../js/hrRecruiter.js?v=20260224-4"></script>
+    <script src="../js/hrRecruiter.js?v=20260225-1"></script>
   </body>
 </html>
 

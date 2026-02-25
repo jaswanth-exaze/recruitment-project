@@ -707,20 +707,42 @@ textarea.form-control {
   border: 1px solid rgba(65, 103, 223, 0.3);
 }
 
-.dash-company-name {
-  margin-top: 0.34rem;
+.company-brand-logo {
+  width: 130px;
+  height: 50px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid rgba(216, 229, 255, 0.42);
+  border-radius: 0.58rem;
+  padding: 0.2rem 0.3rem;
+  margin-left: 0.35rem;
+  box-shadow: 0 4px 12px rgba(15, 31, 87, 0.2);
+}
+
+.company-logo-thumb {
+  width: 3rem;
+  height: 2rem;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid #d9e5ff;
+  border-radius: 0.45rem;
+  padding: 0.12rem;
+}
+
+.company-name-inline {
   display: inline-flex;
   align-items: center;
-  font-family: "Poppins", sans-serif;
-  font-size: clamp(1rem, 1.45vw, 1.28rem);
-  font-weight: 700;
-  line-height: 1.15;
-  color: var(--brand-800);
-  letter-spacing: -0.01em;
-  background: linear-gradient(145deg, rgba(65, 103, 223, 0.13), rgba(61, 169, 252, 0.12));
-  border: 1px solid rgba(65, 103, 223, 0.21);
-  border-radius: 999px;
-  padding: 0.21rem 0.66rem;
+  gap: 0.46rem;
+}
+
+.company-logo-chip {
+  width: 2.1rem;
+  height: 1.4rem;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid #d9e5ff;
+  border-radius: 0.38rem;
+  padding: 0.1rem;
 }
 
 .search-box {
@@ -987,6 +1009,15 @@ textarea.form-control {
   background: linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
 }
 
+#candApplyModal [data-cand-apply-form] {
+  min-height: 0;
+}
+
+#candApplyModal [data-cand-apply-form] .modal-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .cand-job-detail-shell {
   display: grid;
   gap: 0.9rem;
@@ -1191,6 +1222,7 @@ textarea.form-control {
 
 .dashboard-sidebar-collapsed .sidebar-label,
 .dashboard-sidebar-collapsed .dash-brand-text,
+.dashboard-sidebar-collapsed .company-brand-logo,
 .dashboard-sidebar-collapsed .sidebar-footnote {
   display: none;
 }
@@ -1325,5 +1357,10 @@ textarea.form-control {
   .search-box {
     width: 100%;
     min-width: 0;
+  }
+
+  .company-logo-thumb {
+    width: 2.65rem;
+    height: 1.75rem;
   }
 }

@@ -1,10 +1,34 @@
 const db = require("../config/db");
 const { sendEmail, buildRecruitmentEmailHtml } = require("../utils/email.util");
 
+const CANDIDATE_STATUS_EMAIL_ALLOWLIST = new Set([
+  "interview",
+  "rejected",
+  "offer_letter_sent",
+  "hired",
+]);
+
+function normalizeStatus(status) {
+  const raw = String(status || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  if (!raw) return "";
+  if (raw === "offer_accecepted" || raw === "offer_accepted") return "offer_accepted";
+  if (raw === "interview_score_submited" || raw === "interview_score_submitted") return "interview_score_submitted";
+  return raw;
+}
+
 function toStatusLabel(status) {
-  const value = String(status || "").trim();
-  if (!value) return "Updated";
-  return value
+  const normalized = normalizeStatus(status);
+  if (!normalized) return "Updated";
+
+  if (normalized === "interview") return "Screening Passed - Interview Round";
+  if (normalized === "offer_letter_sent") return "Offer Letter Sent";
+  if (normalized === "hired") return "Hired";
+  if (normalized === "rejected") return "Rejected";
+
+  return normalized
     .split("_")
     .join(" ")
     .replace(/\b\w/g, (ch) => ch.toUpperCase());
@@ -24,20 +48,26 @@ function canUseCta(url) {
 }
 
 function statusTone(status) {
-  const normalized = String(status || "").trim().toLowerCase();
-  if (["hired", "selected", "offer_accepted"].includes(normalized)) return "success";
+  const normalized = normalizeStatus(status);
+  if (["hired", "offer_letter_sent"].includes(normalized)) return "success";
   if (["rejected"].includes(normalized)) return "danger";
-  if (["interview", "interview_score_submitted", "offer_letter_sent"].includes(normalized)) return "warning";
+  if (["interview"].includes(normalized)) return "warning";
   return "info";
 }
 
 function statusSpecificLine(status) {
-  const normalized = String(status || "").trim().toLowerCase();
+  const normalized = normalizeStatus(status);
+  if (normalized === "interview") {
+    return "Good news! You have cleared screening and moved to the interview round.";
+  }
   if (normalized === "hired") {
     return "Congratulations! You have been hired.";
   }
   if (normalized === "offer_letter_sent") {
     return "Your offer letter is available in your candidate portal.";
+  }
+  if (normalized === "rejected") {
+    return "Thank you for your interest. Your application has not been selected for this stage.";
   }
   return "";
 }
@@ -80,7 +110,12 @@ exports.notifyApplicationStatusChange = async ({ applicationId, companyId, statu
     if (!context || !context.candidate_email) return false;
 
     const resolvedStatus = String(status || context.status || "").trim();
-    const statusLabel = toStatusLabel(resolvedStatus);
+    const normalizedStatus = normalizeStatus(resolvedStatus);
+    if (!CANDIDATE_STATUS_EMAIL_ALLOWLIST.has(normalizedStatus)) {
+      return false;
+    }
+
+    const statusLabel = toStatusLabel(normalizedStatus);
     const jobTitle = context.job_title || "Untitled Job";
     const companyName = context.company_name || "your company";
     const candidateName = [context.candidate_first_name, context.candidate_last_name].filter(Boolean).join(" ").trim() || "Candidate";
@@ -88,7 +123,7 @@ exports.notifyApplicationStatusChange = async ({ applicationId, companyId, statu
     const subject = `Application Status Update: ${statusLabel}`;
 
     const actorText = triggeredBy ? `Updated by: ${triggeredBy}.` : "";
-    const specificLine = statusSpecificLine(resolvedStatus);
+    const specificLine = statusSpecificLine(normalizedStatus);
     const updatedAt = context.updated_at ? new Date(context.updated_at).toLocaleString() : "";
     const url = loginUrl();
 
@@ -126,7 +161,7 @@ exports.notifyApplicationStatusChange = async ({ applicationId, companyId, statu
         specificLine || "Please check your dashboard for the latest progress and next steps.",
       ],
       statusLabel,
-      tone: statusTone(resolvedStatus),
+      tone: statusTone(normalizedStatus),
       companyName,
       footerText: `Thanks,\n${companyName} Hiring Team`,
       ctaLabel: canUseCta(url) ? "Open Candidate Dashboard" : "",

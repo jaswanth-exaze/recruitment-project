@@ -21,6 +21,7 @@ async function getUserProfileById(userId) {
         u.id,
         u.company_id,
         c.name AS company_name,
+        c.logo_url AS company_logo_url,
         u.email,
         u.first_name,
         u.last_name,

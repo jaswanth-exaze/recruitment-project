@@ -8,6 +8,7 @@ CREATE TABLE companies (
   id INT NOT NULL AUTO_INCREMENT,
   name VARCHAR(255) NOT NULL,
   domain VARCHAR(255) DEFAULT NULL,
+  logo_url VARCHAR(1000) DEFAULT NULL,
   is_active TINYINT(1) DEFAULT 1,
   created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -280,10 +281,10 @@ CREATE TABLE refresh_tokens (
 -- ==============================================================================================================
 -- ==============================================================================================================
 -- ==============================================================================================================
-INSERT INTO companies (id,name,domain,is_active,created_at,updated_at) VALUES
-(1,'TCS Limited','tcs.com',1,'2026-01-04 09:16:17','2026-01-04 09:16:17'),
-(2,'Infosys Private Ltd','infosys.com',1,'2026-01-11 09:16:17','2026-01-11 09:16:17'),
-(3,'Wipro Technologies','wipro.com',1,'2026-01-19 09:16:17','2026-01-19 09:16:17');
+INSERT INTO companies (id,name,domain,logo_url,is_active,created_at,updated_at) VALUES
+(1,'TCS Limited','tcs.com','https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/TCS_Logo_%28cropped%29.jpg/640px-TCS_Logo_%28cropped%29.jpg',1,'2026-01-04 09:16:17','2026-01-04 09:16:17'),
+(2,'Infosys Private Ltd','infosys.com','https://upload.wikimedia.org/wikipedia/commons/9/95/Infosys_logo.svg',1,'2026-01-11 09:16:17','2026-01-11 09:16:17'),
+(3,'Wipro Technologies','wipro.com','https://upload.wikimedia.org/wikipedia/commons/a/a0/Wipro_Primary_Logo_Color_RGB.svg',1,'2026-01-19 09:16:17','2026-01-19 09:16:17');
 
 INSERT INTO users (id,company_id,email,password_hash,first_name,last_name,role,is_active,last_login_at,created_at,updated_at) VALUES
 (1,1,'admin@tcs.com','$2y$10$YourHashedPasswordHere','Amit','Sharma','CompanyAdmin',1,'2026-02-17 09:16:17','2026-01-04 09:16:17','2026-02-17 09:16:17'),

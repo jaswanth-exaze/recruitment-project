@@ -30,6 +30,12 @@ const INTERVIEWER_CONFIG = {
   }
 };
 
+const COMPANY_LOGO_FALLBACKS = {
+  infosys: "https://upload.wikimedia.org/wikipedia/commons/9/95/Infosys_logo.svg",
+  tcs: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/TCS_Logo_%28cropped%29.jpg/640px-TCS_Logo_%28cropped%29.jpg",
+  wipro: "https://upload.wikimedia.org/wikipedia/commons/a/a0/Wipro_Primary_Logo_Color_RGB.svg",
+};
+
 const intState = {
   currentView: "dashboard",
   currentProfile: null,
@@ -70,6 +76,7 @@ const ui = {
   headerTitle: document.querySelector("[data-int-header-title]"),
   headerSubtitle: document.querySelector("[data-int-header-subtitle]"),
   topCompanyName: document.querySelector("[data-int-top-company]"),
+  topCompanyLogo: document.querySelector("[data-int-brand-logo]"),
   searchInput: document.querySelector("[data-int-search]"),
 
   kpiScheduled: document.querySelector("[data-int-kpi-scheduled]"),
@@ -573,9 +580,34 @@ function resolveCompanyName(profile) {
   return "N/A";
 }
 
+function resolveCompanyLogoUrl(profile) {
+  const direct = firstValue(profile || {}, ["company_logo_url", "logo_url"], "").trim();
+  if (direct) return direct;
+
+  const companyName = firstValue(profile || {}, ["company_name"], "").toLowerCase();
+  if (!companyName) return "";
+  if (companyName.includes("infosys")) return COMPANY_LOGO_FALLBACKS.infosys;
+  if (companyName.includes("wipro")) return COMPANY_LOGO_FALLBACKS.wipro;
+  if (companyName.includes("tcs")) return COMPANY_LOGO_FALLBACKS.tcs;
+  return "";
+}
+
 function renderTopCompanyName() {
-  if (!ui.topCompanyName) return;
-  ui.topCompanyName.textContent = `Company: ${resolveCompanyName(intState.currentProfile)}`;
+  if (ui.topCompanyName) {
+    ui.topCompanyName.textContent = `Company: ${resolveCompanyName(intState.currentProfile)}`;
+  }
+
+  if (!ui.topCompanyLogo) return;
+  const logoUrl = resolveCompanyLogoUrl(intState.currentProfile);
+  if (!logoUrl) {
+    ui.topCompanyLogo.classList.add("d-none");
+    ui.topCompanyLogo.removeAttribute("src");
+    return;
+  }
+
+  ui.topCompanyLogo.src = logoUrl;
+  ui.topCompanyLogo.alt = `${resolveCompanyName(intState.currentProfile)} logo`;
+  ui.topCompanyLogo.classList.remove("d-none");
 }
 
 function showSection(id) {

@@ -8,6 +8,7 @@ const {
   sendOfferLetterSentToCandidateEmail,
 } = require("./recruitmentEmail.service");
 const { generateOfferLetterPdf, buildOfferLetterLinks } = require("../utils/offerLetterPdf.util");
+const { createInterviewGoogleMeet } = require("../utils/googleCalendar.util");
 
 function parseJsonField(value) {
   if (value === null || value === undefined) return null;
@@ -31,6 +32,24 @@ function fullName(firstName, lastName, fallback = "N/A") {
   const last = String(lastName || "").trim();
   const combined = `${first} ${last}`.trim();
   return combined || fallback;
+}
+
+function parseDateTimeInput(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function normalizeDurationMinutes(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 480) {
+    throw new Error("duration_minutes must be an integer between 1 and 480");
+  }
+  return parsed;
 }
 
 async function getUserProfileById(userId) {
@@ -520,19 +539,98 @@ exports.recommendOffer = async (id, companyId) => {
   return result.affectedRows;
 };
 
-exports.scheduleInterview = async (payload, companyId) => {
+exports.scheduleInterview = async (payload, companyId, actor = {}) => {
   const { application_id, interviewer_id, scheduled_at, duration_minutes, meeting_link, notes } = payload;
   if (!application_id || !interviewer_id || !scheduled_at) {
     throw new Error("application_id, interviewer_id and scheduled_at are required");
   }
   if (!companyId) throw new Error("company_id is required");
 
+  const scheduledAt = parseDateTimeInput(scheduled_at);
+  if (!scheduledAt) {
+    throw new Error("scheduled_at must be a valid date or datetime");
+  }
+  if (scheduledAt.getTime() <= Date.now()) {
+    throw new Error("Interviews cannot be scheduled for a date or time that has already passed");
+  }
+
+  const normalizedDuration = normalizeDurationMinutes(duration_minutes);
+  const normalizedMeetingLink = String(meeting_link || "").trim();
+  if (normalizedMeetingLink) {
+    try {
+      const meetingLinkUrl = new URL(normalizedMeetingLink);
+      if (!["http:", "https:"].includes(meetingLinkUrl.protocol)) {
+        throw new Error("meeting_link must use http or https");
+      }
+    } catch (err) {
+      throw new Error("meeting_link must be a valid URL");
+    }
+  }
+
   const [interviewerRows] = await db.promise().query(
-    `SELECT id FROM users WHERE id = ? AND company_id = ? LIMIT 1`,
+    `
+      SELECT id, email, first_name, last_name
+      FROM users
+      WHERE id = ? AND company_id = ? AND role = 'Interviewer' AND is_active = 1
+      LIMIT 1
+    `,
     [interviewer_id, companyId],
   );
   if (!interviewerRows.length) {
-    throw new Error("interviewer_id is not part of your company");
+    throw new Error("interviewer_id must be an active Interviewer from your company");
+  }
+
+  const [applicationRows] = await db.promise().query(
+    `
+      SELECT
+        a.id,
+        a.status,
+        candidate.email AS candidate_email,
+        j.title AS job_title,
+        c.name AS company_name
+      FROM applications a
+      JOIN job_requisitions j ON a.job_id = j.id
+      JOIN users candidate ON a.candidate_id = candidate.id
+      LEFT JOIN companies c ON c.id = j.company_id
+      WHERE a.id = ? AND j.company_id = ?
+      LIMIT 1
+    `,
+    [application_id, companyId],
+  );
+  const application = applicationRows[0];
+  if (!application) {
+    throw new Error("application_id must be in interview stage and belong to your company");
+  }
+  if (String(application.status || "").trim().toLowerCase() !== "interview") {
+    throw new Error("application_id must be in interview stage and belong to your company");
+  }
+
+  const [pendingInterviewRows] = await db.promise().query(
+    `SELECT id FROM interviews WHERE application_id = ? AND status = 'scheduled' LIMIT 1`,
+    [application_id],
+  );
+  if (pendingInterviewRows.length) {
+    throw new Error("A scheduled interview already exists for this application");
+  }
+
+  let resolvedMeetingLink = normalizedMeetingLink;
+  if (!resolvedMeetingLink) {
+    try {
+      const generatedMeeting = await createInterviewGoogleMeet({
+        organizerEmail: String(actor?.email || "").trim(),
+        candidateEmail: String(application.candidate_email || "").trim(),
+        interviewerEmail: String(interviewerRows[0].email || "").trim(),
+        scheduledAt: String(scheduled_at).trim(),
+        durationMinutes: normalizedDuration || 60,
+        jobTitle: String(application.job_title || "").trim(),
+        companyName: String(application.company_name || "").trim(),
+        applicationId: application_id,
+        notes: String(notes || "").trim(),
+      });
+      resolvedMeetingLink = generatedMeeting.meetingLink;
+    } catch (error) {
+      throw new Error(`Failed to auto-generate interview link: ${error.message || "Google Calendar error"}`);
+    }
   }
 
   const [result] = await db.promise().query(
@@ -541,12 +639,20 @@ exports.scheduleInterview = async (payload, companyId) => {
       SELECT a.id, ?, ?, ?, ?, 'scheduled', ?, NOW(), NOW()
       FROM applications a
       JOIN job_requisitions j ON a.job_id = j.id
-      WHERE a.id = ? AND j.company_id = ?
+      WHERE a.id = ? AND j.company_id = ? AND a.status = 'interview'
     `,
-    [interviewer_id, scheduled_at, duration_minutes || null, meeting_link || null, notes || null, application_id, companyId],
+    [
+      interviewer_id,
+      String(scheduled_at).trim(),
+      normalizedDuration,
+      resolvedMeetingLink || null,
+      notes || null,
+      application_id,
+      companyId,
+    ],
   );
   if (!result.affectedRows) {
-    throw new Error("application_id is not part of your company");
+    throw new Error("application_id must be in interview stage and belong to your company");
   }
   await sendInterviewAssignedEmail({ interviewId: result.insertId, companyId });
   await sendCandidateInterviewInvitationEmail({ interviewId: result.insertId, companyId });

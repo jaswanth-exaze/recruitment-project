@@ -508,7 +508,7 @@ exports.finalDecision = async (id, status, companyId) => {
   if (!["selected", "rejected"].includes(status)) throw new Error("status must be selected or rejected");
   if (!companyId) throw new Error("company_id is required");
   const [result] = await db.promise().query(
-    `UPDATE applications a JOIN job_requisitions j ON a.job_id = j.id SET a.status = ?, a.final_decision_at = NOW(), a.updated_at = NOW() WHERE a.id = ? AND j.company_id = ?`,
+    `UPDATE applications a JOIN job_requisitions j ON a.job_id = j.id SET a.status = ?, a.final_decision_at = NOW(), a.updated_at = NOW() WHERE a.id = ? AND j.company_id = ? AND a.status = 'interview score submited'`,
     [status, id, companyId],
   );
   if (result.affectedRows) {
@@ -588,13 +588,15 @@ exports.createOfferDraft = async (payload, companyId) => {
         JOIN companies c ON j.company_id = c.id
         JOIN users candidate ON a.candidate_id = candidate.id
         LEFT JOIN users creator ON creator.id = ? AND creator.company_id = j.company_id
-        WHERE a.id = ? AND j.company_id = ?
+        WHERE a.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')
         LIMIT 1
       `,
       [created_by, application_id, companyId],
     );
     const context = contextRows[0];
-    if (!context) throw new Error("Application not found for your company");
+    if (!context) {
+      throw new Error("Only interview score submitted/selected applications from your company can receive offers");
+    }
 
     const [insertResult] = await connection.query(
       `
@@ -602,11 +604,13 @@ exports.createOfferDraft = async (payload, companyId) => {
         SELECT a.id, ?, 'draft', ?, NOW(), NOW()
         FROM applications a
         JOIN job_requisitions j ON a.job_id = j.id
-        WHERE a.id = ? AND j.company_id = ?
+        WHERE a.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')
       `,
       [created_by, offerDetails === null ? null : JSON.stringify(offerDetails), application_id, companyId],
     );
-    if (!insertResult.affectedRows) throw new Error("Application not found for your company");
+    if (!insertResult.affectedRows) {
+      throw new Error("Only interview score submitted/selected applications from your company can receive offers");
+    }
 
     const offerId = insertResult.insertId;
     const { absolutePath, relativePath } = await generateOfferLetterPdf({
@@ -663,7 +667,7 @@ exports.sendOffer = async (id, payload, companyId) => {
      FROM offers o
      JOIN applications a ON o.application_id = a.id
      JOIN job_requisitions j ON a.job_id = j.id
-     WHERE o.id = ? AND j.company_id = ?
+     WHERE o.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')
      LIMIT 1`,
     [id, companyId],
   );
@@ -687,7 +691,7 @@ exports.sendOffer = async (id, payload, companyId) => {
        o.updated_at = NOW(),
        a.status = 'offer_letter_sent',
        a.updated_at = NOW()
-     WHERE o.id = ? AND j.company_id = ?`,
+     WHERE o.id = ? AND j.company_id = ? AND a.status IN ('interview score submited', 'selected')`,
     [finalDocumentUrl, finalEsignLink, id, companyId],
   );
 

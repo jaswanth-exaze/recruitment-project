@@ -2287,19 +2287,25 @@ async function submitCreateOffer(event) {
       offer_details: offerDetails
     });
     const offerRecord = result?.data && typeof result.data === "object" ? result.data : result;
+    const createdOfferId = firstValue(offerRecord, ["id", "offer_id", "offerId"], "");
+    const createdDocumentUrl = firstValue(offerRecord, ["document_url", "documentUrl"], "");
+    const createdEsignLink = firstValue(offerRecord, ["esign_link", "esignLink", "e_sign_url"], "");
 
     ui.offerCreateForm.reset();
     setMessage(ui.offerCreateMsg, result?.message || "Offer draft created.", "success");
 
     const draftSnapshot = {
-      id: firstValue(offerRecord, ["id", "offer_id"], ""),
+      id: createdOfferId,
       application_id: applicationId,
-      document_url: firstValue(offerRecord, ["document_url"], ""),
-      esign_link: firstValue(offerRecord, ["esign_link"], ""),
+      document_url: createdDocumentUrl,
+      esign_link: createdEsignLink,
       created_at: new Date().toISOString(),
     };
     storeLastCreatedOfferDraft(draftSnapshot);
     applyOfferDraftToSendForm(draftSnapshot, true);
+    if (ui.offerSendId && createdOfferId) ui.offerSendId.value = createdOfferId;
+    if (ui.offerSendDoc && createdDocumentUrl) ui.offerSendDoc.value = createdDocumentUrl;
+    if (ui.offerSendEsign && createdEsignLink) ui.offerSendEsign.value = createdEsignLink;
 
     showSection("offers");
     await loadOfferEligibleApplications();
@@ -2589,6 +2595,13 @@ function bindActions() {
       },
       true,
     );
+  }
+  if (ui.offerCreateBtn) {
+    ui.offerCreateBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      submitCreateOffer(event);
+    });
   }
   if (ui.offerEligibleLoadBtn) ui.offerEligibleLoadBtn.addEventListener("click", loadOfferEligibleApplications);
   if (ui.offerSendForm) {

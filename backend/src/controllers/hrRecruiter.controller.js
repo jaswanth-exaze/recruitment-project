@@ -179,7 +179,7 @@ exports.recommendOffer = async (req, res) => {
 
 exports.scheduleInterview = async (req, res) => {
   try {
-    return res.status(201).json(await service.scheduleInterview(req.body, req.user.company_id));
+    return res.status(201).json(await service.scheduleInterview(req.body, req.user.company_id, req.user));
   } catch (err) {
     return handleError(res, err);
   }

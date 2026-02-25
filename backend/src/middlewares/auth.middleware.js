@@ -8,6 +8,9 @@ async function resolveAuthorizedUser(userId) {
         u.id,
         u.role,
         u.company_id,
+        u.email,
+        u.first_name,
+        u.last_name,
         u.is_active,
         c.is_active AS company_is_active
       FROM users u
@@ -26,6 +29,9 @@ async function resolveAuthorizedUser(userId) {
     user_id: user.id,
     role: user.role,
     company_id: user.company_id,
+    email: user.email,
+    first_name: user.first_name,
+    last_name: user.last_name,
   };
 }
 
